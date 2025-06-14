@@ -19,13 +19,29 @@ public class FolderWatcher : IDisposable
         _writer = writer;
         // 許可する拡張子を正規化
         _extensions = options.AllowedExtensions.Select(e => e.StartsWith(".") ? e : $".{e}").ToArray();
+
         _watcher = new FileSystemWatcher(options.Path)
         {
             IncludeSubdirectories = options.IncludeSubfolders,
-            EnableRaisingEvents = true
+            EnableRaisingEvents = false
         };
+
         _watcher.Created += OnCreated;
         _watcher.Renamed += OnCreated;
+
+        // 既存ファイルも転送キューへ追加
+        var searchOption = options.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+        foreach (var file in Directory.EnumerateFiles(options.Path, "*", searchOption))
+        {
+            if (_extensions.Length > 0 && !_extensions.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            _writer.TryWrite(new TransferItem(file, TransferAction.Upload));
+        }
+
+        // 監視を開始
+        _watcher.EnableRaisingEvents = true;
     }
 
     // ファイル作成/リネーム時に呼び出される
