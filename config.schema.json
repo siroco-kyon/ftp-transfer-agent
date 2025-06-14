@@ -61,7 +61,8 @@
       "type": "object",
       "properties": {
         "Level": {"type": "string"},
-        "RollingFilePath": {"type": "string"}
+        "RollingFilePath": {"type": "string"},
+        "MaxBytes": {"type": "integer"}
       }
     }
   }

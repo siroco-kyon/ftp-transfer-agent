@@ -1,0 +1,99 @@
+using System.Collections.Concurrent;
+using Microsoft.Extensions.Logging;
+using FtpTransferAgent.Configuration;
+
+namespace FtpTransferAgent.Logging;
+
+internal sealed class RollingFileLoggerProvider : ILoggerProvider
+{
+    private readonly LoggingOptions _options;
+    private readonly ConcurrentDictionary<string, RollingFileLogger> _loggers = new();
+
+    public RollingFileLoggerProvider(LoggingOptions options)
+    {
+        _options = options;
+        var dir = Path.GetDirectoryName(_options.RollingFilePath);
+        if (!string.IsNullOrEmpty(dir))
+        {
+            Directory.CreateDirectory(dir);
+        }
+    }
+
+    public ILogger CreateLogger(string categoryName)
+    {
+        return _loggers.GetOrAdd(categoryName, name => new RollingFileLogger(name, _options));
+    }
+
+    public void Dispose()
+    {
+    }
+}
+
+internal sealed class RollingFileLogger : ILogger
+{
+    private readonly string _category;
+    private readonly LoggingOptions _options;
+    private readonly object _lock = new();
+    private DateTime _currentDate = DateTime.UtcNow.Date;
+    private int _index;
+    private StreamWriter? _writer;
+
+    public RollingFileLogger(string category, LoggingOptions options)
+    {
+        _category = category;
+        _options = options;
+    }
+
+    private string GetPath()
+    {
+        var basePath = _options.RollingFilePath;
+        var dir = Path.GetDirectoryName(basePath) ?? string.Empty;
+        var name = Path.GetFileNameWithoutExtension(basePath);
+        var ext = Path.GetExtension(basePath);
+        var suffix = _index > 0 ? $"_{_index}" : string.Empty;
+        return Path.Combine(dir, $"{name}{_currentDate:yyyyMMdd}{suffix}{ext}");
+    }
+
+    private void EnsureWriter()
+    {
+        var now = DateTime.UtcNow.Date;
+        if (_writer == null)
+        {
+            _writer = new StreamWriter(new FileStream(GetPath(), FileMode.Append, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
+            _currentDate = now;
+            return;
+        }
+        if (now != _currentDate)
+        {
+            _writer.Dispose();
+            _index = 0;
+            _currentDate = now;
+            _writer = new StreamWriter(new FileStream(GetPath(), FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
+            return;
+        }
+        if (new FileInfo(GetPath()).Length >= _options.MaxBytes)
+        {
+            _writer.Dispose();
+            _index++;
+            _writer = new StreamWriter(new FileStream(GetPath(), FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
+        }
+    }
+
+    public IDisposable? BeginScope<TState>(TState state) => null;
+
+    public bool IsEnabled(LogLevel logLevel) => true;
+
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+    {
+        var message = formatter(state, exception);
+        lock (_lock)
+        {
+            EnsureWriter();
+            _writer!.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{logLevel}] {_category} {message}");
+            if (exception != null)
+            {
+                _writer.WriteLine(exception);
+            }
+        }
+    }
+}
