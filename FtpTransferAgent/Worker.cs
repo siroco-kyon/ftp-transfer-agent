@@ -32,13 +32,19 @@ public class Worker : BackgroundService
         _logger = logger;
     }
 
+    // テスト用にクライアント生成処理をオーバーライドできるようメソッド化
+    protected virtual IFileTransferClient CreateClient()
+    {
+        return _transfer.Mode.ToLower() == "sftp"
+            ? new SftpClientWrapper(_transfer, _services.GetRequiredService<ILogger<SftpClientWrapper>>())
+            : new AsyncFtpClientWrapper(_transfer, _services.GetRequiredService<ILogger<AsyncFtpClientWrapper>>());
+    }
+
     // バックグラウンド処理の本体
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         // 設定に応じて FTP または SFTP クライアントを生成
-        using IFileTransferClient client = _transfer.Mode.ToLower() == "sftp"
-            ? new SftpClientWrapper(_transfer, _services.GetRequiredService<ILogger<SftpClientWrapper>>())
-            : new AsyncFtpClientWrapper(_transfer, _services.GetRequiredService<ILogger<AsyncFtpClientWrapper>>());
+        using IFileTransferClient client = CreateClient();
 
         // 再試行付きの転送キューを開始
         var queueLogger = _services.GetRequiredService<ILogger<TransferQueue>>();
