@@ -19,6 +19,7 @@ builder.Services.AddOptions<LoggingOptions>().BindConfiguration("Logging").Valid
 
 // ログ出力の設定を読み込み
 var logging = builder.Configuration.GetSection("Logging").Get<LoggingOptions>() ?? new LoggingOptions();
+var smtp = builder.Configuration.GetSection("Smtp").Get<SmtpOptions>() ?? new SmtpOptions();
 builder.Logging.ClearProviders();
 builder.Logging.SetMinimumLevel(Enum.Parse<LogLevel>(logging.Level, true));
 builder.Logging.AddSimpleConsole(o => o.TimestampFormat = "yyyy-MM-dd HH:mm:ss ");
@@ -26,6 +27,10 @@ if (!string.IsNullOrEmpty(logging.RollingFilePath))
 {
     // ログをファイルにも出力する
     builder.Logging.AddProvider(new RollingFileLoggerProvider(logging));
+}
+if (smtp.Enabled)
+{
+    builder.Logging.AddProvider(new ErrorEmailLoggerProvider(smtp));
 }
 
 // バックグラウンド処理を行う Worker を登録

@@ -50,6 +50,7 @@
     "Smtp": {
       "type": "object",
       "properties": {
+        "Enabled": {"type": "boolean"},
         "RelayHost": {"type": "string"},
         "RelayPort": {"type": "integer"},
         "UseTls": {"type": "boolean"},
