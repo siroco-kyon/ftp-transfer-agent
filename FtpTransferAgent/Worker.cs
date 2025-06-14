@@ -16,7 +16,6 @@ public class Worker : BackgroundService
     private readonly HashOptions _hash;
     private readonly CleanupOptions _cleanup;
     private readonly IServiceProvider _services;
-    private FolderWatcher? _watcher;
 
     // 転送処理用のチャンネル
     private readonly Channel<TransferItem> _channel = Channel.CreateUnbounded<TransferItem>();
@@ -87,10 +86,19 @@ public class Worker : BackgroundService
             }
         }, stoppingToken);
 
-        // アップロード処理が有効な場合はフォルダ監視を開始
+        // アップロード処理が有効な場合は指定フォルダ内のファイルを列挙
         if (_transfer.Direction is "put" or "both")
         {
-            _watcher = new FolderWatcher(_watch, _channel.Writer);
+            var exts = _watch.AllowedExtensions.Select(e => e.StartsWith(".") ? e : $".{e}").ToArray();
+            var option = _watch.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+            foreach (var file in Directory.EnumerateFiles(_watch.Path, "*", option))
+            {
+                if (exts.Length > 0 && !exts.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                _channel.Writer.TryWrite(new TransferItem(file, TransferAction.Upload));
+            }
         }
 
         // ダウンロード処理が有効な場合はリモート一覧を取得
@@ -103,14 +111,14 @@ public class Worker : BackgroundService
             }
         }
 
-        // キューの完了を待機
+        // 書き込みを完了してすべての転送が終わるのを待機
+        _channel.Writer.Complete();
         await queueTask;
     }
 
     public override void Dispose()
     {
-        // フォルダ監視の後始末
-        _watcher?.Dispose();
+        // 後始末
         base.Dispose();
     }
 }
