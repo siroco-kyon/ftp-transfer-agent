@@ -25,4 +25,11 @@ public class TransferOptions
 
     [Required]
     public string RemotePath { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 並列転送数。1 以上を指定します。
+    /// 既定値は 1 (逐次転送)。
+    /// </summary>
+    [Range(1, 16)]
+    public int Concurrency { get; set; } = 1;
 }

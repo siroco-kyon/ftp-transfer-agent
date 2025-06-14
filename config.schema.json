@@ -20,7 +20,8 @@
         "Port": {"type": "integer"},
         "Username": {"type": "string"},
         "Password": {"type": "string"},
-        "RemotePath": {"type": "string"}
+        "RemotePath": {"type": "string"},
+        "Concurrency": {"type": "integer", "minimum": 1}
       },
       "required": ["Mode", "Direction", "Host", "Username", "Password", "RemotePath"]
     },

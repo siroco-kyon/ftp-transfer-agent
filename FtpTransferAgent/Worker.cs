@@ -37,7 +37,7 @@ public class Worker : BackgroundService
             : new AsyncFtpClientWrapper(_transfer, _services.GetRequiredService<ILogger<AsyncFtpClientWrapper>>());
 
         var queueLogger = _services.GetRequiredService<ILogger<TransferQueue>>();
-        var queue = new TransferQueue(_channel, _retry, queueLogger);
+        var queue = new TransferQueue(_channel, _retry, queueLogger, _transfer.Concurrency);
         var queueTask = queue.StartAsync(async (item, token) =>
         {
             var id = Guid.NewGuid();
