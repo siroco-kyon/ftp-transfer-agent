@@ -75,6 +75,16 @@ $ dotnet build --configuration Release
 $ dotnet run --project FtpTransferAgent
 ```
 
+## テスト
+
+統合テストでは Python 製の FTP サーバーを利用するため、事前に `pyftpdlib` をインストールしておきます。
+
+```bash
+$ pip install pyftpdlib
+$ dotnet build
+$ dotnet test --no-build --verbosity normal
+```
+
 ## ライセンス
 
 このプロジェクトは MIT ライセンスの下で公開されています。
