@@ -17,9 +17,16 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     private readonly SftpClient _client;
     private readonly ILogger<SftpClientWrapper> _logger;
 
-    public SftpClientWrapper(TransferOptions options, ILogger<SftpClientWrapper> logger)
+    // テスト用に既存の SftpClient を渡せるようにする
+    public SftpClientWrapper(TransferOptions options, ILogger<SftpClientWrapper> logger, SftpClient? client = null)
     {
         _logger = logger;
+
+        if (client != null)
+        {
+            _client = client;
+            return;
+        }
 
         if (!string.IsNullOrEmpty(options.PrivateKeyPath))
         {
