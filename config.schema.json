@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "Watch": {
+      "type": "object",
+      "properties": {
+        "Path": {"type": "string"},
+        "IncludeSubfolders": {"type": "boolean"},
+        "AllowedExtensions": {"type": "array", "items": {"type": "string"}}
+      },
+      "required": ["Path"]
+    },
+    "Transfer": {
+      "type": "object",
+      "properties": {
+        "Mode": {"enum": ["ftp", "sftp"]},
+        "Direction": {"enum": ["get", "put", "both"]},
+        "Host": {"type": "string"},
+        "Port": {"type": "integer"},
+        "Username": {"type": "string"},
+        "Password": {"type": "string"},
+        "RemotePath": {"type": "string"}
+      },
+      "required": ["Mode", "Direction", "Host", "Username", "Password", "RemotePath"]
+    },
+    "Retry": {
+      "type": "object",
+      "properties": {
+        "MaxAttempts": {"type": "integer"},
+        "DelaySeconds": {"type": "integer"}
+      }
+    },
+    "Hash": {
+      "type": "object",
+      "properties": {
+        "Algorithm": {"enum": ["MD5", "SHA256"]}
+      },
+      "required": ["Algorithm"]
+    },
+    "Cleanup": {
+      "type": "object",
+      "properties": {
+        "DeleteAfterVerify": {"type": "boolean"}
+      }
+    },
+    "Smtp": {
+      "type": "object",
+      "properties": {
+        "RelayHost": {"type": "string"},
+        "RelayPort": {"type": "integer"},
+        "UseTls": {"type": "boolean"},
+        "Username": {"type": "string"},
+        "Password": {"type": "string"},
+        "From": {"type": "string"},
+        "To": {"type": "array", "items": {"type": "string"}}
+      },
+      "required": ["To"]
+    },
+    "Logging": {
+      "type": "object",
+      "properties": {
+        "Level": {"type": "string"},
+        "RollingFilePath": {"type": "string"}
+      }
+    }
+  }
+}
