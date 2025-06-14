@@ -24,7 +24,28 @@
 
 `appsettings.json` では次のように設定を記述します（一部抜粋）。
 ```json
-{"Watch": {"Path": "./watch", "IncludeSubfolders": false, "AllowedExtensions": [".txt"]}, "Transfer": {"Mode": "ftp", "Direction": "both", "Host": "localhost", "Port": 21, "Username": "user", "Password": "pass", "RemotePath": "/remote", "Concurrency": 2}}
+{
+  "Watch": {
+    "Path": "./watch",
+    "IncludeSubfolders": false,
+    "AllowedExtensions": [".txt"]
+  },
+  "Transfer": {
+    "Mode": "sftp",
+    "Direction": "both",
+    "Host": "localhost",
+    "Port": 22,
+    "Username": "user",
+    "PrivateKeyPath": "./id_ed25519",
+    "RemotePath": "/remote",
+    "Concurrency": 2
+  }
+}
+```
+`PrivateKeyPath` には SFTP 接続に使用する秘密鍵ファイルを指定します。鍵はアプリケーションから読み取り可能な場所に保存してください。鍵の生成例は以下の通りです。
+```bash
+$ ssh-keygen -t ed25519 -f id_ed25519
+$ ssh-copy-id -i id_ed25519.pub user@host
 ```
 `Transfer.Concurrency` を増やすと同時に処理する転送数を変更できます。詳細は同ファイルおよび `config.schema.json` を参照してください。
 

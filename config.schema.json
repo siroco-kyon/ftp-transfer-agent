@@ -20,10 +20,12 @@
         "Port": {"type": "integer"},
         "Username": {"type": "string"},
         "Password": {"type": "string"},
+        "PrivateKeyPath": {"type": "string"},
+        "PrivateKeyPassphrase": {"type": "string"},
         "RemotePath": {"type": "string"},
         "Concurrency": {"type": "integer", "minimum": 1}
       },
-      "required": ["Mode", "Direction", "Host", "Username", "Password", "RemotePath"]
+      "required": ["Mode", "Direction", "Host", "Username", "RemotePath"]
     },
     "Retry": {
       "type": "object",

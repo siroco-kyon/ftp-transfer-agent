@@ -20,7 +20,26 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     public SftpClientWrapper(TransferOptions options, ILogger<SftpClientWrapper> logger)
     {
         _logger = logger;
-        _client = new SftpClient(options.Host, options.Port, options.Username, options.Password);
+
+        if (!string.IsNullOrEmpty(options.PrivateKeyPath))
+        {
+            var methods = new List<AuthenticationMethod>();
+            if (!string.IsNullOrEmpty(options.Password))
+            {
+                methods.Add(new PasswordAuthenticationMethod(options.Username, options.Password));
+            }
+            var keyFile = string.IsNullOrEmpty(options.PrivateKeyPassphrase)
+                ? new PrivateKeyFile(options.PrivateKeyPath)
+                : new PrivateKeyFile(options.PrivateKeyPath, options.PrivateKeyPassphrase);
+            methods.Add(new PrivateKeyAuthenticationMethod(options.Username, keyFile));
+
+            var conn = new ConnectionInfo(options.Host, options.Port, options.Username, methods.ToArray());
+            _client = new SftpClient(conn);
+        }
+        else
+        {
+            _client = new SftpClient(options.Host, options.Port, options.Username, options.Password);
+        }
     }
 
     // 接続されていなければ接続を確立
