@@ -45,7 +45,8 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         }
         else
         {
-            _client = new SftpClient(options.Host, options.Port, options.Username, options.Password);
+            var password = options.Password ?? throw new ArgumentNullException(nameof(options.Password));
+            _client = new SftpClient(options.Host, options.Port, options.Username, password);
         }
     }
 
