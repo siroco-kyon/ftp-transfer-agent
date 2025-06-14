@@ -12,6 +12,8 @@ jobs:
       - uses: actions/setup-dotnet@v3
         with:
           dotnet-version: '8.0.x'
+      - name: Install test dependencies
+        run: python -m pip install pyftpdlib
       - name: Restore
         run: dotnet restore
       - name: Format
@@ -19,4 +21,4 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
       - name: Test
-        run: dotnet test --no-build --verbosity normal
+        run: dotnet test FtpTransferAgent.Tests/FtpTransferAgent.Tests.csproj --no-build --configuration Release --verbosity normal

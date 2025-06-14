@@ -38,7 +38,7 @@ internal sealed class ErrorEmailLogger : ILogger
         _options = options;
     }
 
-    public IDisposable? BeginScope<TState>(TState state) => null;
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
     public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Error;
 
