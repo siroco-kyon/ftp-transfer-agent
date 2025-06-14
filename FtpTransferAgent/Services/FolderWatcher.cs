@@ -30,7 +30,7 @@ public class FolderWatcher : IDisposable
         {
             return;
         }
-        _writer.TryWrite(new TransferItem(e.FullPath));
+        _writer.TryWrite(new TransferItem(e.FullPath, TransferAction.Upload));
     }
 
     public void Dispose()

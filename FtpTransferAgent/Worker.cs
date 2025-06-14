@@ -41,29 +41,57 @@ public class Worker : BackgroundService
         var queueTask = queue.StartAsync(async (item, token) =>
         {
             var id = Guid.NewGuid();
-            var remotePath = Path.Combine(_transfer.RemotePath, Path.GetFileName(item.Path)).Replace('\\', '/');
-            _logger.LogInformation("[{Id}] Uploading {File} to {Remote}", id, item.Path, remotePath);
-            await client.UploadAsync(item.Path, remotePath, token);
-            var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token);
-            var localHash = await HashUtil.ComputeHashAsync(item.Path, _hash.Algorithm, token);
-            if (string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
+            if (item.Action == TransferAction.Upload)
             {
-                _logger.LogInformation("[{Id}] Verified hash for {File}", id, item.Path);
-                if (_cleanup.DeleteAfterVerify)
+                var remotePath = Path.Combine(_transfer.RemotePath, Path.GetFileName(item.Path)).Replace('\\', '/');
+                _logger.LogInformation("[{Id}] Uploading {File} to {Remote}", id, item.Path, remotePath);
+                await client.UploadAsync(item.Path, remotePath, token);
+                var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token);
+                var localHash = await HashUtil.ComputeHashAsync(item.Path, _hash.Algorithm, token);
+                if (string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
                 {
-                    File.Delete(item.Path);
-                    _logger.LogInformation("[{Id}] Deleted {File}", id, item.Path);
+                    _logger.LogInformation("[{Id}] Verified hash for {File}", id, item.Path);
+                    if (_cleanup.DeleteAfterVerify)
+                    {
+                        File.Delete(item.Path);
+                        _logger.LogInformation("[{Id}] Deleted {File}", id, item.Path);
+                    }
+                }
+                else
+                {
+                    _logger.LogError("[{Id}] Hash mismatch for {File}", id, item.Path);
                 }
             }
             else
             {
-                _logger.LogError("[{Id}] Hash mismatch for {File}", id, item.Path);
+                var localPath = Path.Combine(_watch.Path, Path.GetFileName(item.Path));
+                _logger.LogInformation("[{Id}] Downloading {Remote} to {Local}", id, item.Path, localPath);
+                await client.DownloadAsync(item.Path, localPath, token);
+                var remoteHash = await client.GetRemoteHashAsync(item.Path, _hash.Algorithm, token);
+                var localHash = await HashUtil.ComputeHashAsync(localPath, _hash.Algorithm, token);
+                if (string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    _logger.LogInformation("[{Id}] Verified hash for {File}", id, item.Path);
+                }
+                else
+                {
+                    _logger.LogError("[{Id}] Hash mismatch for {File}", id, item.Path);
+                }
             }
         }, stoppingToken);
 
         if (_transfer.Direction is "put" or "both")
         {
             _watcher = new FolderWatcher(_watch, _channel.Writer);
+        }
+
+        if (_transfer.Direction is "get" or "both")
+        {
+            var files = await client.ListFilesAsync(_transfer.RemotePath, stoppingToken);
+            foreach (var f in files)
+            {
+                _channel.Writer.TryWrite(new TransferItem(f, TransferAction.Download));
+            }
         }
 
         await queueTask;

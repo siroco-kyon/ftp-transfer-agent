@@ -2,14 +2,14 @@
 
 ## 概要
 
-`FtpTransferAgent` は .NET 8 で実装されたバックグラウンドサービスで、指定したフォルダを監視し、FTP もしくは SFTP 経由でファイルを転送するためのツールです。転送後はハッシュ値を検証し、必要に応じてローカルファイルの削除も行います。アプリケーションの各種挙動は `appsettings.json` によって設定できます。
+`FtpTransferAgent` は .NET 8 で実装されたバックグラウンドサービスで、指定したフォルダを監視し、FTP もしくは SFTP 経由でファイルを転送するツールです。アップロードだけでなくダウンロードにも対応しており、転送後はハッシュ値を検証し、必要に応じてローカルファイルの削除も行います。アプリケーションの各種挙動は `appsettings.json` によって設定できます。
 
 ## 主な構成ファイル
 
 - **Program.cs** - アプリケーションのエントリーポイント。各種設定クラスを DI コンテナに登録し、`Worker` サービスを起動します。
 - **Worker.cs** - 実際の処理を行うバックグラウンドサービス。以下の流れで動作します。
   1. `IFileTransferClient`（FTP または SFTP のラッパークラス）を生成
-  2. `TransferQueue` を開始し、キュー内のファイルをアップロード
+  2. `TransferQueue` を開始し、キュー内のファイルをアップロードまたはダウンロード
   3. `FolderWatcher` で指定フォルダを監視し、新規ファイルをキューに追加
   4. 転送後にハッシュ値を比較し、一致すれば `CleanupOptions` に従い削除
 - **Services/**
@@ -24,7 +24,7 @@
 
 `appsettings.json` では次のように設定を記述します（一部抜粋）。
 ```json
-{"Watch": {"Path": "./watch", "IncludeSubfolders": false, "AllowedExtensions": [".txt"]}, "Transfer": {"Mode": "ftp", "Direction": "put", "Host": "localhost", "Port": 21, "Username": "user", "Password": "pass", "RemotePath": "/remote"}}
+{"Watch": {"Path": "./watch", "IncludeSubfolders": false, "AllowedExtensions": [".txt"]}, "Transfer": {"Mode": "ftp", "Direction": "both", "Host": "localhost", "Port": 21, "Username": "user", "Password": "pass", "RemotePath": "/remote"}}
 ```
 詳細は同ファイルおよび `config.schema.json` を参照してください。
 
