@@ -5,6 +5,8 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FtpTransferAgent", "FtpTransferAgent\FtpTransferAgent.csproj", "{E3D2A83F-52ED-4339-9F1C-279DCD1A7DDE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FtpTransferAgent.Tests", "FtpTransferAgent.Tests\FtpTransferAgent.Tests.csproj", "{AE297360-C081-4F41-ABDB-2697334B7C26}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{E3D2A83F-52ED-4339-9F1C-279DCD1A7DDE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{E3D2A83F-52ED-4339-9F1C-279DCD1A7DDE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{E3D2A83F-52ED-4339-9F1C-279DCD1A7DDE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{AE297360-C081-4F41-ABDB-2697334B7C26}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{AE297360-C081-4F41-ABDB-2697334B7C26}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{AE297360-C081-4F41-ABDB-2697334B7C26}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{AE297360-C081-4F41-ABDB-2697334B7C26}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
