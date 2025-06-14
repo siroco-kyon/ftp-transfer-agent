@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FtpTransferAgent.Configuration;
 
+/// <summary>
+/// 再試行に関する設定
+/// </summary>
 public class RetryOptions
 {
     [Range(0, int.MaxValue)]

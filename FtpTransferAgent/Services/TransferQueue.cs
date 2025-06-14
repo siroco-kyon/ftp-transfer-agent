@@ -7,6 +7,9 @@ using Polly.Retry;
 
 namespace FtpTransferAgent.Services;
 
+/// <summary>
+/// 非同期に転送処理を行うためのキュー
+/// </summary>
 public class TransferQueue
 {
     private readonly ChannelReader<TransferItem> _reader;
@@ -19,6 +22,7 @@ public class TransferQueue
         _reader = channel.Reader;
         _logger = logger;
         _concurrency = Math.Max(1, concurrency);
+        // 例外発生時にリトライするポリシー
         _policy = Policy
             .Handle<Exception>()
             .WaitAndRetryAsync(options.MaxAttempts,
@@ -26,8 +30,10 @@ public class TransferQueue
                 (ex, ts, attempt, ctx) => _logger.LogWarning(ex, "Retry {Attempt}", attempt));
     }
 
+    // キューの読み取りを開始する
     public Task StartAsync(Func<TransferItem, CancellationToken, Task> handler, CancellationToken ct)
     {
+        // 指定された並列数だけワーカーを起動
         var tasks = new Task[_concurrency];
         for (int i = 0; i < _concurrency; i++)
         {
@@ -35,6 +41,7 @@ public class TransferQueue
         }
         return Task.WhenAll(tasks);
 
+        // キューからアイテムを読み取りハンドラーを実行
         async Task Worker(CancellationToken token)
         {
             while (await _reader.WaitToReadAsync(token))

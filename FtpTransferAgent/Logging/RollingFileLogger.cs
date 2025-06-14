@@ -4,6 +4,9 @@ using FtpTransferAgent.Configuration;
 
 namespace FtpTransferAgent.Logging;
 
+/// <summary>
+/// 日付とサイズでローテーションするファイルロガーのプロバイダー
+/// </summary>
 internal sealed class RollingFileLoggerProvider : ILoggerProvider
 {
     private readonly LoggingOptions _options;
@@ -29,6 +32,9 @@ internal sealed class RollingFileLoggerProvider : ILoggerProvider
     }
 }
 
+/// <summary>
+/// 1 日ごと、かつ指定サイズでファイルをローテーションするロガー
+/// </summary>
 internal sealed class RollingFileLogger : ILogger
 {
     private readonly string _category;
@@ -44,6 +50,7 @@ internal sealed class RollingFileLogger : ILogger
         _options = options;
     }
 
+    // 現在のログファイルパスを取得
     private string GetPath()
     {
         var basePath = _options.RollingFilePath;
@@ -54,6 +61,7 @@ internal sealed class RollingFileLogger : ILogger
         return Path.Combine(dir, $"{name}{_currentDate:yyyyMMdd}{suffix}{ext}");
     }
 
+    // ログファイルのローテーションを管理
     private void EnsureWriter()
     {
         var now = DateTime.UtcNow.Date;

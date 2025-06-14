@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FtpTransferAgent.Configuration;
 
+/// <summary>
+/// フォルダ監視に関する設定
+/// </summary>
 public class WatchOptions
 {
     [Required]

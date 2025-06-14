@@ -1,5 +1,8 @@
 namespace FtpTransferAgent.Configuration;
 
+/// <summary>
+/// ログ出力に関する設定
+/// </summary>
 public class LoggingOptions
 {
     public string Level { get; set; } = "Information";

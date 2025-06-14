@@ -9,6 +9,9 @@ using Renci.SshNet.Sftp;
 
 namespace FtpTransferAgent.Services;
 
+/// <summary>
+/// SSH.NET を利用した SFTP クライアントのラッパー
+/// </summary>
 public class SftpClientWrapper : IFileTransferClient, IDisposable
 {
     private readonly SftpClient _client;
@@ -20,6 +23,7 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         _client = new SftpClient(options.Host, options.Port, options.Username, options.Password);
     }
 
+    // 接続されていなければ接続を確立
     private void EnsureConnected()
     {
         if (!_client.IsConnected)
@@ -28,6 +32,7 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         }
     }
 
+    // ファイルを一時名でアップロードしてからリネーム
     public Task UploadAsync(string localPath, string remotePath, CancellationToken ct)
     {
         EnsureConnected();
@@ -38,6 +43,7 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         return Task.CompletedTask;
     }
 
+    // ダウンロードも一時ファイル経由で行う
     public Task DownloadAsync(string remotePath, string localPath, CancellationToken ct)
     {
         EnsureConnected();
@@ -49,6 +55,7 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         return Task.CompletedTask;
     }
 
+    // リモートファイルのハッシュ値を取得
     public Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct)
     {
         EnsureConnected();
@@ -60,6 +67,7 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         return Task.FromResult(BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant());
     }
 
+    // 指定ディレクトリのファイル一覧を取得
     public Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct)
     {
         EnsureConnected();

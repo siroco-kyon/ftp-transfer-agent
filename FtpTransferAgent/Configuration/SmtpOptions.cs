@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FtpTransferAgent.Configuration;
 
+/// <summary>
+/// SMTP 通知に関する設定
+/// </summary>
 public class SmtpOptions
 {
     public string RelayHost { get; set; } = string.Empty;
