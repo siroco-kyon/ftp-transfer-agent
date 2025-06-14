@@ -96,6 +96,13 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         return Task.FromResult((IEnumerable<string>)files.ToArray());
     }
 
+    public Task DeleteAsync(string remotePath, CancellationToken ct)
+    {
+        EnsureConnected();
+        _client.DeleteFile(remotePath);
+        return Task.CompletedTask;
+    }
+
     public void Dispose()
     {
         _client.Dispose();

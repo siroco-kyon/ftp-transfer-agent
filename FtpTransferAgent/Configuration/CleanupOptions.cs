@@ -6,4 +6,5 @@ namespace FtpTransferAgent.Configuration;
 public class CleanupOptions
 {
     public bool DeleteAfterVerify { get; set; }
+    public bool DeleteRemoteAfterDownload { get; set; }
 }
