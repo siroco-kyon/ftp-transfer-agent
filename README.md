@@ -10,11 +10,11 @@
 - **Worker.cs** - 実際の処理を行うバックグラウンドサービス。以下の流れで動作します。
   1. `IFileTransferClient`（FTP または SFTP のラッパークラス）を生成
   2. `TransferQueue` を開始し、キュー内のファイルをアップロードまたはダウンロード
-  3. `FolderWatcher` で指定フォルダを監視し、新規ファイルをキューに追加
+  3. `FolderWatcher` で指定フォルダを監視し、既存ファイルと新規ファイルをキューに追加
   4. 転送後にハッシュ値を比較し、一致すれば `CleanupOptions` に従い削除
 - **Services/**
   - `AsyncFtpClientWrapper`・`SftpClientWrapper` - それぞれ FTP/SFTP 用のクライアントを実装。アップロード・ダウンロード処理とハッシュ取得機能を提供します。
-  - `FolderWatcher` - `FileSystemWatcher` を利用しフォルダの変化を監視します。対象拡張子のフィルタリングも行います。
+  - `FolderWatcher` - `FileSystemWatcher` を利用しフォルダの変化を監視します。対象拡張子のフィルタリングを行い、起動時には既存ファイルもキューへ登録します。
   - `TransferQueue` - `Channel` と `Polly` を使った再試行付きの処理キューです。並列転送数を指定できます。
   - `HashUtil` - ファイルの MD5/SHA256 ハッシュを計算するユーティリティ。
 - **Configuration/** - 各種設定項目を表すクラス群。`appsettings.json` からバインドされます。
