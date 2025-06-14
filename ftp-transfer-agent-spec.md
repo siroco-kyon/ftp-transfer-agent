@@ -191,7 +191,9 @@ FTP/SFTP サーバーへの接続情報と転送設定です。
 | Host | string | ✓ | サーバーのホスト名/IPアドレス | なし | - |
 | Port | integer | - | ポート番号 | 21 | - |
 | Username | string | ✓ | ログインユーザー名 | なし | - |
-| Password | string | ✓ | ログインパスワード | なし | - |
+| Password | string | - | ログインパスワード | なし | - |
+| PrivateKeyPath | string | - | SFTP 鍵認証で使用する秘密鍵パス | なし | - |
+| PrivateKeyPassphrase | string | - | 鍵パスフレーズ | なし | - |
 | RemotePath | string | ✓ | リモートの転送先パス | なし | - |
 | Concurrency | integer | - | 同時転送数 | 1 | 1～16 |
 
@@ -221,11 +223,17 @@ FTP/SFTP サーバーへの接続情報と転送設定です。
   "Host": "sftp.company.com",
   "Port": 22,
   "Username": "sftpuser",
-  "Password": "ssh_password",
+  "PrivateKeyPath": "./id_ed25519",
   "RemotePath": "/home/sftpuser/data",
-  "Concurrency": 4
+"Concurrency": 4
 }
 ```
+鍵認証を使用する場合は上記のように `PrivateKeyPath` を設定します。鍵は次のコマンドで生成できます。
+```bash
+$ ssh-keygen -t ed25519 -f id_ed25519
+$ ssh-copy-id -i id_ed25519.pub sftpuser@sftp.company.com
+```
+生成した秘密鍵をアプリケーションの実行ユーザーから読み取れる場所へ配置してください。
 
 #### 4.2.3 Retry（再試行設定）
 
@@ -620,6 +628,7 @@ export DOTNET_ENVIRONMENT=Development
 - 設定ファイルにパスワードを平文で保存することは推奨されません
 - 環境変数や秘密管理ツールの使用を検討してください
 - .NET User Secrets（開発環境）の活用も可能
+- 鍵認証を使用する場合は `PrivateKeyPath` に鍵ファイルを指定します。ファイル権限は 600 など最小限にしてください
 
 ### 7.2 ファイル権限
 - 設定ファイルは適切な権限で保護してください
