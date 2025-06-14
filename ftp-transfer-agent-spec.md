@@ -6,7 +6,7 @@ FtpTransferAgent は、指定したローカルフォルダ内のファイルを
 
 ### 主な特徴
 - 📤📥 FTP/SFTP 双方向転送（アップロード/ダウンロード）
-- 🚀 起動時の一括転送処理
+- 🚀 起動時の一括転送処理（バッチ処理型）
 - 🔐 SFTP 鍵認証対応（パスワード認証と鍵認証の両方をサポート）
 - 🔒 ハッシュ値による整合性検証（MD5/SHA256）
 - 🔄 自動再試行機能（Polly による）
@@ -18,6 +18,8 @@ FtpTransferAgent は、指定したローカルフォルダ内のファイルを
 
 ### 動作モード
 本ツールは**バッチ処理型**のアプリケーションとして設計されており、起動時に一度だけ転送処理を実行して終了します。継続的な監視が必要な場合は、cron や Windows タスクスケジューラーでの定期実行を推奨します。
+
+**注意**: `FolderWatcher` クラスは実装されていますが、現在は使用されていません。将来的なリアルタイム監視機能の実装に備えたコードとして残されています。
 
 ## 2. システム要件
 
@@ -71,12 +73,17 @@ dotnet publish -c Release -r osx-x64 --self-contained
 ./FtpTransferAgent
 ```
 
-### 3.3 定期実行の設定
+### 3.3 定期実行の設定（推奨）
+
+本アプリケーションは起動時に一度だけ処理を実行して終了するため、定期的な転送が必要な場合は以下のように設定します。
 
 #### Windows タスクスケジューラー
 ```powershell
 # 毎日午前2時に実行するタスクを作成
 schtasks /create /tn "FtpTransferAgent" /tr "C:\path\to\FtpTransferAgent.exe" /sc daily /st 02:00
+
+# 30分ごとに実行
+schtasks /create /tn "FtpTransferAgent" /tr "C:\path\to\FtpTransferAgent.exe" /sc minute /mo 30
 ```
 
 #### Linux cron
@@ -86,6 +93,9 @@ crontab -e
 
 # 毎時0分に実行
 0 * * * * /opt/ftptransferagent/FtpTransferAgent
+
+# 5分ごとに実行
+*/5 * * * * /opt/ftptransferagent/FtpTransferAgent
 ```
 
 ## 4. 設定ファイル（appsettings.json）
@@ -126,7 +136,10 @@ crontab -e
 | IncludeSubfolders | boolean | - | サブフォルダも含めるか | false |
 | AllowedExtensions | string[] | - | 転送対象の拡張子リスト（空の場合は全て）<br>ドット付きでもなしでも可 | [] |
 
-**注意**: 現在の実装では、このフォルダ内のファイルは起動時に一度だけ処理されます。リアルタイムのフォルダ監視機能は実装されていません。
+**重要**: 
+- アプリケーション起動時に、このフォルダ内のファイルが一度だけ処理されます
+- リアルタイムのフォルダ監視機能は実装されていません
+- 新しいファイルを転送するには、アプリケーションを再度実行する必要があります
 
 **使用例：**
 ```json
@@ -315,10 +328,12 @@ chmod 600 id_ed25519
 
 | 項目 | 型 | 必須 | 説明 | デフォルト値 |
 |------|-----|------|------|--------------|
-| DeleteAfterVerify | boolean | - | ハッシュ検証成功後にローカルファイルを削除 | false |
-| DeleteRemoteAfterDownload | boolean | - | ダウンロード成功後にリモートファイルを削除 | false |
+| DeleteAfterVerify | boolean | - | アップロード＆検証成功後にローカルファイルを削除 | false |
+| DeleteRemoteAfterDownload | boolean | - | ダウンロード＆検証成功後にリモートファイルを削除 | false |
 
-**注意**: `Direction` に応じて、アップロード時はローカルファイル、ダウンロード時はリモートファイルが対象となります。
+**動作の詳細**: 
+- `DeleteAfterVerify`: アップロード時のみ有効。ハッシュ検証成功後にローカルファイルを削除
+- `DeleteRemoteAfterDownload`: ダウンロード時のみ有効。ハッシュ検証成功後にリモートファイルを削除
 
 **使用例：**
 ```json
@@ -474,7 +489,8 @@ chmod 600 id_ed25519
     "Algorithm": "MD5"
   },
   "Cleanup": {
-    "DeleteAfterVerify": false
+    "DeleteAfterVerify": false,
+    "DeleteRemoteAfterDownload": false
   },
   "Smtp": {
     "Enabled": false,
@@ -521,7 +537,8 @@ chmod 600 id_ed25519
     "Algorithm": "SHA256"
   },
   "Cleanup": {
-    "DeleteAfterVerify": true
+    "DeleteAfterVerify": true,
+    "DeleteRemoteAfterDownload": true
   },
   "Smtp": {
     "Enabled": true,
@@ -551,28 +568,36 @@ chmod 600 id_ed25519
    - FTP/SFTP クライアントの初期化
    - 転送キューの初期化（並列度の設定）
 
-2. **ファイル処理（Direction に応じて実行）**
-   - **"put" モード**: Watch.Path 内のファイルを列挙してアップロード
-   - **"get" モード**: RemotePath 内のファイルリストを取得してダウンロード
-   - **"both" モード**: 先に get を実行、その後 put を実行
+2. **ファイル列挙**（Direction に応じて実行）
+   - **"put" モード**: Watch.Path 内のファイルを `Directory.EnumerateFiles` で列挙
+   - **"get" モード**: RemotePath 内のファイルリストを取得
+   - **"both" モード**: 先に get のファイル列挙、その後 put のファイル列挙
+   - 拡張子フィルターが設定されている場合は、該当するファイルのみを対象とする
 
-3. **転送処理**（並列実行可能）
-   - キューからファイルを取得
-   - 一時ファイル名（.tmp）で転送
-   - 転送完了後に正式なファイル名にリネーム
-   - 各転送には固有の ID (GUID) が割り当てられる
+3. **キューへの登録**
+   - 列挙されたファイルを `Channel<TransferItem>` に登録
+   - 各ファイルには転送方向（Upload/Download）が設定される
 
-4. **検証処理**
-   - ローカルファイルのハッシュ値計算
-   - リモートファイルのハッシュ値取得
-   - ハッシュ値の比較
+4. **転送処理**（並列実行）
+   - 指定された並列度（Concurrency）でワーカースレッドが起動
+   - 各ワーカーはキューからファイルを取得して転送
+   - 一時ファイル名（.tmp）で転送し、完了後に正式なファイル名にリネーム
+   - 各転送には固有の ID (GUID) が割り当てられ、ログで追跡可能
 
-5. **後処理**
-   - 検証成功時：設定に応じてローカルファイルを削除（アップロード時のみ）
+5. **検証処理**
+   - ローカルファイルのハッシュ値計算（HashUtil.ComputeHashAsync）
+   - リモートファイルのハッシュ値取得（FTP/SFTP 経由）
+   - ハッシュ値の比較（大文字小文字を無視）
+
+6. **後処理**
+   - 検証成功時：
+     - アップロード時：設定に応じてローカルファイルを削除
+     - ダウンロード時：設定に応じてリモートファイルを削除
    - 検証失敗時：エラーログを出力（メール通知も送信）
 
-6. **終了**
+7. **終了**
    - すべての転送処理が完了したらアプリケーションを終了
+   - BackgroundService として実装されているが、実質的にワンショット処理
 
 ### 5.2 並列転送の仕組み
 
@@ -603,7 +628,7 @@ chmod 600 id_ed25519
 - タイムアウトエラー
 
 #### 再試行されないエラー
-- 設定ファイルの検証エラー
+- 設定ファイルの検証エラー（起動時に失敗）
 - 認証エラー（ユーザー名/パスワード不正）
 - 権限エラー（書き込み権限なし）
 - ディスク容量不足
@@ -640,6 +665,8 @@ chmod 600 id_ed25519
   - **解決**: `Watch.Path` が正しいパスを指していることを確認
 - **原因3**: ファイルが他のプロセスで使用中
   - **解決**: ファイルの書き込みが完了してから実行する
+- **原因4**: 前回の実行で既に転送済み
+  - **解決**: 本アプリケーションは起動時に存在するファイルのみを処理します
 
 #### 転送エラーが発生する
 - **原因1**: ネットワーク接続の問題
@@ -749,50 +776,72 @@ export DOTNET_ENVIRONMENT=Development
 - ✅ **SMTP 通知**: エラーログをメールで送信
 - ✅ **SFTP 鍵認証**: パスフレーズ付き鍵ファイルにも対応
 - ✅ **一括転送**: 起動時の一括転送処理
-- ❌ **リアルタイム監視**: フォルダの継続的な監視は未実装
+- ❌ **リアルタイム監視**: 実装されていない（FolderWatcher クラスは未使用）
 - ❌ **転送の中断/再開**: 未対応
 - ❌ **転送履歴の永続化**: 未対応
+- ❌ **重複チェック**: 同じファイルを再度転送する可能性あり
 
 ### 9.2 既知の制限
 - アプリケーションは一度の実行で処理を完了して終了する（常駐しない）
+- 新しいファイルを転送するには再度実行する必要がある
+- FolderWatcher クラスは実装されているが、実際には使用されていない
 - SFTP でのハッシュ取得はファイル全体のダウンロードが必要（プロトコルの制限）
 - Windows でのファイルパス長は 260 文字まで（.NET の制限）
 - 同時接続数はサーバー側の制限に依存
-- FolderWatcher クラスは実装されているが未使用
 
 ### 9.3 推奨される使用方法
 - **定期実行**: cron や Windows タスクスケジューラーで定期的に実行
 - **ワークフロー統合**: 他のバッチ処理の一部として組み込む
 - **イベントドリブン**: ファイル生成プロセスの完了後に実行
+- **重複転送の回避**: 転送済みファイルを別フォルダに移動するなどの運用上の工夫
 
-### 9.4 定期実行の例
+### 9.4 定期実行の詳細設定例
 
-#### Linux での定期実行設定
+#### Linux cron での高度な設定
 ```bash
-# 5分ごとに実行
-*/5 * * * * /opt/ftptransferagent/FtpTransferAgent
+# 5分ごとに実行（ロック機構付き）
+*/5 * * * * flock -n /var/lock/ftpagent.lock -c '/opt/ftptransferagent/FtpTransferAgent'
 
-# 毎日午前1時と午後1時に実行
-0 1,13 * * * /opt/ftptransferagent/FtpTransferAgent
+# 毎日午前1時と午後1時に実行（エラー時のみメール通知）
+0 1,13 * * * /opt/ftptransferagent/FtpTransferAgent 2>&1 | grep -E "(Error|Critical)" | mail -s "FTP Transfer Error" admin@example.com
 
-# 平日の業務時間中、30分ごとに実行
-*/30 8-18 * * 1-5 /opt/ftptransferagent/FtpTransferAgent
+# 平日の業務時間中、30分ごとに実行（ログ付き）
+*/30 8-18 * * 1-5 /opt/ftptransferagent/FtpTransferAgent >> /var/log/ftpagent-cron.log 2>&1
+
+# 実行前に新しいファイルの存在をチェック
+*/10 * * * * [ -n "$(find /path/to/watch -type f -mmin -10)" ] && /opt/ftptransferagent/FtpTransferAgent
 ```
 
-#### Windows タスクスケジューラーでの設定
+#### Windows タスクスケジューラーでの詳細設定
 ```xml
 <?xml version="1.0" encoding="UTF-16"?>
 <Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <RegistrationInfo>
+    <Description>FTP Transfer Agent - 定期的にファイルを転送</Description>
+  </RegistrationInfo>
   <Triggers>
     <TimeTrigger>
       <Repetition>
         <Interval>PT5M</Interval>
+        <Duration>P1D</Duration>
         <StopAtDurationEnd>false</StopAtDurationEnd>
       </Repetition>
       <StartBoundary>2025-01-01T00:00:00</StartBoundary>
       <Enabled>true</Enabled>
     </TimeTrigger>
   </Triggers>
+  <Principals>
+    <Principal>
+      <UserId>SYSTEM</UserId>
+      <RunLevel>HighestAvailable</RunLevel>
+    </Principal>
+  </Principals>
+  <Settings>
+    <MultipleInstancesPolicy>IgnoreNew</MultipleInstancesPolicy>
+    <DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>
+    <StopIfGoingOnBatteries>false</StopIfGoingOnBatteries>
+    <ExecutionTimeLimit>PT1H</ExecutionTimeLimit>
+  </Settings>
   <Actions>
     <Exec>
       <Command>C:\FtpTransferAgent\FtpTransferAgent.exe</Command>
@@ -802,19 +851,50 @@ export DOTNET_ENVIRONMENT=Development
 </Task>
 ```
 
-## 10. ライセンス
+#### PowerShell での設定
+```powershell
+# 5分ごとに実行するタスクを作成
+$action = New-ScheduledTaskAction -Execute "C:\FtpTransferAgent\FtpTransferAgent.exe" -WorkingDirectory "C:\FtpTransferAgent"
+$trigger = New-ScheduledTaskTrigger -Once -At (Get-Date) -RepetitionInterval (New-TimeSpan -Minutes 5) -RepetitionDuration ([TimeSpan]::MaxValue)
+$settings = New-ScheduledTaskSettingsSet -MultipleInstances IgnoreNew -ExecutionTimeLimit (New-TimeSpan -Hours 1)
+Register-ScheduledTask -TaskName "FtpTransferAgent" -Action $action -Trigger $trigger -Settings $settings -User "SYSTEM" -RunLevel Highest
+```
+
+## 10. 今後の開発予定
+
+以下の機能は将来的な実装を検討しています：
+
+1. **リアルタイムフォルダ監視**
+   - FolderWatcher クラスを活用した継続的な監視機能
+   - ファイル作成・変更時の即時転送
+
+2. **転送履歴の管理**
+   - 転送済みファイルのデータベース記録
+   - 重複転送の防止機能
+
+3. **Web UI / API**
+   - 転送状況の確認
+   - 設定の動的変更
+   - 転送履歴の参照
+
+4. **高度な転送制御**
+   - 転送の一時停止・再開
+   - 優先度付きキュー
+   - 帯域制限機能
+
+## 11. ライセンス
 
 本ソフトウェアは MIT ライセンスの下で公開されています。
 
 ---
 
-**更新日**: 2025年6月14日  
-**バージョン**: 2.0.0  
+**更新日**: 2025年6月15日  
+**バージョン**: 2.1.0  
 **主な更新内容**:
-- リアルタイムフォルダ監視機能の記述を削除（未実装のため）
-- 起動時の一括転送処理として動作を明確化
-- FolderWatcher クラスが未使用であることを明記
-- 定期実行での使用を前提とした説明に変更
+- 現在の実装に合わせて仕様を全面的に見直し
+- FolderWatcher が未使用であることを明確化
 - バッチ処理型アプリケーションとしての特性を強調
-- 定期実行の設定例を充実
-- Cleanup 設定がアップロード時のみ有効であることを明記
+- 定期実行での使用を前提とした説明に変更
+- 各設定項目の動作詳細を実装に基づいて修正
+- 定期実行の設定例を大幅に拡充
+- 今後の開発予定セクションを追加
