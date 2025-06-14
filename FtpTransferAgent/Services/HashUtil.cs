@@ -3,8 +3,12 @@ using System.IO;
 
 namespace FtpTransferAgent.Services;
 
+/// <summary>
+/// ファイルのハッシュ値を計算するユーティリティ
+/// </summary>
 public static class HashUtil
 {
+    // 指定アルゴリズムでハッシュ値を計算
     public static async Task<string> ComputeHashAsync(string path, string algorithm, CancellationToken ct)
     {
         using var stream = File.OpenRead(path);

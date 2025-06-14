@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FtpTransferAgent.Configuration;
 
+/// <summary>
+/// 転送処理に関する設定
+/// </summary>
 public class TransferOptions
 {
     [Required]

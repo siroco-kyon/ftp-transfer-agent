@@ -2,6 +2,9 @@ using System.ComponentModel.DataAnnotations;
 
 namespace FtpTransferAgent.Configuration;
 
+/// <summary>
+/// ハッシュ計算に関する設定
+/// </summary>
 public class HashOptions
 {
     [Required]

@@ -7,6 +7,9 @@ using Microsoft.Extensions.Logging;
 
 namespace FtpTransferAgent.Services;
 
+/// <summary>
+/// FluentFTP を利用した FTP クライアントのラッパー
+/// </summary>
 public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
 {
     private readonly AsyncFtpClient _client;
@@ -18,6 +21,7 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
         _client = new AsyncFtpClient(options.Host, options.Username, options.Password, options.Port);
     }
 
+    // 接続されていなければ接続を確立
     private async Task EnsureConnectedAsync(CancellationToken ct)
     {
         if (!_client.IsConnected)
@@ -26,6 +30,7 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
         }
     }
 
+    // ファイルを一時名でアップロードしてからリネーム
     public async Task UploadAsync(string localPath, string remotePath, CancellationToken ct)
     {
         await EnsureConnectedAsync(ct);
@@ -34,6 +39,7 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
         await _client.Rename(tempPath, remotePath, ct);
     }
 
+    // ダウンロードも一時ファイル経由で行う
     public async Task DownloadAsync(string remotePath, string localPath, CancellationToken ct)
     {
         await EnsureConnectedAsync(ct);
@@ -42,6 +48,7 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
         File.Move(temp, localPath, true);
     }
 
+    // リモートファイルのハッシュ値を取得
     public async Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct)
     {
         await EnsureConnectedAsync(ct);
@@ -54,6 +61,7 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
         return hash?.Value ?? string.Empty;
     }
 
+    // 指定ディレクトリのファイル一覧を取得
     public async Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct)
     {
         await EnsureConnectedAsync(ct);
