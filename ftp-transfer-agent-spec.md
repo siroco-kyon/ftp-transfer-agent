@@ -304,30 +304,34 @@ chmod 600 id_ed25519
 
 #### 4.2.5 Cleanup（クリーンアップ設定）
 
-転送成功後のローカルファイル処理を設定します。
+転送成功後のファイル削除に関する設定を行います。
 
 ```json
 "Cleanup": {
-  "DeleteAfterVerify": false
+  "DeleteAfterVerify": false,
+  "DeleteRemoteAfterDownload": false
 }
 ```
 
 | 項目 | 型 | 必須 | 説明 | デフォルト値 |
 |------|-----|------|------|--------------|
-| DeleteAfterVerify | boolean | - | ハッシュ検証成功後にローカルファイルを削除<br>（アップロード時のみ有効） | false |
+| DeleteAfterVerify | boolean | - | ハッシュ検証成功後にローカルファイルを削除 | false |
+| DeleteRemoteAfterDownload | boolean | - | ダウンロード成功後にリモートファイルを削除 | false |
 
-**注意**: この設定は `Direction` が "put" または "both" の場合のアップロード処理時のみ有効です。ダウンロードしたファイルは削除されません。
+**注意**: `Direction` に応じて、アップロード時はローカルファイル、ダウンロード時はリモートファイルが対象となります。
 
 **使用例：**
 ```json
 // 例1: ファイルを残す（バックアップ推奨）
 "Cleanup": {
-  "DeleteAfterVerify": false
+  "DeleteAfterVerify": false,
+  "DeleteRemoteAfterDownload": false
 }
 
 // 例2: 自動削除（ディスク容量節約）
 "Cleanup": {
-  "DeleteAfterVerify": true
+  "DeleteAfterVerify": true,
+  "DeleteRemoteAfterDownload": true
 }
 ```
 

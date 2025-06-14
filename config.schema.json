@@ -44,7 +44,8 @@
     "Cleanup": {
       "type": "object",
       "properties": {
-        "DeleteAfterVerify": {"type": "boolean"}
+        "DeleteAfterVerify": {"type": "boolean"},
+        "DeleteRemoteAfterDownload": {"type": "boolean"}
       }
     },
     "Smtp": {

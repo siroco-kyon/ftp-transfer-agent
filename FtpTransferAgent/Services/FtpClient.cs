@@ -69,6 +69,12 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
         return listing.Where(i => i.Type == FtpObjectType.File).Select(i => i.FullName);
     }
 
+    public async Task DeleteAsync(string remotePath, CancellationToken ct)
+    {
+        await EnsureConnectedAsync(ct);
+        await _client.DeleteFile(remotePath, ct);
+    }
+
     public void Dispose()
     {
         _client.Dispose();

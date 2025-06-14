@@ -78,6 +78,11 @@ public class Worker : BackgroundService
                 if (string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
                 {
                     _logger.LogInformation("[{Id}] Verified hash for {File}", id, item.Path);
+                    if (_cleanup.DeleteRemoteAfterDownload)
+                    {
+                        await client.DeleteAsync(item.Path, token);
+                        _logger.LogInformation("[{Id}] Deleted remote {File}", id, item.Path);
+                    }
                 }
                 else
                 {
