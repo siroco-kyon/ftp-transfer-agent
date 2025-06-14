@@ -189,6 +189,7 @@ FTP/SFTP サーバーへの接続情報と転送設定です。
 | Username | string | ✓ | ログインユーザー名 | なし | - |
 | Password | string | ✓ | ログインパスワード | なし | - |
 | RemotePath | string | ✓ | リモートの転送先パス | なし | - |
+| Concurrency | integer | - | 同時転送数 | 1 | 1以上 |
 
 **使用例：**
 ```json
@@ -200,7 +201,8 @@ FTP/SFTP サーバーへの接続情報と転送設定です。
   "Port": 21,
   "Username": "upload_user",
   "Password": "secure_password",
-  "RemotePath": "/data/incoming"
+  "RemotePath": "/data/incoming",
+  "Concurrency": 2
 }
 
 // 例2: SFTP サーバー
@@ -211,7 +213,8 @@ FTP/SFTP サーバーへの接続情報と転送設定です。
   "Port": 22,
   "Username": "sftpuser",
   "Password": "ssh_password",
-  "RemotePath": "/home/sftpuser/uploads"
+  "RemotePath": "/home/sftpuser/uploads",
+  "Concurrency": 4
 }
 ```
 
@@ -315,9 +318,10 @@ FTP/SFTP サーバーへの接続情報と転送設定です。
     "Direction": "put",
     "Host": "localhost",
     "Port": 21,
-    "Username": "testuser",
-    "Password": "testpass",
-    "RemotePath": "/test"
+  "Username": "testuser",
+  "Password": "testpass",
+  "RemotePath": "/test",
+  "Concurrency": 1
   },
   "Retry": {
     "MaxAttempts": 2,
@@ -346,8 +350,9 @@ FTP/SFTP サーバーへの接続情報と転送設定です。
     "Host": "secure-ftp.company.com",
     "Port": 22,
     "Username": "prod_transfer",
-    "Password": "${SFTP_PASSWORD}",
-    "RemotePath": "/imports/automated"
+  "Password": "${SFTP_PASSWORD}",
+  "RemotePath": "/imports/automated",
+  "Concurrency": 4
   },
   "Retry": {
     "MaxAttempts": 5,
@@ -488,8 +493,8 @@ export DOTNET_ENVIRONMENT=Development
 ## 8. パフォーマンスに関する考慮事項
 
 ### 8.1 大量ファイルの処理
-- 一度に大量のファイルが作成される場合、転送は順次処理されます
-- 並列処理は現在サポートされていません
+- 一度に大量のファイルが作成される場合、キューに登録して順次処理されます
+- `Transfer.Concurrency` を 2 以上に設定することで並列転送が可能です
 
 ### 8.2 大容量ファイルの転送
 - ファイルサイズに制限はありませんが、大容量ファイルは転送に時間がかかります
@@ -505,7 +510,6 @@ export DOTNET_ENVIRONMENT=Development
 - **転送方向**: 現在は "get"/"put"/"both" の 3 つをサポート
 - **SMTP 通知**: 未実装
 - **ローリングログ**: 実装済み（ファイルサイズに応じたローテーション）
-- **並列転送**: 未対応
 - **転送の中断/再開**: 未対応
 
 ### 9.2 実装予定の機能

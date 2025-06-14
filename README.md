@@ -15,7 +15,7 @@
 - **Services/**
   - `AsyncFtpClientWrapper`・`SftpClientWrapper` - それぞれ FTP/SFTP 用のクライアントを実装。アップロード・ダウンロード処理とハッシュ取得機能を提供します。
   - `FolderWatcher` - `FileSystemWatcher` を利用しフォルダの変化を監視します。対象拡張子のフィルタリングも行います。
-  - `TransferQueue` - `Channel` と `Polly` を使った再試行付きの処理キューです。
+  - `TransferQueue` - `Channel` と `Polly` を使った再試行付きの処理キューです。並列転送数を指定できます。
   - `HashUtil` - ファイルの MD5/SHA256 ハッシュを計算するユーティリティ。
 - **Configuration/** - 各種設定項目を表すクラス群。`appsettings.json` からバインドされます。
 - **config.schema.json** - 設定ファイルの JSON スキーマ。必須項目や値の制約が記載されています。
@@ -24,9 +24,9 @@
 
 `appsettings.json` では次のように設定を記述します（一部抜粋）。
 ```json
-{"Watch": {"Path": "./watch", "IncludeSubfolders": false, "AllowedExtensions": [".txt"]}, "Transfer": {"Mode": "ftp", "Direction": "both", "Host": "localhost", "Port": 21, "Username": "user", "Password": "pass", "RemotePath": "/remote"}}
+{"Watch": {"Path": "./watch", "IncludeSubfolders": false, "AllowedExtensions": [".txt"]}, "Transfer": {"Mode": "ftp", "Direction": "both", "Host": "localhost", "Port": 21, "Username": "user", "Password": "pass", "RemotePath": "/remote", "Concurrency": 2}}
 ```
-詳細は同ファイルおよび `config.schema.json` を参照してください。
+`Transfer.Concurrency` を増やすと同時に処理する転送数を変更できます。詳細は同ファイルおよび `config.schema.json` を参照してください。
 
 ## ログ設定
 
