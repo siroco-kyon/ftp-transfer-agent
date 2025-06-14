@@ -2,12 +2,11 @@
 
 ## 1. 概要
 
-FtpTransferAgent は、指定したローカルフォルダを監視し、新しいファイルを自動的に FTP または SFTP サーバーに転送する .NET 8 ベースのバックグラウンドサービスです。転送後はハッシュ値による整合性チェックを行い、必要に応じて転送済みファイルの自動削除も可能です。双方向転送（アップロード/ダウンロード）にも対応しています。
+FtpTransferAgent は、指定したローカルフォルダ内のファイルを FTP または SFTP サーバーに一括転送する .NET 8 ベースのコンソールアプリケーションです。起動時にフォルダ内のファイルを検出し、設定に従って転送処理を実行します。転送後はハッシュ値による整合性チェックを行い、必要に応じて転送済みファイルの自動削除も可能です。双方向転送（アップロード/ダウンロード）にも対応しています。
 
 ### 主な特徴
-- 🔍 リアルタイムフォルダ監視
-- 🚀 起動時に既存ファイルを自動転送
 - 📤📥 FTP/SFTP 双方向転送（アップロード/ダウンロード）
+- 🚀 起動時の一括転送処理
 - 🔐 SFTP 鍵認証対応（パスワード認証と鍵認証の両方をサポート）
 - 🔒 ハッシュ値による整合性検証（MD5/SHA256）
 - 🔄 自動再試行機能（Polly による）
@@ -16,6 +15,9 @@ FtpTransferAgent は、指定したローカルフォルダを監視し、新し
 - 📝 ローリングファイルログ（日付・サイズベース）
 - 📧 エラー時のメール通知機能
 - ⚙️ JSON による柔軟な設定
+
+### 動作モード
+本ツールは**バッチ処理型**のアプリケーションとして設計されており、起動時に一度だけ転送処理を実行して終了します。継続的な監視が必要な場合は、cron や Windows タスクスケジューラーでの定期実行を推奨します。
 
 ## 2. システム要件
 
@@ -69,49 +71,21 @@ dotnet publish -c Release -r osx-x64 --self-contained
 ./FtpTransferAgent
 ```
 
-### 3.3 Windows サービスとしての登録
+### 3.3 定期実行の設定
 
+#### Windows タスクスケジューラー
 ```powershell
-# サービスの作成
-sc create FtpTransferAgent binPath= "C:\path\to\FtpTransferAgent.exe"
-
-# サービスの開始
-sc start FtpTransferAgent
-
-# サービスの停止
-sc stop FtpTransferAgent
+# 毎日午前2時に実行するタスクを作成
+schtasks /create /tn "FtpTransferAgent" /tr "C:\path\to\FtpTransferAgent.exe" /sc daily /st 02:00
 ```
 
-### 3.4 Linux systemd サービスとしての登録
-
+#### Linux cron
 ```bash
-# サービスファイルの作成
-sudo nano /etc/systemd/system/ftptransferagent.service
-```
+# crontab を編集
+crontab -e
 
-```ini
-[Unit]
-Description=FTP Transfer Agent
-After=network.target
-
-[Service]
-Type=notify
-ExecStart=/opt/ftptransferagent/FtpTransferAgent
-WorkingDirectory=/opt/ftptransferagent
-Restart=always
-RestartSec=10
-SyslogIdentifier=ftptransferagent
-User=ftpagent
-Environment="DOTNET_ENVIRONMENT=Production"
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-# サービスの有効化と開始
-sudo systemctl enable ftptransferagent
-sudo systemctl start ftptransferagent
+# 毎時0分に実行
+0 * * * * /opt/ftptransferagent/FtpTransferAgent
 ```
 
 ## 4. 設定ファイル（appsettings.json）
@@ -122,7 +96,7 @@ sudo systemctl start ftptransferagent
 
 ```json
 {
-  "Watch": { ... },      // フォルダ監視設定
+  "Watch": { ... },      // ローカルフォルダ設定
   "Transfer": { ... },   // 転送設定
   "Retry": { ... },      // 再試行設定
   "Hash": { ... },       // ハッシュ検証設定
@@ -134,9 +108,9 @@ sudo systemctl start ftptransferagent
 
 ### 4.2 各セクションの詳細
 
-#### 4.2.1 Watch（フォルダ監視設定）
+#### 4.2.1 Watch（ローカルフォルダ設定）
 
-監視対象のフォルダと条件を設定します。
+転送対象のローカルフォルダと条件を設定します。
 
 ```json
 "Watch": {
@@ -148,9 +122,11 @@ sudo systemctl start ftptransferagent
 
 | 項目 | 型 | 必須 | 説明 | デフォルト値 |
 |------|-----|------|------|--------------|
-| Path | string | ✓ | 監視対象フォルダのパス（相対/絶対パス） | なし |
-| IncludeSubfolders | boolean | - | サブフォルダも監視するか | false |
+| Path | string | ✓ | 転送対象フォルダのパス（相対/絶対パス） | なし |
+| IncludeSubfolders | boolean | - | サブフォルダも含めるか | false |
 | AllowedExtensions | string[] | - | 転送対象の拡張子リスト（空の場合は全て）<br>ドット付きでもなしでも可 | [] |
+
+**注意**: 現在の実装では、このフォルダ内のファイルは起動時に一度だけ処理されます。リアルタイムのフォルダ監視機能は実装されていません。
 
 **使用例：**
 ```json
@@ -202,10 +178,9 @@ FTP/SFTP サーバーへの接続情報と転送設定です。
 | Concurrency | integer | - | 同時転送数 | 1 | 1～16 |
 
 **転送方向（Direction）の詳細：**
-- **"put"**: ローカル → リモート（アップロードのみ）
-- **"get"**: リモート → ローカル（ダウンロードのみ）  
-  ※起動時に一度だけリモートファイル一覧を取得してダウンロード
-- **"both"**: 双方向転送（起動時にダウンロード、その後アップロード監視）
+- **"put"**: ローカル → リモート（Watch.Path 内のファイルをアップロード）
+- **"get"**: リモート → ローカル（RemotePath 内のファイルを Watch.Path にダウンロード）
+- **"both"**: 先に get を実行してから put を実行
 
 **認証方式の制約：**
 - **FTP モード**: Password が必須
@@ -339,7 +314,9 @@ chmod 600 id_ed25519
 
 | 項目 | 型 | 必須 | 説明 | デフォルト値 |
 |------|-----|------|------|--------------|
-| DeleteAfterVerify | boolean | - | ハッシュ検証成功後にローカルファイルを削除 | false |
+| DeleteAfterVerify | boolean | - | ハッシュ検証成功後にローカルファイルを削除<br>（アップロード時のみ有効） | false |
+
+**注意**: この設定は `Direction` が "put" または "both" の場合のアップロード処理時のみ有効です。ダウンロードしたファイルは削除されません。
 
 **使用例：**
 ```json
@@ -569,14 +546,11 @@ chmod 600 id_ed25519
    - ログシステムの初期化（コンソール + ローリングファイル + メール通知）
    - FTP/SFTP クライアントの初期化
    - 転送キューの初期化（並列度の設定）
-   - フォルダ監視の開始（put/both モード時）
-   - 既存ファイルのアップロード（put/both モード時）
-   - リモートファイルリストの取得とダウンロード（get/both モード時）
 
-2. **ファイル検出時の処理**
-   - 新規ファイルまたはリネームされたファイルを検出
-   - 拡張子フィルターによる対象ファイルの判定
-   - 転送キューへの追加
+2. **ファイル処理（Direction に応じて実行）**
+   - **"put" モード**: Watch.Path 内のファイルを列挙してアップロード
+   - **"get" モード**: RemotePath 内のファイルリストを取得してダウンロード
+   - **"both" モード**: 先に get を実行、その後 put を実行
 
 3. **転送処理**（並列実行可能）
    - キューからファイルを取得
@@ -590,8 +564,11 @@ chmod 600 id_ed25519
    - ハッシュ値の比較
 
 5. **後処理**
-   - 検証成功時：設定に応じてローカルファイルを削除
+   - 検証成功時：設定に応じてローカルファイルを削除（アップロード時のみ）
    - 検証失敗時：エラーログを出力（メール通知も送信）
+
+6. **終了**
+   - すべての転送処理が完了したらアプリケーションを終了
 
 ### 5.2 並列転送の仕組み
 
@@ -658,7 +635,7 @@ chmod 600 id_ed25519
 - **原因2**: フォルダパスが間違っている
   - **解決**: `Watch.Path` が正しいパスを指していることを確認
 - **原因3**: ファイルが他のプロセスで使用中
-  - **解決**: ファイルの書き込みが完了してから転送されるまで待つ
+  - **解決**: ファイルの書き込みが完了してから実行する
 
 #### 転送エラーが発生する
 - **原因1**: ネットワーク接続の問題
@@ -740,7 +717,7 @@ export DOTNET_ENVIRONMENT=Development
 ## 8. パフォーマンスに関する考慮事項
 
 ### 8.1 大量ファイルの処理
-- 一度に大量のファイルが作成される場合、キューに登録して順次処理されます
+- 起動時に指定フォルダ内のすべてのファイルがキューに登録されます
 - `Transfer.Concurrency` を 2 以上に設定することで並列転送が可能です（最大16）
 - CPU コア数とネットワーク帯域を考慮して並列度を設定してください
 
@@ -759,7 +736,7 @@ export DOTNET_ENVIRONMENT=Development
 - ファイルは一時的にメモリにバッファリングされません（ストリーム処理）
 - SFTP でのハッシュ値取得時は、ファイル全体をメモリに読み込むため注意が必要
 
-## 9. 制限事項と今後の実装予定
+## 9. 実装の詳細と制限事項
 
 ### 9.1 現在の実装状況
 - ✅ **転送方向**: "get"/"put"/"both" の 3 つをサポート
@@ -767,20 +744,59 @@ export DOTNET_ENVIRONMENT=Development
 - ✅ **ローリングログ**: 日付とサイズベースのローテーション実装済み
 - ✅ **SMTP 通知**: エラーログをメールで送信
 - ✅ **SFTP 鍵認証**: パスフレーズ付き鍵ファイルにも対応
+- ✅ **一括転送**: 起動時の一括転送処理
+- ❌ **リアルタイム監視**: フォルダの継続的な監視は未実装
 - ❌ **転送の中断/再開**: 未対応
 - ❌ **転送履歴の永続化**: 未対応
-- ❌ **定期的なリモートファイル監視**: 未対応（get/both は起動時のみ）
 
 ### 9.2 既知の制限
+- アプリケーションは一度の実行で処理を完了して終了する（常駐しない）
 - SFTP でのハッシュ取得はファイル全体のダウンロードが必要（プロトコルの制限）
 - Windows でのファイルパス長は 260 文字まで（.NET の制限）
 - 同時接続数はサーバー側の制限に依存
-- ダウンロード機能（get/both）は起動時に一度だけ実行される
+- FolderWatcher クラスは実装されているが未使用
 
-### 9.3 推奨事項
-- 定期的なダウンロードが必要な場合は、cron や Task Scheduler で定期実行
-- 大量のファイルを扱う場合は、適切な並列度の設定が重要
-- セキュリティが重要な環境では SFTP + 鍵認証を使用
+### 9.3 推奨される使用方法
+- **定期実行**: cron や Windows タスクスケジューラーで定期的に実行
+- **ワークフロー統合**: 他のバッチ処理の一部として組み込む
+- **イベントドリブン**: ファイル生成プロセスの完了後に実行
+
+### 9.4 定期実行の例
+
+#### Linux での定期実行設定
+```bash
+# 5分ごとに実行
+*/5 * * * * /opt/ftptransferagent/FtpTransferAgent
+
+# 毎日午前1時と午後1時に実行
+0 1,13 * * * /opt/ftptransferagent/FtpTransferAgent
+
+# 平日の業務時間中、30分ごとに実行
+*/30 8-18 * * 1-5 /opt/ftptransferagent/FtpTransferAgent
+```
+
+#### Windows タスクスケジューラーでの設定
+```xml
+<?xml version="1.0" encoding="UTF-16"?>
+<Task version="1.2" xmlns="http://schemas.microsoft.com/windows/2004/02/mit/task">
+  <Triggers>
+    <TimeTrigger>
+      <Repetition>
+        <Interval>PT5M</Interval>
+        <StopAtDurationEnd>false</StopAtDurationEnd>
+      </Repetition>
+      <StartBoundary>2025-01-01T00:00:00</StartBoundary>
+      <Enabled>true</Enabled>
+    </TimeTrigger>
+  </Triggers>
+  <Actions>
+    <Exec>
+      <Command>C:\FtpTransferAgent\FtpTransferAgent.exe</Command>
+      <WorkingDirectory>C:\FtpTransferAgent</WorkingDirectory>
+    </Exec>
+  </Actions>
+</Task>
+```
 
 ## 10. ライセンス
 
@@ -789,11 +805,12 @@ export DOTNET_ENVIRONMENT=Development
 ---
 
 **更新日**: 2025年6月14日  
-**バージョン**: 1.3.0  
+**バージョン**: 2.0.0  
 **主な更新内容**:
-- 実装済み機能の正確な反映（SMTP通知、ローリングログ、並列転送、SFTP鍵認証）
-- 設定ファイルの配置場所を明確化
-- SFTP 鍵認証の詳細な説明を追加
-- Smtp.Enabled フィールドの説明を追加
-- 各設定項目の必須/任意を明確化
-- メール通知のトラブルシューティングを追加
+- リアルタイムフォルダ監視機能の記述を削除（未実装のため）
+- 起動時の一括転送処理として動作を明確化
+- FolderWatcher クラスが未使用であることを明記
+- 定期実行での使用を前提とした説明に変更
+- バッチ処理型アプリケーションとしての特性を強調
+- 定期実行の設定例を充実
+- Cleanup 設定がアップロード時のみ有効であることを明記
