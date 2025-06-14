@@ -24,11 +24,11 @@ FtpTransferAgent は、指定したローカルフォルダを監視し、新し
 - **ネットワーク**: FTP/SFTP サーバーへのアクセス
 
 ### 依存パッケージ
-- FluentFTP 45.0.0（FTP 通信）
-- SSH.NET 2020.0.1（SFTP 通信）
-- Polly 7.2.3（再試行処理）
-- Microsoft.Extensions.Hosting 8.0.1（ホスティング）
-- Microsoft.Extensions.Options.DataAnnotations 8.0.0（設定検証）
+- FluentFTP 52.1.0（FTP 通信）
+- SSH.NET 2025.0.0（SFTP 通信）
+- Polly 8.6.0（再試行処理）
+- Microsoft.Extensions.Hosting 9.0.6（ホスティング）
+- Microsoft.Extensions.Options.DataAnnotations 9.0.6（設定検証）
 
 ## 3. インストールと起動
 
@@ -125,7 +125,7 @@ sudo systemctl start ftptransferagent
   "Retry": { ... },      // 再試行設定
   "Hash": { ... },       // ハッシュ検証設定
   "Cleanup": { ... },    // クリーンアップ設定
-  "Smtp": { ... },       // SMTP設定（未実装）
+  "Smtp": { ... },       // SMTP設定
   "Logging": { ... }     // ログ設定
 }
 ```
@@ -367,9 +367,9 @@ $ ssh-copy-id -i id_ed25519.pub sftpuser@sftp.company.com
 }
 ```
 
-#### 4.2.7 Smtp（SMTP設定） - 未実装
+#### 4.2.7 Smtp（SMTP設定）
 
-SMTP によるメール通知の設定です。現在未実装ですが、設定構造は定義されています。
+SMTP によるメール通知の設定です。エラーログ発生時にメールを送信します。
 
 ```json
 "Smtp": {
@@ -670,12 +670,12 @@ export DOTNET_ENVIRONMENT=Development
 - ✅ **転送方向**: "get"/"put"/"both" の 3 つをサポート
 - ✅ **並列転送**: 最大 16 並列まで対応
 - ✅ **ローリングログ**: 日付とサイズベースのローテーション実装済み
-- ❌ **SMTP 通知**: 未実装（設定構造のみ定義）
+- ✅ **SMTP 通知**: エラーログをメールで送信
 - ❌ **転送の中断/再開**: 未対応
 - ❌ **転送履歴の永続化**: 未対応
 
 ### 9.2 実装予定の機能
-- SMTP によるエラー通知・定期レポート
+- SMTP による定期レポート
 - 転送履歴のデータベース記録
 - Web UI による管理画面
 - 転送スケジューリング機能
@@ -694,10 +694,11 @@ export DOTNET_ENVIRONMENT=Development
 ---
 
 **更新日**: 2025年6月14日  
-**バージョン**: 1.1.0  
+**バージョン**: 1.2.0  
 **主な更新内容**:
 - ローリングログ機能の実装状況を更新
 - 並列転送機能の詳細説明を追加
 - Logging セクションに MaxBytes の説明を追加
 - 転送方向（Direction）の詳細説明を追加
+- SMTP 通知機能の実装
 - 実装状況を最新の状態に更新
