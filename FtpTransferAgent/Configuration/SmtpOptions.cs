@@ -7,6 +7,10 @@ namespace FtpTransferAgent.Configuration;
 /// </summary>
 public class SmtpOptions
 {
+    /// <summary>
+    /// エラーメール送信を有効にするかどうか
+    /// </summary>
+    public bool Enabled { get; set; }
     public string RelayHost { get; set; } = string.Empty;
     public int RelayPort { get; set; } = 25;
     public bool UseTls { get; set; }
