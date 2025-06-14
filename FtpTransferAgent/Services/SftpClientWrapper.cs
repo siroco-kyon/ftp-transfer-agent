@@ -1,5 +1,7 @@
 using System.IO;
 using System;
+using System.Collections.Generic;
+using System.Linq;
 using FtpTransferAgent.Configuration;
 using Microsoft.Extensions.Logging;
 using Renci.SshNet;
@@ -56,6 +58,15 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         using System.Security.Cryptography.HashAlgorithm hasher = algorithm.ToUpper() == "SHA256" ? System.Security.Cryptography.SHA256.Create() : System.Security.Cryptography.MD5.Create();
         var hash = hasher.ComputeHash(ms);
         return Task.FromResult(BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant());
+    }
+
+    public Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct)
+    {
+        EnsureConnected();
+        var files = _client.ListDirectory(remotePath)
+            .Where(f => !f.IsDirectory && !f.IsSymbolicLink)
+            .Select(f => f.FullName);
+        return Task.FromResult((IEnumerable<string>)files.ToArray());
     }
 
     public void Dispose()

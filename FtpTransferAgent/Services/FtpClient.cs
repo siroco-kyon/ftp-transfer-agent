@@ -1,5 +1,7 @@
 using FluentFTP;
 using System.IO;
+using System.Collections.Generic;
+using System.Linq;
 using FtpTransferAgent.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -50,6 +52,13 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
         };
         var hash = await _client.GetChecksum(remotePath, alg, ct);
         return hash?.Value ?? string.Empty;
+    }
+
+    public async Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct)
+    {
+        await EnsureConnectedAsync(ct);
+        var listing = await _client.GetListing(remotePath, ct);
+        return listing.Where(i => i.Type == FtpObjectType.File).Select(i => i.FullName);
     }
 
     public void Dispose()
