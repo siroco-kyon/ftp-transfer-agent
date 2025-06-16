@@ -59,10 +59,31 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         }
     }
 
+    // リモートディレクトリが存在しなければ作成
+    private void EnsureDirectory(string path)
+    {
+        var dir = Path.GetDirectoryName(path)?.Replace('\\', '/');
+        if (string.IsNullOrEmpty(dir) || _client.Exists(dir))
+        {
+            return;
+        }
+        var parts = dir.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var current = string.Empty;
+        foreach (var part in parts)
+        {
+            current += "/" + part;
+            if (!_client.Exists(current))
+            {
+                _client.CreateDirectory(current);
+            }
+        }
+    }
+
     // ファイルを一時名でアップロードしてからリネーム
     public Task UploadAsync(string localPath, string remotePath, CancellationToken ct)
     {
         EnsureConnected();
+        EnsureDirectory(remotePath);
         using var fs = File.OpenRead(localPath);
         var temp = remotePath + ".tmp";
         _client.UploadFile(fs, temp, true);
