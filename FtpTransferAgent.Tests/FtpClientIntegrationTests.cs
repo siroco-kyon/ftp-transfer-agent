@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Services;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -13,7 +14,8 @@ public class FtpClientIntegrationTests
 {
     private Process StartFtpServer(string root, int port)
     {
-        var psi = new ProcessStartInfo("python3", $"-m pyftpdlib -p {port} -w -d {root} -u user -P pass")
+        var python = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "python" : "python3";
+        var psi = new ProcessStartInfo(python, $"-m pyftpdlib -p {port} -w -d {root} -u user -P pass")
         {
             RedirectStandardOutput = true,
             RedirectStandardError = true,
