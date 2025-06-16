@@ -51,25 +51,28 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
     }
 
     // リモートファイルのハッシュ値を取得
-    public async Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct)
+    public async Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = true)
     {
         await EnsureConnectedAsync(ct);
-        FtpHashAlgorithm alg = algorithm.ToUpper() switch
+        if (useServerCommand)
         {
-            "SHA256" => FtpHashAlgorithm.SHA256,
-            _ => FtpHashAlgorithm.MD5
-        };
-        try
-        {
-            var hash = await _client.GetChecksum(remotePath, alg, ct);
-            if (!string.IsNullOrEmpty(hash?.Value))
+            FtpHashAlgorithm alg = algorithm.ToUpper() switch
             {
-                return hash.Value;
+                "SHA256" => FtpHashAlgorithm.SHA256,
+                _ => FtpHashAlgorithm.MD5
+            };
+            try
+            {
+                var hash = await _client.GetChecksum(remotePath, alg, ct);
+                if (!string.IsNullOrEmpty(hash?.Value))
+                {
+                    return hash.Value;
+                }
             }
-        }
-        catch (FtpCommandException ex)
-        {
-            _logger.LogWarning(ex, "Checksum command not supported; falling back to manual calculation.");
+            catch (FtpCommandException ex)
+            {
+                _logger.LogWarning(ex, "Checksum command not supported; falling back to manual calculation.");
+            }
         }
 
         await using var stream = await _client.OpenRead(remotePath, FtpDataType.Binary, 0, true, ct);

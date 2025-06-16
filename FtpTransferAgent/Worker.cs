@@ -58,7 +58,7 @@ public class Worker : BackgroundService
                 var remotePath = Path.Combine(_transfer.RemotePath, Path.GetFileName(item.Path)).Replace('\\', '/');
                 _logger.LogInformation("[{Id}] Uploading {File} to {Remote}", id, item.Path, remotePath);
                 await client.UploadAsync(item.Path, remotePath, token);
-                var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token);
+                var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token, _hash.UseServerCommand);
                 var localHash = await HashUtil.ComputeHashAsync(item.Path, _hash.Algorithm, token);
                 if (string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
                 {
@@ -79,7 +79,7 @@ public class Worker : BackgroundService
                 var localPath = Path.Combine(_watch.Path, Path.GetFileName(item.Path));
                 _logger.LogInformation("[{Id}] Downloading {Remote} to {Local}", id, item.Path, localPath);
                 await client.DownloadAsync(item.Path, localPath, token);
-                var remoteHash = await client.GetRemoteHashAsync(item.Path, _hash.Algorithm, token);
+                var remoteHash = await client.GetRemoteHashAsync(item.Path, _hash.Algorithm, token, _hash.UseServerCommand);
                 var localHash = await HashUtil.ComputeHashAsync(localPath, _hash.Algorithm, token);
                 if (string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
                 {

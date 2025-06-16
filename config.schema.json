@@ -37,7 +37,8 @@
     "Hash": {
       "type": "object",
       "properties": {
-        "Algorithm": {"enum": ["MD5", "SHA256"]}
+        "Algorithm": {"enum": ["MD5", "SHA256"]},
+        "UseServerCommand": {"type": "boolean"}
       },
       "required": ["Algorithm"]
     },

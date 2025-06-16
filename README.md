@@ -51,6 +51,10 @@
     "PrivateKeyPath": "./id_ed25519",
     "RemotePath": "/remote",
     "Concurrency": 2
+  },
+  "Hash": {
+    "Algorithm": "MD5",
+    "UseServerCommand": false
   }
 }
 ```
@@ -60,6 +64,8 @@ $ ssh-keygen -t ed25519 -f id_ed25519
 $ ssh-copy-id -i id_ed25519.pub user@host
 ```
 `Transfer.Concurrency` を増やすと同時に処理する転送数を変更できます。詳細は同ファイルおよび `config.schema.json` を参照してください。
+
+`Hash.UseServerCommand` を `false` にすると、サーバーにハッシュ計算機能が無い場合でもファイルを取得してローカルでハッシュを計算します。
 
 ## ログ設定
 
@@ -102,7 +108,7 @@ $ dotnet test --no-build --verbosity normal
 - **接続エラーが発生する**: ホスト名・ポート・認証情報が正しいか確認してください。
 - **アップロードに失敗する**: SFTP ではアップロード先ディレクトリが存在しないとエラーになります。必要に応じてリモート側で事前に作成してください。
 
- - **ハッシュ検証に失敗する**: 一部の FTP サーバーではハッシュ計算コマンドをサポートしていません。その場合は FluentFTP の `OpenRead` を利用してファイルをストリーム取得し、ローカルに保存せずハッシュを計算します。
+ - **ハッシュ検証に失敗する**: 一部の FTP サーバーではハッシュ計算コマンドをサポートしていません。その際は `Hash.UseServerCommand` を `false` に設定すると、サーバーコマンドを使わずファイルをダウンロードしてハッシュを計算します。
 
 
 ## ライセンス
