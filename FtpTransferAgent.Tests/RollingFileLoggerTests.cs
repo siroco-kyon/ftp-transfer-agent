@@ -19,17 +19,20 @@ public class RollingFileLoggerTests
         Directory.CreateDirectory(dir);
         var options = new LoggingOptions { RollingFilePath = Path.Combine(dir, "log.txt"), MaxBytes = 1024 };
         var type = typeof(Worker).Assembly.GetType("FtpTransferAgent.Logging.RollingFileLoggerProvider", true)!;
+
+        string file;
         using (var provider = (ILoggerProvider)Activator.CreateInstance(type, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public, null, new object[] { options }, null)!)
         {
             var logger = provider.CreateLogger("Test");
 
             logger.LogInformation("hello");
 
-            var file = Path.Combine(dir, $"log{DateTime.UtcNow:yyyyMMdd}.txt");
+            file = Path.Combine(dir, $"log{DateTime.UtcNow:yyyyMMdd}.txt");
             Assert.True(File.Exists(file));
-            var content = File.ReadAllText(file);
-            Assert.Contains("hello", content);
         }
+
+        var content = File.ReadAllText(file);
+        Assert.Contains("hello", content);
 
         Directory.Delete(dir, true);
     }
@@ -41,6 +44,7 @@ public class RollingFileLoggerTests
         Directory.CreateDirectory(dir);
         var options = new LoggingOptions { RollingFilePath = Path.Combine(dir, "log.txt"), MaxBytes = 1 };
         var type = typeof(Worker).Assembly.GetType("FtpTransferAgent.Logging.RollingFileLoggerProvider", true)!;
+        string baseName;
         using (var provider = (ILoggerProvider)Activator.CreateInstance(type, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public, null, new object[] { options }, null)!)
         {
             var logger = provider.CreateLogger("Test");
@@ -48,10 +52,11 @@ public class RollingFileLoggerTests
             logger.LogInformation("first");
             logger.LogInformation("second");
 
-            var baseName = Path.Combine(dir, $"log{DateTime.UtcNow:yyyyMMdd}");
-            Assert.True(File.Exists(baseName + ".txt"));
-            Assert.True(File.Exists(baseName + "_1.txt"));
+            baseName = Path.Combine(dir, $"log{DateTime.UtcNow:yyyyMMdd}");
         }
+
+        Assert.True(File.Exists(baseName + ".txt"));
+        Assert.True(File.Exists(baseName + "_1.txt"));
 
         Directory.Delete(dir, true);
     }
