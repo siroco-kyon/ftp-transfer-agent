@@ -61,4 +61,43 @@ public class FtpClientIntegrationTests
             Directory.Delete(tempDir, true);
         }
     }
+
+    [Fact]
+    public async Task Upload_OverwritesExistingRemoteFile()
+    {
+        var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(tempDir);
+        var server = StartFtpServer(tempDir, 2122);
+        try
+        {
+            var opts = new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "put",
+                Host = "localhost",
+                Port = 2122,
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/"
+            };
+            var wrapper = new AsyncFtpClientWrapper(opts, NullLogger<AsyncFtpClientWrapper>.Instance);
+
+            var existingPath = Path.Combine(tempDir, "upload.txt");
+            await File.WriteAllTextAsync(existingPath, "old");
+
+            var localPath = Path.Combine(tempDir, "local.txt");
+            await File.WriteAllTextAsync(localPath, "newcontent");
+            await wrapper.UploadAsync(localPath, "/upload.txt", CancellationToken.None);
+
+            var downloadPath = Path.Combine(tempDir, "verify.txt");
+            await wrapper.DownloadAsync("/upload.txt", downloadPath, CancellationToken.None);
+            var content = await File.ReadAllTextAsync(downloadPath);
+            Assert.Equal("newcontent", content);
+        }
+        finally
+        {
+            server.Kill();
+            Directory.Delete(tempDir, true);
+        }
+    }
 }
