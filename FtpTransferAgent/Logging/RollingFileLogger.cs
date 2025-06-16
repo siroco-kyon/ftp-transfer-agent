@@ -29,13 +29,18 @@ internal sealed class RollingFileLoggerProvider : ILoggerProvider
 
     public void Dispose()
     {
+        foreach (var logger in _loggers.Values)
+        {
+            logger.Dispose();
+        }
+        _loggers.Clear();
     }
 }
 
 /// <summary>
 /// 1 日ごと、かつ指定サイズでファイルをローテーションするロガー
 /// </summary>
-internal sealed class RollingFileLogger : ILogger
+internal sealed class RollingFileLogger : ILogger, IDisposable
 {
     private readonly string _category;
     private readonly LoggingOptions _options;
@@ -43,6 +48,7 @@ internal sealed class RollingFileLogger : ILogger
     private DateTime _currentDate = DateTime.UtcNow.Date;
     private int _index;
     private StreamWriter? _writer;
+    private bool _disposed;
 
     public RollingFileLogger(string category, LoggingOptions options)
     {
@@ -102,6 +108,20 @@ internal sealed class RollingFileLogger : ILogger
             {
                 _writer.WriteLine(exception);
             }
+        }
+    }
+
+    public void Dispose()
+    {
+        lock (_lock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+            _writer?.Dispose();
+            _writer = null;
+            _disposed = true;
         }
     }
 }
