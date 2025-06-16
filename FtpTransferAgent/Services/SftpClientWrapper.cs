@@ -87,6 +87,10 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         using var fs = File.OpenRead(localPath);
         var temp = remotePath + ".tmp";
         _client.UploadFile(fs, temp, true);
+        if (_client.Exists(remotePath))
+        {
+            _client.DeleteFile(remotePath);
+        }
         _client.RenameFile(temp, remotePath);
         return Task.CompletedTask;
     }

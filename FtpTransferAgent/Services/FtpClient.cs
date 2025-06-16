@@ -38,7 +38,7 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
         await EnsureConnectedAsync(ct);
         var tempPath = remotePath + ".tmp";
         await _client.UploadFile(localPath, tempPath, FtpRemoteExists.Overwrite, true, FtpVerify.None, null, ct);
-        await _client.Rename(tempPath, remotePath, ct);
+        await _client.MoveFile(tempPath, remotePath, FtpRemoteExists.Overwrite, ct);
     }
 
     // ダウンロードも一時ファイル経由で行う
