@@ -20,6 +20,18 @@
 - **Configuration/** - 各種設定項目を表すクラス群。`appsettings.json` からバインドされます。
 - **config.schema.json** - 設定ファイルの JSON スキーマ。必須項目や値の制約が記載されています。
 
+## 依存関係
+
+`dotnet restore` を実行すると以下の NuGet パッケージが自動的に取得されます。
+
+- [FluentFTP](https://github.com/robinrodricks/FluentFTP) 52.1.0
+- [SSH.NET](https://github.com/sshnet/SSH.NET) 2025.0.0
+- [Polly](https://github.com/App-vNext/Polly) 8.6.0
+- Microsoft.Extensions.Hosting 9.0.6
+- Microsoft.Extensions.Options.DataAnnotations 9.0.6
+
+テストを実行する場合は Python 3 と `pyftpdlib` が必要です。
+
 ## 設定ファイル例
 
 `appsettings.json` では次のように設定を記述します（一部抜粋）。
@@ -84,6 +96,12 @@ $ pip install pyftpdlib
 $ dotnet build
 $ dotnet test --no-build --verbosity normal
 ```
+
+## よくあるエラーと対処法
+
+- **接続エラーが発生する**: ホスト名・ポート・認証情報が正しいか確認してください。
+- **アップロードに失敗する**: SFTP ではアップロード先ディレクトリが存在しないとエラーになります。必要に応じてリモート側で事前に作成してください。
+- **ハッシュ検証に失敗する**: 一部の FTP サーバーではハッシュ計算コマンドをサポートしていません。その場合はファイルをダウンロードして計算する方式に自動的に切り替わりますが、通信量に注意してください。
 
 ## ライセンス
 
