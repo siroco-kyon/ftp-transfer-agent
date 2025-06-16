@@ -72,10 +72,8 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
             _logger.LogWarning(ex, "Checksum command not supported; falling back to manual calculation.");
         }
 
-        var temp = Path.GetTempFileName();
-        await _client.DownloadFile(temp, remotePath, FtpLocalExists.Overwrite, FtpVerify.None, null, ct);
-        var result = await HashUtil.ComputeHashAsync(temp, algorithm, ct);
-        File.Delete(temp);
+        await using var stream = await _client.OpenRead(remotePath, FtpDataType.Binary, 0, true, ct);
+        var result = await HashUtil.ComputeHashAsync(stream, algorithm, ct);
         return result;
     }
 
