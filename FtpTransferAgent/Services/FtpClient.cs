@@ -2,6 +2,7 @@ using FluentFTP;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
+using FluentFTP.Exceptions;
 using FtpTransferAgent.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -58,8 +59,24 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
             "SHA256" => FtpHashAlgorithm.SHA256,
             _ => FtpHashAlgorithm.MD5
         };
-        var hash = await _client.GetChecksum(remotePath, alg, ct);
-        return hash?.Value ?? string.Empty;
+        try
+        {
+            var hash = await _client.GetChecksum(remotePath, alg, ct);
+            if (!string.IsNullOrEmpty(hash?.Value))
+            {
+                return hash.Value;
+            }
+        }
+        catch (FtpCommandException ex)
+        {
+            _logger.LogWarning(ex, "Checksum command not supported; falling back to manual calculation.");
+        }
+
+        var temp = Path.GetTempFileName();
+        await _client.DownloadFile(temp, remotePath, FtpLocalExists.Overwrite, FtpVerify.None, null, ct);
+        var result = await HashUtil.ComputeHashAsync(temp, algorithm, ct);
+        File.Delete(temp);
+        return result;
     }
 
     // 指定ディレクトリのファイル一覧を取得

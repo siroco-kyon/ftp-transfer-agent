@@ -8,10 +8,9 @@ namespace FtpTransferAgent.Services;
 /// </summary>
 public static class HashUtil
 {
-    // 指定アルゴリズムでハッシュ値を計算
-    public static async Task<string> ComputeHashAsync(string path, string algorithm, CancellationToken ct)
+    // ストリームからハッシュ値を計算
+    public static async Task<string> ComputeHashAsync(Stream stream, string algorithm, CancellationToken ct)
     {
-        using var stream = File.OpenRead(path);
         using HashAlgorithm hasher = algorithm.ToUpper() == "SHA256" ? SHA256.Create() : MD5.Create();
         var buffer = new byte[81920];
         int read;
@@ -21,5 +20,12 @@ public static class HashUtil
         }
         hasher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
         return BitConverter.ToString(hasher.Hash!).Replace("-", string.Empty).ToLowerInvariant();
+    }
+
+    // ファイルパスを受け取ってハッシュ値を計算
+    public static async Task<string> ComputeHashAsync(string path, string algorithm, CancellationToken ct)
+    {
+        await using var stream = File.OpenRead(path);
+        return await ComputeHashAsync(stream, algorithm, ct);
     }
 }
