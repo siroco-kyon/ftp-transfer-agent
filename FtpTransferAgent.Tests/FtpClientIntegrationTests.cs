@@ -42,7 +42,7 @@ public class FtpClientIntegrationTests
                 Password = "pass",
                 RemotePath = "/"
             };
-        var wrapper = new AsyncFtpClientWrapper(opts, NullLogger<AsyncFtpClientWrapper>.Instance);
+            var wrapper = new AsyncFtpClientWrapper(opts, NullLogger<AsyncFtpClientWrapper>.Instance);
 
             var localPath = Path.Combine(tempDir, "test.txt");
             await File.WriteAllTextAsync(localPath, "hello");
