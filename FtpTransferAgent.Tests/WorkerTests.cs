@@ -41,7 +41,7 @@ public class WorkerTests
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.UploadAsync(file, remotePath, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask).Verifiable();
-        mock.Setup(c => c.GetRemoteHashAsync(remotePath, "MD5", It.IsAny<CancellationToken>()))
+        mock.Setup(c => c.GetRemoteHashAsync(remotePath, "MD5", It.IsAny<CancellationToken>(), true))
             .ReturnsAsync(localHash);
         mock.Setup(c => c.Dispose());
 
@@ -79,7 +79,7 @@ public class WorkerTests
         public void Dispose() { }
         public Task UploadAsync(string localPath, string remotePath, CancellationToken ct) => _inner.UploadAsync(localPath, remotePath, ct);
         public Task DownloadAsync(string remotePath, string localPath, CancellationToken ct) => _inner.DownloadAsync(remotePath, localPath, ct);
-        public Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct) => _inner.GetRemoteHashAsync(remotePath, algorithm, ct);
+        public Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = true) => _inner.GetRemoteHashAsync(remotePath, algorithm, ct, useServerCommand);
         public Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct) => _inner.ListFilesAsync(remotePath, ct);
         public Task DeleteAsync(string remotePath, CancellationToken ct) => _inner.DeleteAsync(remotePath, ct);
     }

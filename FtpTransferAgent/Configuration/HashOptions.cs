@@ -10,4 +10,7 @@ public class HashOptions
     [Required]
     [RegularExpression("MD5|SHA256")]
     public string Algorithm { get; set; } = "MD5";
+
+    // FTP サーバーのハッシュ計算コマンドを利用するか
+    public bool UseServerCommand { get; set; } = true;
 }

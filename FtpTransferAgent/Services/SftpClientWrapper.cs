@@ -108,7 +108,7 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     }
 
     // リモートファイルのハッシュ値を取得
-    public Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct)
+    public Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = true)
     {
         EnsureConnected();
         using var ms = new MemoryStream();
