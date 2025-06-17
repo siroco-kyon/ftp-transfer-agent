@@ -3,6 +3,7 @@ using System.Threading.Channels;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Services;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
 
 namespace FtpTransferAgent;
 
@@ -16,12 +17,20 @@ public class Worker : BackgroundService
     private readonly HashOptions _hash;
     private readonly CleanupOptions _cleanup;
     private readonly IServiceProvider _services;
+    private readonly IHostApplicationLifetime _lifetime;
 
     // 転送処理用のチャンネル
     private readonly Channel<TransferItem> _channel = Channel.CreateUnbounded<TransferItem>();
 
     // DI された各種オプションを受け取る
-    public Worker(IOptions<WatchOptions> watch, IOptions<TransferOptions> transfer, IOptions<RetryOptions> retry, IOptions<HashOptions> hash, IOptions<CleanupOptions> cleanup, IServiceProvider services, ILogger<Worker> logger)
+    public Worker(IOptions<WatchOptions> watch,
+                  IOptions<TransferOptions> transfer,
+                  IOptions<RetryOptions> retry,
+                  IOptions<HashOptions> hash,
+                  IOptions<CleanupOptions> cleanup,
+                  IServiceProvider services,
+                  ILogger<Worker> logger,
+                  IHostApplicationLifetime lifetime)
     {
         _watch = watch.Value;
         _transfer = transfer.Value;
@@ -30,6 +39,7 @@ public class Worker : BackgroundService
         _cleanup = cleanup.Value;
         _services = services;
         _logger = logger;
+        _lifetime = lifetime;
     }
 
     // テスト用にクライアント生成処理をオーバーライドできるようメソッド化
@@ -125,6 +135,9 @@ public class Worker : BackgroundService
         // 書き込みを完了してすべての転送が終わるのを待機
         _channel.Writer.Complete();
         await queueTask;
+
+        // 全ての転送が完了したらアプリケーションを終了
+        _lifetime.StopApplication();
     }
 
     public override void Dispose()

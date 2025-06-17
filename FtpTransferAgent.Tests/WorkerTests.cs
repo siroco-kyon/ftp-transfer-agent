@@ -4,6 +4,7 @@ using FtpTransferAgent.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Hosting;
 using Moq;
 
 namespace FtpTransferAgent.Tests;
@@ -49,8 +50,9 @@ public class WorkerTests
         services.AddLogging();
         var provider = services.BuildServiceProvider();
         var logger = provider.GetRequiredService<ILogger<Worker>>();
+        var lifetime = new Mock<IHostApplicationLifetime>();
 
-        var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, new NoDisposeClient(mock.Object));
+        var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime.Object, new NoDisposeClient(mock.Object));
         await worker.RunAsync(CancellationToken.None);
 
         mock.Verify();
@@ -61,8 +63,16 @@ public class WorkerTests
     private class TestWorker : Worker
     {
         private readonly IFileTransferClient _client;
-        public TestWorker(IOptions<WatchOptions> w, IOptions<TransferOptions> t, IOptions<RetryOptions> r, IOptions<HashOptions> h, IOptions<CleanupOptions> c, IServiceProvider sp, ILogger<Worker> l, IFileTransferClient client)
-            : base(w, t, r, h, c, sp, l)
+        public TestWorker(IOptions<WatchOptions> w,
+                          IOptions<TransferOptions> t,
+                          IOptions<RetryOptions> r,
+                          IOptions<HashOptions> h,
+                          IOptions<CleanupOptions> c,
+                          IServiceProvider sp,
+                          ILogger<Worker> l,
+                          IHostApplicationLifetime life,
+                          IFileTransferClient client)
+            : base(w, t, r, h, c, sp, l, life)
         {
             _client = client;
         }

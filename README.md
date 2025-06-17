@@ -92,6 +92,7 @@ $ dotnet build --configuration Release
 # 実行
 $ dotnet run --project FtpTransferAgent
 ```
+上記コマンドを実行すると、一度だけ転送処理を行い、完了後は自動的にアプリケーションが終了します。
 
 ## テスト
 
