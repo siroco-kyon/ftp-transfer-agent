@@ -3,6 +3,7 @@ using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
 using Moq;
 
@@ -50,7 +51,8 @@ public class WorkerTests
         var provider = services.BuildServiceProvider();
         var logger = provider.GetRequiredService<ILogger<Worker>>();
 
-        var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, new NoDisposeClient(mock.Object));
+        var lifetime = new DummyLifetime();
+        var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
         await worker.RunAsync(CancellationToken.None);
 
         mock.Verify();
@@ -61,8 +63,8 @@ public class WorkerTests
     private class TestWorker : Worker
     {
         private readonly IFileTransferClient _client;
-        public TestWorker(IOptions<WatchOptions> w, IOptions<TransferOptions> t, IOptions<RetryOptions> r, IOptions<HashOptions> h, IOptions<CleanupOptions> c, IServiceProvider sp, ILogger<Worker> l, IFileTransferClient client)
-            : base(w, t, r, h, c, sp, l)
+        public TestWorker(IOptions<WatchOptions> w, IOptions<TransferOptions> t, IOptions<RetryOptions> r, IOptions<HashOptions> h, IOptions<CleanupOptions> c, IServiceProvider sp, ILogger<Worker> l, IHostApplicationLifetime lifetime, IFileTransferClient client)
+            : base(w, t, r, h, c, sp, l, lifetime)
         {
             _client = client;
         }
@@ -82,5 +84,13 @@ public class WorkerTests
         public Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = true) => _inner.GetRemoteHashAsync(remotePath, algorithm, ct, useServerCommand);
         public Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct) => _inner.ListFilesAsync(remotePath, ct);
         public Task DeleteAsync(string remotePath, CancellationToken ct) => _inner.DeleteAsync(remotePath, ct);
+    }
+
+    private class DummyLifetime : IHostApplicationLifetime
+    {
+        public CancellationToken ApplicationStarted => CancellationToken.None;
+        public CancellationToken ApplicationStopping => CancellationToken.None;
+        public CancellationToken ApplicationStopped => CancellationToken.None;
+        public void StopApplication() { }
     }
 }
