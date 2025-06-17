@@ -42,7 +42,7 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
         }
         if (!await _client.DirectoryExists(dir, ct))
         {
-            await _client.CreateDirectory(dir, ct, true);
+            await _client.CreateDirectory(dir, true, ct);
         }
     }
 
