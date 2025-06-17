@@ -23,7 +23,8 @@
         "PrivateKeyPath": {"type": "string"},
         "PrivateKeyPassphrase": {"type": "string"},
         "RemotePath": {"type": "string"},
-        "Concurrency": {"type": "integer", "minimum": 1}
+        "Concurrency": {"type": "integer", "minimum": 1},
+        "PreserveFolderStructure": {"type": "boolean"}
       },
       "required": ["Mode", "Direction", "Host", "Username", "RemotePath"]
     },

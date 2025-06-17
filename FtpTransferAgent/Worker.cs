@@ -58,7 +58,10 @@ public class Worker : BackgroundService
             var id = Guid.NewGuid();
             if (item.Action == TransferAction.Upload)
             {
-                var remotePath = Path.Combine(_transfer.RemotePath, Path.GetFileName(item.Path)).Replace('\\', '/');
+                var name = _transfer.PreserveFolderStructure
+                    ? Path.GetRelativePath(_watch.Path, item.Path)
+                    : Path.GetFileName(item.Path);
+                var remotePath = Path.Combine(_transfer.RemotePath, name).Replace('\\', '/');
                 _logger.LogInformation("[{Id}] Uploading {File} to {Remote}", id, item.Path, remotePath);
                 await client.UploadAsync(item.Path, remotePath, token);
                 var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token, _hash.UseServerCommand);
