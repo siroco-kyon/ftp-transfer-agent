@@ -290,7 +290,7 @@ chmod 600 id_ed25519
 
 #### 4.2.4 Hash（ハッシュ検証設定）
 
-転送後の整合性検証に使用するハッシュアルゴリズムを設定します。
+転送後の整合性検証に使用するハッシュアルゴリズムと取得方法を設定します。
 
 ```json
 "Hash": {
@@ -301,6 +301,11 @@ chmod 600 id_ed25519
 | 項目 | 型 | 必須 | 説明 | デフォルト値 | 制約 |
 |------|-----|------|------|--------------|------|
 | Algorithm | string | ✓ | ハッシュアルゴリズム | "MD5" | "MD5" または "SHA256" |
+| UseServerCommand | boolean | - | FTP サーバーのハッシュ計算コマンドを利用するか | true | - |
+
+`UseServerCommand` が `false` の場合、サーバー側でハッシュ計算コマンドが利用でき
+ないときでもファイルを取得してローカルでハッシュを計算します。SFTP では常にローカ
+ル計算が行われ、この設定は無視されます。
 
 **使用例：**
 ```json
@@ -311,7 +316,8 @@ chmod 600 id_ed25519
 
 // 例2: SHA256（より安全）
 "Hash": {
-  "Algorithm": "SHA256"
+  "Algorithm": "SHA256",
+  "UseServerCommand": false
 }
 ```
 
@@ -486,7 +492,8 @@ chmod 600 id_ed25519
     "DelaySeconds": 5
   },
   "Hash": {
-    "Algorithm": "MD5"
+    "Algorithm": "MD5",
+    "UseServerCommand": false
   },
   "Cleanup": {
     "DeleteAfterVerify": false,
@@ -534,7 +541,8 @@ chmod 600 id_ed25519
     "DelaySeconds": 10
   },
   "Hash": {
-    "Algorithm": "SHA256"
+    "Algorithm": "SHA256",
+    "UseServerCommand": false
   },
   "Cleanup": {
     "DeleteAfterVerify": true,
@@ -586,7 +594,9 @@ chmod 600 id_ed25519
 
 5. **検証処理**
    - ローカルファイルのハッシュ値計算（HashUtil.ComputeHashAsync）
-   - リモートファイルのハッシュ値取得（FTP/SFTP 経由）
+   - リモートファイルのハッシュ値取得
+     - `Hash.UseServerCommand` が `true` かつ FTP サーバーが対応している場合はサーバーのハッシュコマンドを使用
+     - それ以外はファイルを取得してローカルで計算（SFTP は常にこちら）
    - ハッシュ値の比較（大文字小文字を無視）
 
 6. **後処理**
@@ -680,7 +690,7 @@ chmod 600 id_ed25519
 
 #### ハッシュ検証エラー
 - **原因1**: FTP サーバーがハッシュコマンドをサポートしていない
-  - **解決**: 別の FTP サーバーを使用するか、SFTP に切り替える
+  - **解決**: `Hash.UseServerCommand` を `false` にしてローカル計算を行う
 - **原因2**: 転送中にファイルが破損
   - **解決**: ネットワークの安定性を確認
 
@@ -888,8 +898,8 @@ Register-ScheduledTask -TaskName "FtpTransferAgent" -Action $action -Trigger $tr
 
 ---
 
-**更新日**: 2025年6月15日  
-**バージョン**: 2.1.0  
+**更新日**: 2025年6月17日
+**バージョン**: 2.1.1
 **主な更新内容**:
 - 現在の実装に合わせて仕様を全面的に見直し
 - FolderWatcher が未使用であることを明確化
