@@ -60,6 +60,53 @@ public class WorkerTests
         Directory.Delete(dir, true);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_PreservesFolderStructure()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var sub = Path.Combine(dir, "sub");
+        Directory.CreateDirectory(sub);
+        var file = Path.Combine(sub, "sample.txt");
+        await File.WriteAllTextAsync(file, "data");
+        var hash = await HashUtil.ComputeHashAsync(file, "MD5", CancellationToken.None);
+
+        var watch = Options.Create(new WatchOptions { Path = dir, IncludeSubfolders = true });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 1,
+            PreserveFolderStructure = true
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
+        var cleanup = Options.Create(new CleanupOptions());
+
+        var expected = "/remote/sub/sample.txt";
+        var mock = new Mock<IFileTransferClient>();
+        mock.Setup(c => c.UploadAsync(file, expected, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask).Verifiable();
+        mock.Setup(c => c.GetRemoteHashAsync(expected, "MD5", It.IsAny<CancellationToken>(), true))
+            .ReturnsAsync(hash);
+        mock.Setup(c => c.Dispose());
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var provider = services.BuildServiceProvider();
+        var logger = provider.GetRequiredService<ILogger<Worker>>();
+
+        var lifetime = new DummyLifetime();
+        var worker = new TestWorker(watch, transfer, retry, Options.Create(new HashOptions { Algorithm = "MD5" }), cleanup,
+            provider, logger, lifetime, new NoDisposeClient(mock.Object));
+        await worker.RunAsync(CancellationToken.None);
+
+        mock.Verify();
+        Directory.Delete(dir, true);
+    }
+
     private class TestWorker : Worker
     {
         private readonly IFileTransferClient _client;

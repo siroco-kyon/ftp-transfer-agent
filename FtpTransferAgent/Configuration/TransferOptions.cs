@@ -46,6 +46,12 @@ public class TransferOptions : IValidatableObject
     [Range(1, 16)]
     public int Concurrency { get; set; } = 1;
 
+    /// <summary>
+    /// サブフォルダを含めてアップロードする際に
+    /// ローカルのフォルダ構成を維持するかどうか
+    /// </summary>
+    public bool PreserveFolderStructure { get; set; }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (Mode == "ftp" && string.IsNullOrEmpty(Password))

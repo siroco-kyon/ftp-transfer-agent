@@ -32,10 +32,25 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
         }
     }
 
+    // リモートディレクトリが存在しなければ作成
+    private async Task EnsureDirectoryAsync(string path, CancellationToken ct)
+    {
+        var dir = Path.GetDirectoryName(path)?.Replace('\\', '/');
+        if (string.IsNullOrEmpty(dir))
+        {
+            return;
+        }
+        if (!await _client.DirectoryExists(dir, ct))
+        {
+            await _client.CreateDirectory(dir, ct, true);
+        }
+    }
+
     // ファイルを一時名でアップロードしてからリネーム
     public async Task UploadAsync(string localPath, string remotePath, CancellationToken ct)
     {
         await EnsureConnectedAsync(ct);
+        await EnsureDirectoryAsync(remotePath, ct);
         var tempPath = remotePath + ".tmp";
         await _client.UploadFile(localPath, tempPath, FtpRemoteExists.Overwrite, true, FtpVerify.None, null, ct);
         await _client.MoveFile(tempPath, remotePath, FtpRemoteExists.Overwrite, ct);
