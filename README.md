@@ -50,7 +50,8 @@
     "Username": "user",
     "PrivateKeyPath": "./id_ed25519",
     "RemotePath": "/remote",
-    "Concurrency": 2
+    "Concurrency": 2,
+    "PreserveFolderStructure": false
   },
   "Hash": {
     "Algorithm": "MD5",
@@ -64,6 +65,9 @@ $ ssh-keygen -t ed25519 -f id_ed25519
 $ ssh-copy-id -i id_ed25519.pub user@host
 ```
 `Transfer.Concurrency` を増やすと同時に処理する転送数を変更できます。詳細は同ファイルおよび `config.schema.json` を参照してください。
+
+`PreserveFolderStructure` を `true` にすると、`Watch.IncludeSubfolders` を有効にした場合に
+ローカルのフォルダ構成を保持したままアップロードします。
 
 `Hash.UseServerCommand` を `false` にすると、サーバーにハッシュ計算機能が無い場合でもファイルを取得してローカルでハッシュを計算します。
 

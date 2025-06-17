@@ -173,7 +173,8 @@ FTP/SFTP サーバーへの接続情報と転送設定です。
   "PrivateKeyPath": null,
   "PrivateKeyPassphrase": null,
   "RemotePath": "/upload",
-  "Concurrency": 1
+  "Concurrency": 1,
+  "PreserveFolderStructure": false
 }
 ```
 
@@ -189,6 +190,7 @@ FTP/SFTP サーバーへの接続情報と転送設定です。
 | PrivateKeyPassphrase | string | - | 秘密鍵のパスフレーズ | null | - |
 | RemotePath | string | ✓ | リモートの転送先パス | なし | - |
 | Concurrency | integer | - | 同時転送数 | 1 | 1～16 |
+| PreserveFolderStructure | boolean | - | サブフォルダの構成を保持してアップロード | false | - |
 
 **転送方向（Direction）の詳細：**
 - **"put"**: ローカル → リモート（Watch.Path 内のファイルをアップロード）
@@ -210,7 +212,8 @@ FTP/SFTP サーバーへの接続情報と転送設定です。
   "Username": "upload_user",
   "Password": "secure_password",
   "RemotePath": "/data/incoming",
-  "Concurrency": 1
+  "Concurrency": 1,
+  "PreserveFolderStructure": false
 }
 
 // 例2: SFTP サーバー（鍵認証・並列転送）
@@ -224,7 +227,8 @@ FTP/SFTP サーバーへの接続情報と転送設定です。
   "PrivateKeyPath": "./id_ed25519",
   "PrivateKeyPassphrase": null,
   "RemotePath": "/home/sftpuser/data",
-  "Concurrency": 4
+  "Concurrency": 4,
+  "PreserveFolderStructure": false
 }
 
 // 例3: SFTP サーバー（パスワード＋鍵認証）
@@ -238,7 +242,8 @@ FTP/SFTP サーバーへの接続情報と転送設定です。
   "PrivateKeyPath": "./keys/id_rsa",
   "PrivateKeyPassphrase": "keypass",
   "RemotePath": "/uploads",
-  "Concurrency": 2
+  "Concurrency": 2,
+  "PreserveFolderStructure": false
 }
 ```
 
