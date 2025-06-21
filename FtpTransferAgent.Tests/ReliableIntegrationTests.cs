@@ -23,7 +23,7 @@ public class ReliableIntegrationTests : IDisposable
         _tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         _watchDir = Path.Combine(_tempDir, "watch");
         _remoteDir = Path.Combine(_tempDir, "remote");
-        
+
         Directory.CreateDirectory(_watchDir);
         Directory.CreateDirectory(_remoteDir);
     }
@@ -35,7 +35,7 @@ public class ReliableIntegrationTests : IDisposable
         var testFiles = new[]
         {
             "file1.txt",
-            "file2.txt", 
+            "file2.txt",
             "file3.txt"
         };
 
@@ -89,7 +89,7 @@ public class ReliableIntegrationTests : IDisposable
 
         // モッククライアントを設定
         var mockClient = new Mock<IFileTransferClient>();
-        
+
         // アップロード処理をシミュレート
         mockClient.Setup(x => x.UploadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                   .Returns((string local, string remote, CancellationToken ct) =>
@@ -114,10 +114,10 @@ public class ReliableIntegrationTests : IDisposable
 
         // Workerをテスト用に拡張したクラスを作成
         var worker = new TestableWorker(
-            watchOptions, 
-            transferOptions, 
-            retryOptions, 
-            hashOptions, 
+            watchOptions,
+            transferOptions,
+            retryOptions,
+            hashOptions,
             cleanupOptions,
             mockServiceProvider.Object,
             mockLogger.Object,
@@ -134,7 +134,7 @@ public class ReliableIntegrationTests : IDisposable
         {
             var remotePath = Path.Combine(_remoteDir, fileName);
             Assert.True(File.Exists(remotePath), $"File {fileName} should be transferred");
-            
+
             // ハッシュが一致することを確認
             var localHash = await HashUtil.ComputeHashAsync(Path.Combine(_watchDir, fileName), "MD5", CancellationToken.None);
             var remoteHash = await HashUtil.ComputeHashAsync(remotePath, "MD5", CancellationToken.None);
@@ -155,7 +155,7 @@ public class ReliableIntegrationTests : IDisposable
             Mode = "ftp",
             Direction = "put",
             Host = "localhost",
-            Username = "test", 
+            Username = "test",
             Password = "test",
             RemotePath = _remoteDir,
             Concurrency = 1
@@ -197,7 +197,7 @@ public class ReliableIntegrationTests : IDisposable
 
         // Act & Assert
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-        
+
         // ハッシュミスマッチによる例外が発生することを確認
         await Assert.ThrowsAnyAsync<Exception>(async () =>
         {

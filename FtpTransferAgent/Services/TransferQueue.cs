@@ -30,10 +30,10 @@ public class TransferQueue
             .WaitAndRetryAsync(
                 retryCount: options.MaxAttempts,
                 sleepDurationProvider: attempt => TimeSpan.FromSeconds(options.DelaySeconds * Math.Pow(2, attempt - 1)), // 指数バックオフ
-                onRetry: (ex, ts, attempt, ctx) => 
+                onRetry: (ex, ts, attempt, ctx) =>
                 {
                     var itemPath = ctx.ContainsKey("ItemPath") ? ctx["ItemPath"].ToString() : "Unknown";
-                    _logger.LogWarning(ex, "Retry {Attempt}/{MaxAttempts} for {ItemPath}: {Error}", 
+                    _logger.LogWarning(ex, "Retry {Attempt}/{MaxAttempts} for {ItemPath}: {Error}",
                         attempt, options.MaxAttempts + 1, itemPath, ex.Message);
                 });
     }
@@ -71,7 +71,7 @@ public class TransferQueue
                         var context = new Context(itemKey) { ["ItemPath"] = item.Path };
                         try
                         {
-                            await _policy.ExecuteAsync(async (ctx, t) => 
+                            await _policy.ExecuteAsync(async (ctx, t) =>
                             {
                                 _logger.LogDebug("Worker {WorkerId} processing {ItemKey}", workerId, itemKey);
                                 await handler(item, t);
