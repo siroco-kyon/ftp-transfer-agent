@@ -21,7 +21,14 @@ builder.Services.AddOptions<LoggingOptions>().BindConfiguration("Logging").Valid
 var logging = builder.Configuration.GetSection("Logging").Get<LoggingOptions>() ?? new LoggingOptions();
 var smtp = builder.Configuration.GetSection("Smtp").Get<SmtpOptions>() ?? new SmtpOptions();
 builder.Logging.ClearProviders();
-builder.Logging.SetMinimumLevel(Enum.Parse<LogLevel>(logging.Level, true));
+// 設定値のパースに例外処理を追加
+var logLevel = LogLevel.Information; // デフォルト値
+if (!string.IsNullOrEmpty(logging.Level) && !Enum.TryParse<LogLevel>(logging.Level, true, out logLevel))
+{
+    Console.WriteLine($"Warning: Invalid log level '{logging.Level}'. Using default 'Information'.");
+    logLevel = LogLevel.Information;
+}
+builder.Logging.SetMinimumLevel(logLevel);
 builder.Logging.AddSimpleConsole(o => o.TimestampFormat = "yyyy-MM-dd HH:mm:ss ");
 if (!string.IsNullOrEmpty(logging.RollingFilePath))
 {
@@ -37,5 +44,13 @@ if (smtp.Enabled)
 builder.Services.AddHostedService<Worker>();
 
 // ホストを構築して実行
-var host = builder.Build();
-host.Run();
+try
+{
+    var host = builder.Build();
+    host.Run();
+}
+catch (Exception ex)
+{
+    Console.WriteLine($"Application terminated unexpectedly: {ex.Message}");
+    Environment.Exit(1);
+}

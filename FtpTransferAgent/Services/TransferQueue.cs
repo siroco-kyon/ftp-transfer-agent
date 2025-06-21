@@ -29,7 +29,7 @@ public class TransferQueue
             .Handle<Exception>()
             .WaitAndRetryAsync(
                 retryCount: options.MaxAttempts,
-                sleepDurationProvider: attempt => TimeSpan.FromSeconds(options.DelaySeconds * Math.Pow(2, attempt - 1)), // 指数バックオフ
+                sleepDurationProvider: attempt => TimeSpan.FromSeconds(options.DelaySeconds * Math.Pow(2, attempt)), // 指数バックオフ（初回から遅延あり）
                 onRetry: (ex, ts, attempt, ctx) =>
                 {
                     var itemPath = ctx.ContainsKey("ItemPath") ? ctx["ItemPath"].ToString() : "Unknown";
@@ -46,7 +46,7 @@ public class TransferQueue
         for (int i = 0; i < _concurrency; i++)
         {
             int workerId = i;
-            tasks[i] = Task.Run(async () => await Worker(workerId, ct), ct);
+            tasks[i] = Task.Run(async () => await Worker(workerId, ct).ConfigureAwait(false), ct);
         }
         return Task.WhenAll(tasks);
 
@@ -81,8 +81,8 @@ public class TransferQueue
                         catch (Exception ex)
                         {
                             _logger.LogError(ex, "Worker {WorkerId} failed to process {ItemKey} after all retries", workerId, itemKey);
-                            // 失敗したアイテムを処理済みから除去（再処理できるように）
-                            _processedItems.TryRemove(itemKey, out _);
+                            // 失敗したアイテムは処理済みとして保持（無限リトライ防止）
+                            // リトライが必要な場合は手動でアプリケーションを再起動
                             throw;
                         }
                     }

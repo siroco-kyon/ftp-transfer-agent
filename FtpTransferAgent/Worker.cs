@@ -19,8 +19,13 @@ public class Worker : BackgroundService
     private readonly IServiceProvider _services;
     private readonly IHostApplicationLifetime _lifetime;
 
-    // 転送処理用のチャンネル
-    private readonly Channel<TransferItem> _channel = Channel.CreateUnbounded<TransferItem>();
+    // 転送処理用のチャンネル（容量制限でメモリリーク防止）
+    private readonly Channel<TransferItem> _channel = Channel.CreateBounded<TransferItem>(new BoundedChannelOptions(1000)
+    {
+        FullMode = BoundedChannelFullMode.Wait,
+        SingleReader = false,
+        SingleWriter = false
+    });
 
     // DI された各種オプションを受け取る
     public Worker(IOptions<WatchOptions> watch, IOptions<TransferOptions> transfer, IOptions<RetryOptions> retry, IOptions<HashOptions> hash, IOptions<CleanupOptions> cleanup, IServiceProvider services, ILogger<Worker> logger, IHostApplicationLifetime lifetime)
@@ -71,23 +76,49 @@ public class Worker : BackgroundService
         {
             var exts = _watch.AllowedExtensions.Select(e => e.StartsWith(".") ? e : $".{e}").ToArray();
             var option = _watch.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-            foreach (var file in Directory.EnumerateFiles(_watch.Path, "*", option))
+            try
             {
-                if (exts.Length > 0 && !exts.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
+                foreach (var file in Directory.EnumerateFiles(_watch.Path, "*", option))
                 {
-                    continue;
+                    if (exts.Length > 0 && !exts.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    _channel.Writer.TryWrite(new TransferItem(file, TransferAction.Upload));
                 }
-                _channel.Writer.TryWrite(new TransferItem(file, TransferAction.Upload));
+            }
+            catch (DirectoryNotFoundException ex)
+            {
+                _logger.LogError("Watch directory not found: {Path}. Error: {Error}", _watch.Path, ex.Message);
+                throw;
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogError("Access denied to watch directory: {Path}. Error: {Error}", _watch.Path, ex.Message);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error enumerating files in {Path}: {Error}", _watch.Path, ex.Message);
+                throw;
             }
         }
 
         // ダウンロード処理が有効な場合はリモート一覧を取得
         if (_transfer.Direction is "get" or "both")
         {
-            var files = await client.ListFilesAsync(_transfer.RemotePath, stoppingToken);
-            foreach (var f in files)
+            try
             {
-                _channel.Writer.TryWrite(new TransferItem(f, TransferAction.Download));
+                var files = await client.ListFilesAsync(_transfer.RemotePath, stoppingToken);
+                foreach (var f in files)
+                {
+                    _channel.Writer.TryWrite(new TransferItem(f, TransferAction.Download));
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Error listing remote files from {RemotePath}: {Error}", _transfer.RemotePath, ex.Message);
+                throw;
             }
         }
 
@@ -128,8 +159,19 @@ public class Worker : BackgroundService
             _logger.LogInformation("[{Id}] Hash verification successful for {File}", id, item.Path);
             if (_cleanup.DeleteAfterVerify)
             {
-                File.Delete(item.Path);
-                _logger.LogInformation("[{Id}] Deleted local file {File}", id, item.Path);
+                try
+                {
+                    File.Delete(item.Path);
+                    _logger.LogInformation("[{Id}] Deleted local file {File}", id, item.Path);
+                }
+                catch (IOException ex)
+                {
+                    _logger.LogWarning("[{Id}] Failed to delete local file {File}: {Error}", id, item.Path, ex.Message);
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    _logger.LogWarning("[{Id}] Access denied deleting local file {File}: {Error}", id, item.Path, ex.Message);
+                }
             }
         }
         else
@@ -145,7 +187,14 @@ public class Worker : BackgroundService
     /// </summary>
     private async Task ProcessDownloadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token)
     {
-        var localPath = Path.Combine(_watch.Path, Path.GetFileName(item.Path));
+        // パストラバーサル攻撃対策
+        var fileName = Path.GetFileName(item.Path);
+        if (string.IsNullOrEmpty(fileName) || fileName.Contains("..") || Path.IsPathRooted(fileName))
+        {
+            throw new ArgumentException($"Invalid or unsafe file name: {fileName}");
+        }
+        
+        var localPath = Path.Combine(_watch.Path, fileName);
 
         _logger.LogInformation("[{Id}] Starting download {Remote} to {Local}", id, item.Path, localPath);
 

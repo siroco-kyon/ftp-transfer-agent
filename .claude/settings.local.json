@@ -4,7 +4,10 @@
       "Bash(find:*)",
       "Bash(rm:*)",
       "Bash(dotnet restore:*)",
-      "Bash(dotnet build:*)"
+      "Bash(dotnet build:*)",
+      "Bash(python:*)",
+      "Bash(apt-get:*)",
+      "Bash(apt-get install:*)"
     ],
     "deny": []
   }

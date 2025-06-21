@@ -51,6 +51,15 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     }
 
     // 接続されていなければ接続を確立
+    private async Task EnsureConnectedAsync()
+    {
+        if (!_client.IsConnected)
+        {
+            await Task.Run(() => _client.Connect());
+        }
+    }
+    
+    // 同期版は既存コード互換性のため保持
     private void EnsureConnected()
     {
         if (!_client.IsConnected)
@@ -80,41 +89,47 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     }
 
     // ファイルを一時名でアップロードしてからリネーム
-    public Task UploadAsync(string localPath, string remotePath, CancellationToken ct)
+    public async Task UploadAsync(string localPath, string remotePath, CancellationToken ct)
     {
-        EnsureConnected();
+        await EnsureConnectedAsync();
         EnsureDirectory(remotePath);
-        using var fs = File.OpenRead(localPath);
-        var temp = remotePath + ".tmp";
-        _client.UploadFile(fs, temp, true);
-        if (_client.Exists(remotePath))
-        {
-            _client.DeleteFile(remotePath);
-        }
-        _client.RenameFile(temp, remotePath);
-        return Task.CompletedTask;
+        
+        // 一意な一時ファイル名で衝突防止
+        var temp = $"{remotePath}.tmp.{Guid.NewGuid():N}";
+        
+        await using var fs = File.OpenRead(localPath);
+        await Task.Run(() => {
+            _client.UploadFile(fs, temp, true);
+            if (_client.Exists(remotePath))
+            {
+                _client.DeleteFile(remotePath);
+            }
+            _client.RenameFile(temp, remotePath);
+        }, ct);
     }
 
     // ダウンロードも一時ファイル経由で行う
-    public Task DownloadAsync(string remotePath, string localPath, CancellationToken ct)
+    public async Task DownloadAsync(string remotePath, string localPath, CancellationToken ct)
     {
-        EnsureConnected();
-        var temp = localPath + ".tmp";
-        using var fs = File.Create(temp);
-        _client.DownloadFile(remotePath, fs);
-        fs.Close();
+        await EnsureConnectedAsync();
+        var temp = $"{localPath}.tmp.{Guid.NewGuid():N}";
+        
+        await using (var fs = File.Create(temp))
+        {
+            await Task.Run(() => _client.DownloadFile(remotePath, fs), ct);
+        }
+        
         File.Move(temp, localPath, true);
-        return Task.CompletedTask;
     }
 
-    // リモートファイルのハッシュ値を取得（常にダウンロードして計算）
+    // リモートファイルのハッシュ値を取得（ストリーミング処理でメモリ効率化）
     public async Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = false)
     {
-        EnsureConnected();
-        using var ms = new MemoryStream();
-        _client.DownloadFile(remotePath, ms);
-        ms.Position = 0;
-        return await HashUtil.ComputeHashAsync(ms, algorithm, ct);
+        await EnsureConnectedAsync();
+        
+        // 大容量ファイルの場合はストリーミング処理
+        await using var stream = await Task.Run(() => _client.OpenRead(remotePath), ct);
+        return await HashUtil.ComputeHashAsync(stream, algorithm, ct);
     }
 
     // 指定ディレクトリのファイル一覧を取得

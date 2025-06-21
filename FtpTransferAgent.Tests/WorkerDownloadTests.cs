@@ -37,8 +37,13 @@ public class WorkerDownloadTests
 
         var remoteFile = "/remote/sample.txt";
         var localPath = Path.Combine(dir, "sample.txt");
-        await using var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(remoteContent));
-        var remoteHash = await HashUtil.ComputeHashAsync(ms, "MD5", CancellationToken.None);
+        
+        // メモリストリームを早期Disposeしないように修正
+        string remoteHash;
+        {
+            await using var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(remoteContent));
+            remoteHash = await HashUtil.ComputeHashAsync(ms, "MD5", CancellationToken.None);
+        }
 
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>()))
@@ -62,11 +67,23 @@ public class WorkerDownloadTests
 
         var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
-        await worker.RunAsync(CancellationToken.None);
+        // タイムアウトを設定して無限待機を防止
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await worker.RunAsync(cts.Token);
 
         mock.Verify();
-        Assert.True(File.Exists(localPath));
-        Directory.Delete(dir, true);
+        try
+        {
+            Assert.True(File.Exists(localPath));
+        }
+        finally
+        {
+            // リソースクリーンアップを確実に実行
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
+        }
     }
 
     private class TestWorker : Worker

@@ -51,7 +51,10 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
     {
         await EnsureConnectedAsync(ct);
         await EnsureDirectoryAsync(remotePath, ct);
-        var tempPath = remotePath + ".tmp";
+        
+        // 一意な一時ファイル名で衝突防止
+        var tempPath = $"{remotePath}.tmp.{Guid.NewGuid():N}";
+        
         await _client.UploadFile(localPath, tempPath, FtpRemoteExists.Overwrite, true, FtpVerify.None, null, ct);
         await _client.MoveFile(tempPath, remotePath, FtpRemoteExists.Overwrite, ct);
     }
@@ -60,7 +63,7 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
     public async Task DownloadAsync(string remotePath, string localPath, CancellationToken ct)
     {
         await EnsureConnectedAsync(ct);
-        var temp = localPath + ".tmp";
+        var temp = $"{localPath}.tmp.{Guid.NewGuid():N}";
         await _client.DownloadFile(temp, remotePath, FtpLocalExists.Overwrite, FtpVerify.None, null, ct);
         File.Move(temp, localPath, true);
     }
