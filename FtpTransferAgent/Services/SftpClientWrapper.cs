@@ -107,16 +107,14 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         return Task.CompletedTask;
     }
 
-    // リモートファイルのハッシュ値を取得
-    public Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = true)
+    // リモートファイルのハッシュ値を取得（常にダウンロードして計算）
+    public async Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = false)
     {
         EnsureConnected();
         using var ms = new MemoryStream();
         _client.DownloadFile(remotePath, ms);
         ms.Position = 0;
-        using System.Security.Cryptography.HashAlgorithm hasher = algorithm.ToUpper() == "SHA256" ? System.Security.Cryptography.SHA256.Create() : System.Security.Cryptography.MD5.Create();
-        var hash = hasher.ComputeHash(ms);
-        return Task.FromResult(BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant());
+        return await HashUtil.ComputeHashAsync(ms, algorithm, ct);
     }
 
     // 指定ディレクトリのファイル一覧を取得

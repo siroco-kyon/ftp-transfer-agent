@@ -12,5 +12,5 @@ public class HashOptions
     public string Algorithm { get; set; } = "MD5";
 
     // FTP サーバーのハッシュ計算コマンドを利用するか
-    public bool UseServerCommand { get; set; } = true;
+    public bool UseServerCommand { get; set; } = false; // サーバーコマンドは使用せず確実なローカル計算を行う
 }
