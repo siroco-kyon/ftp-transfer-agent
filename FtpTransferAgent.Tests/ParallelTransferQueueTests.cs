@@ -20,9 +20,9 @@ public class ParallelTransferQueueTests
         var channel = Channel.CreateUnbounded<TransferItem>();
         var mockLogger = new Mock<ILogger<TransferQueue>>();
         var queue = new TransferQueue(channel, options, mockLogger.Object, 2);
-        
+
         var processedItems = new ConcurrentBag<string>();
-        
+
         // 同じアイテムを複数回追加
         var item = new TransferItem("test.txt", TransferAction.Upload);
         channel.Writer.TryWrite(item);
@@ -49,7 +49,7 @@ public class ParallelTransferQueueTests
         var channel = Channel.CreateUnbounded<TransferItem>();
         var mockLogger = new Mock<ILogger<TransferQueue>>();
         var queue = new TransferQueue(channel, options, mockLogger.Object, 1);
-        
+
         var item = new TransferItem("test.txt", TransferAction.Upload);
         channel.Writer.TryWrite(item);
         channel.Writer.Complete();
