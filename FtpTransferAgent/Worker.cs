@@ -108,21 +108,21 @@ public class Worker : BackgroundService
             ? Path.GetRelativePath(_watch.Path, item.Path)
             : Path.GetFileName(item.Path);
         var remotePath = Path.Combine(_transfer.RemotePath, name).Replace('\\', '/');
-        
+
         _logger.LogInformation("[{Id}] Starting upload {File} to {Remote}", id, item.Path, remotePath);
-        
+
         // 事前にローカルファイルのハッシュを計算
         var localHash = await HashUtil.ComputeHashAsync(item.Path, _hash.Algorithm, token);
         _logger.LogDebug("[{Id}] Local hash calculated: {Hash}", id, localHash);
-        
+
         // アップロード実行
         await client.UploadAsync(item.Path, remotePath, token);
         _logger.LogInformation("[{Id}] Upload completed for {File}", id, item.Path);
-        
+
         // リモートファイルのハッシュを取得して検証
         var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token, false);
         _logger.LogDebug("[{Id}] Remote hash calculated: {Hash}", id, remoteHash);
-        
+
         if (string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogInformation("[{Id}] Hash verification successful for {File}", id, item.Path);
@@ -139,28 +139,28 @@ public class Worker : BackgroundService
             throw new InvalidOperationException(error);
         }
     }
-    
+
     /// <summary>
     /// ダウンロード処理（確実なハッシュ検証付き）
     /// </summary>
     private async Task ProcessDownloadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token)
     {
         var localPath = Path.Combine(_watch.Path, Path.GetFileName(item.Path));
-        
+
         _logger.LogInformation("[{Id}] Starting download {Remote} to {Local}", id, item.Path, localPath);
-        
+
         // 事前にリモートファイルのハッシュを計算
         var remoteHash = await client.GetRemoteHashAsync(item.Path, _hash.Algorithm, token, false);
         _logger.LogDebug("[{Id}] Remote hash calculated: {Hash}", id, remoteHash);
-        
+
         // ダウンロード実行
         await client.DownloadAsync(item.Path, localPath, token);
         _logger.LogInformation("[{Id}] Download completed for {Remote}", id, item.Path);
-        
+
         // ローカルファイルのハッシュを計算して検証
         var localHash = await HashUtil.ComputeHashAsync(localPath, _hash.Algorithm, token);
         _logger.LogDebug("[{Id}] Local hash calculated: {Hash}", id, localHash);
-        
+
         if (string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogInformation("[{Id}] Hash verification successful for {Remote}", id, item.Path);
