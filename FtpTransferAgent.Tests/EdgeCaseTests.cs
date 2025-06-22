@@ -294,12 +294,12 @@ public class EdgeCaseTests : IDisposable
 
         // Act
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30)); // タイムアウト設定
-        
+
         await queue.StartAsync(async (item, token) =>
         {
             // 短い処理時間で高頻度のロック競合をシミュレート
             await Task.Delay(Random.Shared.Next(1, 3), token);
-            
+
             lock (lockObject)
             {
                 processedCount++;

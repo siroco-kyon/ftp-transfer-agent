@@ -22,12 +22,12 @@ public class FtpClientIntegrationTests
             UseShellExecute = false,
         };
         var proc = Process.Start(psi)!;
-        
+
         // サーバー起動を確実に待機する
         var maxWaitTime = TimeSpan.FromSeconds(10);
         var startTime = DateTime.Now;
         var connected = false;
-        
+
         while (DateTime.Now - startTime < maxWaitTime && !connected)
         {
             try
@@ -41,13 +41,13 @@ public class FtpClientIntegrationTests
                 await Task.Delay(200);
             }
         }
-        
+
         if (!connected)
         {
             proc.Kill();
             throw new InvalidOperationException($"FTP server failed to start on port {port}");
         }
-        
+
         return proc;
     }
 
@@ -100,7 +100,7 @@ public class FtpClientIntegrationTests
             {
                 server.Dispose();
             }
-            
+
             try
             {
                 if (Directory.Exists(tempDir))
@@ -165,7 +165,7 @@ public class FtpClientIntegrationTests
             {
                 server.Dispose();
             }
-            
+
             try
             {
                 if (Directory.Exists(tempDir))

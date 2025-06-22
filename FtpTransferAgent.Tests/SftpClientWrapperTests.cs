@@ -47,7 +47,7 @@ public class SftpClientWrapperTests : IDisposable
     public void Constructor_ShouldThrowWhenOptionsIsNull()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new SftpClientWrapper(null!, _mockLogger.Object));
     }
 
@@ -55,7 +55,7 @@ public class SftpClientWrapperTests : IDisposable
     public void Constructor_ShouldThrowWhenLoggerIsNull()
     {
         // Arrange, Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new SftpClientWrapper(_transferOptions, null!));
     }
 
@@ -74,7 +74,7 @@ public class SftpClientWrapperTests : IDisposable
         };
 
         // Act & Assert
-        Assert.Throws<ArgumentNullException>(() => 
+        Assert.Throws<ArgumentNullException>(() =>
             new SftpClientWrapper(invalidOptions, _mockLogger.Object));
     }
 
@@ -84,7 +84,7 @@ public class SftpClientWrapperTests : IDisposable
         // Arrange - Just test that private key path is handled, not actual key parsing
         var keyFile = Path.Combine(_tempDir, "test_key");
         // Don't create the file, just test the path handling logic
-        
+
         var keyOptions = new TransferOptions
         {
             Mode = "sftp",
@@ -105,7 +105,7 @@ public class SftpClientWrapperTests : IDisposable
     {
         // Arrange - Test passphrase handling logic
         var keyFile = Path.Combine(_tempDir, "encrypted_key");
-        
+
         var keyOptions = new TransferOptions
         {
             Mode = "sftp",
@@ -271,11 +271,11 @@ public class SftpClientWrapperTests : IDisposable
                 Username = "testuser",
                 Password = "testpass"
             };
-            
+
             // SSH.NET will validate port ranges and throw exceptions for invalid values
             if (port < 0 || port > 65535)
             {
-                Assert.Throws<ArgumentOutOfRangeException>(() => 
+                Assert.Throws<ArgumentOutOfRangeException>(() =>
                     new SftpClientWrapper(options, _mockLogger.Object));
             }
             else
@@ -294,7 +294,7 @@ public class SftpClientWrapperTests : IDisposable
 
         // Act & Assert (Disposeが例外を投げないことを確認)
         wrapper.Dispose();
-        
+
         // Multiple dispose calls should be safe
         wrapper.Dispose();
     }

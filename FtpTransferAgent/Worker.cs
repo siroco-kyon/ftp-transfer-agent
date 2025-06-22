@@ -198,18 +198,18 @@ public class Worker : BackgroundService
         {
             throw new ArgumentException($"Invalid file name: {item.Path}");
         }
-        
+
         // ファイル名の安全性をチェック（パストラバーサル攻撃対策）
         var safePath = Path.Combine(_watch.Path, fileName);
         var fullPath = Path.GetFullPath(safePath);
         var watchFullPath = Path.GetFullPath(_watch.Path);
-        
-        if (!fullPath.StartsWith(watchFullPath + Path.DirectorySeparatorChar) && 
+
+        if (!fullPath.StartsWith(watchFullPath + Path.DirectorySeparatorChar) &&
             !string.Equals(fullPath, watchFullPath, StringComparison.OrdinalIgnoreCase))
         {
             throw new ArgumentException($"Unsafe file path detected: {fileName}");
         }
-        
+
         var localPath = Path.Combine(_watch.Path, fileName);
 
         _logger.LogInformation("[{Id}] Starting download {Remote} to {Local}", id, item.Path, localPath);

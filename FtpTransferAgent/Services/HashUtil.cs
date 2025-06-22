@@ -18,7 +18,7 @@ public static class HashUtil
             "MD5" => MD5.Create(), // 非推奨だが互換性のため保持
             _ => throw new ArgumentException($"Unsupported hash algorithm: {algorithm}")
         };
-        
+
         // ファイルサイズに応じてバッファサイズを調整
         var streamLength = stream.CanSeek ? stream.Length : 0;
         var bufferSize = streamLength switch
@@ -27,7 +27,7 @@ public static class HashUtil
             < 10 * 1024 * 1024 => 32768, // 10MB未満: 32KB
             _ => 81920                    // 10MB以上: 80KB
         };
-        
+
         var buffer = new byte[bufferSize];
         int read;
         while ((read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false)) > 0)

@@ -87,7 +87,7 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
             _writer = new StreamWriter(fs1) { AutoFlush = true };
             return;
         }
-        
+
         // ファイルサイズチェックを安全に行う
         try
         {

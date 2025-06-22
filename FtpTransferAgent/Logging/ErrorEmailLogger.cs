@@ -50,7 +50,7 @@ internal sealed class ErrorEmailLogger : ILogger
         }
 
         var message = formatter(state, exception);
-        
+
         // 非同期でメール送信（リソースを確実に管理）
         _ = Task.Run(async () =>
         {
