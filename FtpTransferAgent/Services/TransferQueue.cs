@@ -29,7 +29,7 @@ public class TransferQueue
             .Handle<Exception>()
             .WaitAndRetryAsync(
                 retryCount: options.MaxAttempts,
-                sleepDurationProvider: attempt => TimeSpan.FromSeconds(options.DelaySeconds * Math.Pow(2, attempt)), // 指数バックオフ（初回から遅延あり）
+                sleepDurationProvider: attempt => TimeSpan.FromSeconds(options.DelaySeconds * Math.Pow(2, attempt - 1)), // 指数バックオフ（初回は基本遅延）
                 onRetry: (ex, ts, attempt, ctx) =>
                 {
                     var itemPath = ctx.ContainsKey("ItemPath") ? ctx["ItemPath"].ToString() : "Unknown";
@@ -56,7 +56,7 @@ public class TransferQueue
             _logger.LogDebug("Worker {WorkerId} started", workerId);
             try
             {
-                while (await _reader.WaitToReadAsync(token))
+                while (await _reader.WaitToReadAsync(token).ConfigureAwait(false))
                 {
                     while (_reader.TryRead(out var item))
                     {
@@ -74,8 +74,8 @@ public class TransferQueue
                             await _policy.ExecuteAsync(async (ctx, t) =>
                             {
                                 _logger.LogDebug("Worker {WorkerId} processing {ItemKey}", workerId, itemKey);
-                                await handler(item, t);
-                            }, context, token);
+                                await handler(item, t).ConfigureAwait(false);
+                            }, context, token).ConfigureAwait(false);
                             _logger.LogDebug("Worker {WorkerId} completed {ItemKey}", workerId, itemKey);
                         }
                         catch (Exception ex)

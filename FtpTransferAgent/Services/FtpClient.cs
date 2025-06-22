@@ -28,7 +28,7 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
     {
         if (!_client.IsConnected)
         {
-            await _client.Connect(ct);
+            await _client.Connect(ct).ConfigureAwait(false);
         }
     }
 
@@ -40,56 +40,56 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
         {
             return;
         }
-        if (!await _client.DirectoryExists(dir, ct))
+        if (!await _client.DirectoryExists(dir, ct).ConfigureAwait(false))
         {
-            await _client.CreateDirectory(dir, true, ct);
+            await _client.CreateDirectory(dir, true, ct).ConfigureAwait(false);
         }
     }
 
     // ファイルを一時名でアップロードしてからリネーム
     public async Task UploadAsync(string localPath, string remotePath, CancellationToken ct)
     {
-        await EnsureConnectedAsync(ct);
-        await EnsureDirectoryAsync(remotePath, ct);
+        await EnsureConnectedAsync(ct).ConfigureAwait(false);
+        await EnsureDirectoryAsync(remotePath, ct).ConfigureAwait(false);
         
         // 一意な一時ファイル名で衝突防止
         var tempPath = $"{remotePath}.tmp.{Guid.NewGuid():N}";
         
-        await _client.UploadFile(localPath, tempPath, FtpRemoteExists.Overwrite, true, FtpVerify.None, null, ct);
-        await _client.MoveFile(tempPath, remotePath, FtpRemoteExists.Overwrite, ct);
+        await _client.UploadFile(localPath, tempPath, FtpRemoteExists.Overwrite, true, FtpVerify.None, null, ct).ConfigureAwait(false);
+        await _client.MoveFile(tempPath, remotePath, FtpRemoteExists.Overwrite, ct).ConfigureAwait(false);
     }
 
     // ダウンロードも一時ファイル経由で行う
     public async Task DownloadAsync(string remotePath, string localPath, CancellationToken ct)
     {
-        await EnsureConnectedAsync(ct);
+        await EnsureConnectedAsync(ct).ConfigureAwait(false);
         var temp = $"{localPath}.tmp.{Guid.NewGuid():N}";
-        await _client.DownloadFile(temp, remotePath, FtpLocalExists.Overwrite, FtpVerify.None, null, ct);
+        await _client.DownloadFile(temp, remotePath, FtpLocalExists.Overwrite, FtpVerify.None, null, ct).ConfigureAwait(false);
         File.Move(temp, localPath, true);
     }
 
     // リモートファイルのハッシュ値を取得（常にダウンロードして計算）
     public async Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = false)
     {
-        await EnsureConnectedAsync(ct);
+        await EnsureConnectedAsync(ct).ConfigureAwait(false);
         // サーバーのハッシュコマンドは使用せず、常にファイルをダウンロードして計算
-        await using var stream = await _client.OpenRead(remotePath, FtpDataType.Binary, 0, true, ct);
-        var result = await HashUtil.ComputeHashAsync(stream, algorithm, ct);
+        await using var stream = await _client.OpenRead(remotePath, FtpDataType.Binary, 0, true, ct).ConfigureAwait(false);
+        var result = await HashUtil.ComputeHashAsync(stream, algorithm, ct).ConfigureAwait(false);
         return result;
     }
 
     // 指定ディレクトリのファイル一覧を取得
     public async Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct)
     {
-        await EnsureConnectedAsync(ct);
-        var listing = await _client.GetListing(remotePath, ct);
+        await EnsureConnectedAsync(ct).ConfigureAwait(false);
+        var listing = await _client.GetListing(remotePath, ct).ConfigureAwait(false);
         return listing.Where(i => i.Type == FtpObjectType.File).Select(i => i.FullName);
     }
 
     public async Task DeleteAsync(string remotePath, CancellationToken ct)
     {
-        await EnsureConnectedAsync(ct);
-        await _client.DeleteFile(remotePath, ct);
+        await EnsureConnectedAsync(ct).ConfigureAwait(false);
+        await _client.DeleteFile(remotePath, ct).ConfigureAwait(false);
     }
 
     public void Dispose()

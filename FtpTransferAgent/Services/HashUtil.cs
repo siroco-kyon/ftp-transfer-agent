@@ -30,18 +30,19 @@ public static class HashUtil
         
         var buffer = new byte[bufferSize];
         int read;
-        while ((read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct)) > 0)
+        while ((read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false)) > 0)
         {
             hasher.TransformBlock(buffer, 0, read, null, 0);
         }
         hasher.TransformFinalBlock(Array.Empty<byte>(), 0, 0);
-        return BitConverter.ToString(hasher.Hash!).Replace("-", string.Empty).ToLowerInvariant();
+        var hashBytes = hasher.Hash ?? throw new InvalidOperationException("Hash computation failed");
+        return BitConverter.ToString(hashBytes).Replace("-", string.Empty).ToLowerInvariant();
     }
 
     // ファイルパスを受け取ってハッシュ値を計算
     public static async Task<string> ComputeHashAsync(string path, string algorithm, CancellationToken ct)
     {
         await using var stream = File.OpenRead(path);
-        return await ComputeHashAsync(stream, algorithm, ct);
+        return await ComputeHashAsync(stream, algorithm, ct).ConfigureAwait(false);
     }
 }

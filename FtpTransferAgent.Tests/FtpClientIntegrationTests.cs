@@ -12,7 +12,7 @@ namespace FtpTransferAgent.Tests;
 /// </summary>
 public class FtpClientIntegrationTests
 {
-    private Process StartFtpServer(string root, int port)
+    private async Task<Process> StartFtpServerAsync(string root, int port)
     {
         var python = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "python" : "python3";
         var psi = new ProcessStartInfo(python, $"-m pyftpdlib -p {port} -w -d {root} -u user -P pass")
@@ -22,7 +22,32 @@ public class FtpClientIntegrationTests
             UseShellExecute = false,
         };
         var proc = Process.Start(psi)!;
-        Thread.Sleep(1000); // サーバ起動待ち
+        
+        // サーバー起動を確実に待機する
+        var maxWaitTime = TimeSpan.FromSeconds(10);
+        var startTime = DateTime.Now;
+        var connected = false;
+        
+        while (DateTime.Now - startTime < maxWaitTime && !connected)
+        {
+            try
+            {
+                using var client = new System.Net.Sockets.TcpClient();
+                await client.ConnectAsync("127.0.0.1", port);
+                connected = true;
+            }
+            catch
+            {
+                await Task.Delay(200);
+            }
+        }
+        
+        if (!connected)
+        {
+            proc.Kill();
+            throw new InvalidOperationException($"FTP server failed to start on port {port}");
+        }
+        
         return proc;
     }
 
@@ -31,7 +56,7 @@ public class FtpClientIntegrationTests
     {
         var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(tempDir);
-        var server = StartFtpServer(tempDir, 2121);
+        var server = await StartFtpServerAsync(tempDir, 2121);
         try
         {
             var opts = new TransferOptions
@@ -59,8 +84,34 @@ public class FtpClientIntegrationTests
         }
         finally
         {
-            server.Kill();
-            Directory.Delete(tempDir, true);
+            try
+            {
+                if (!server.HasExited)
+                {
+                    server.Kill();
+                    server.WaitForExit(5000); // 5秒待機
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to kill FTP server process: {ex.Message}");
+            }
+            finally
+            {
+                server.Dispose();
+            }
+            
+            try
+            {
+                if (Directory.Exists(tempDir))
+                {
+                    Directory.Delete(tempDir, true);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to delete temp directory: {ex.Message}");
+            }
         }
     }
 
@@ -69,7 +120,7 @@ public class FtpClientIntegrationTests
     {
         var tempDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(tempDir);
-        var server = StartFtpServer(tempDir, 2122);
+        var server = await StartFtpServerAsync(tempDir, 2122);
         try
         {
             var opts = new TransferOptions
@@ -98,8 +149,34 @@ public class FtpClientIntegrationTests
         }
         finally
         {
-            server.Kill();
-            Directory.Delete(tempDir, true);
+            try
+            {
+                if (!server.HasExited)
+                {
+                    server.Kill();
+                    server.WaitForExit(5000); // 5秒待機
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to kill FTP server process: {ex.Message}");
+            }
+            finally
+            {
+                server.Dispose();
+            }
+            
+            try
+            {
+                if (Directory.Exists(tempDir))
+                {
+                    Directory.Delete(tempDir, true);
+                }
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"Failed to delete temp directory: {ex.Message}");
+            }
         }
     }
 }

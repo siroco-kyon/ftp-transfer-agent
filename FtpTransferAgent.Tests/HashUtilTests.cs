@@ -26,7 +26,7 @@ public class HashUtilTests
         using (HashAlgorithm hasher = algorithm == "SHA256" ? SHA256.Create() : MD5.Create())
         using (var stream = File.OpenRead(tempFile))
         {
-            var hash = await hasher.ComputeHashAsync(stream);
+            var hash = hasher.ComputeHash(stream);
             expected = BitConverter.ToString(hash).Replace("-", string.Empty).ToLowerInvariant();
         }
 

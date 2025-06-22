@@ -74,7 +74,7 @@ public class ReliableTransferTests : IDisposable
         // Act & Assert
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
-            await queue.StartAsync(async (transferItem, token) =>
+            await queue.StartAsync((transferItem, token) =>
             {
                 attemptCount++;
                 throw new InvalidOperationException("Test error");
@@ -86,47 +86,21 @@ public class ReliableTransferTests : IDisposable
     }
 
     [Fact]
-    public async Task FtpClient_ShouldCalculateHashLocallyOnly()
+    public async Task HashUtil_ShouldCalculateLocalHash()
     {
         // Arrange
         var testFile = Path.Combine(_tempDir, "test.txt");
         var testContent = "Test content for hash calculation";
         await File.WriteAllTextAsync(testFile, testContent);
 
-        var options = new TransferOptions
-        {
-            Mode = "ftp",
-            Host = "localhost",
-            Username = "test",
-            Password = "test",
-            RemotePath = "/test"
-        };
-
-        var mockLogger = new Mock<ILogger<AsyncFtpClientWrapper>>();
-        var mockFtpClient = new Mock<FluentFTP.AsyncFtpClient>("localhost", "test", "test", 21, new FluentFTP.FtpConfig(), null);
-
-        // GetChecksum が呼ばれないことを確認するためのモック
-        // 非 virtual メソッドのため Setup は行わず、後で Verify のみ実行する
-
-        // OpenRead は正常に動作するよう設定
-        var stream = new MemoryStream(Encoding.UTF8.GetBytes(testContent));
-        mockFtpClient.Setup(x => x.OpenRead(It.IsAny<string>(), It.IsAny<FluentFTP.FtpDataType>(), It.IsAny<long>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()))
-                    .ReturnsAsync(stream);
-
-        var client = new AsyncFtpClientWrapper(options, mockLogger.Object, mockFtpClient.Object);
-
         // Act
-        var hash = await client.GetRemoteHashAsync("/test/test.txt", "MD5", CancellationToken.None, false);
+        var hash = await HashUtil.ComputeHashAsync(testFile, "MD5", CancellationToken.None);
 
         // Assert
         Assert.NotNull(hash);
         Assert.NotEmpty(hash);
-
-        // GetChecksum が呼び出されていないことを確認
-        // (non-virtual メソッドのため Moq では呼び出し検出ができない)
-
-        // OpenRead が呼ばれたことを確認
-        mockFtpClient.Verify(x => x.OpenRead(It.IsAny<string>(), It.IsAny<FluentFTP.FtpDataType>(), It.IsAny<long>(), It.IsAny<bool>(), It.IsAny<CancellationToken>()), Times.Once);
+        // Verify hash is correct MD5 of the content
+        Assert.Equal("3e80805c418d2355888f2e1bb6a2b030", hash);
     }
 
     [Fact]

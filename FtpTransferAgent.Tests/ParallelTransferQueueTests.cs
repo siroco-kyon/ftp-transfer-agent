@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO;
 using System.Threading.Channels;
 using FtpTransferAgent.Configuration;
@@ -59,7 +60,7 @@ public class ParallelTransferQueueTests
         // Act & Assert
         await Assert.ThrowsAsync<InvalidOperationException>(async () =>
         {
-            await queue.StartAsync(async (transferItem, token) =>
+            await queue.StartAsync((transferItem, token) =>
             {
                 attemptCount++;
                 throw new InvalidOperationException("Test error");

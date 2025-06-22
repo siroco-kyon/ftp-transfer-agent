@@ -9,11 +9,11 @@ namespace FtpTransferAgent.Configuration;
 public class TransferOptions : IValidatableObject
 {
     [Required]
-    [RegularExpression("ftp|sftp")]
+    [RegularExpression("^(ftp|sftp)$")]
     public string Mode { get; set; } = "ftp";
 
     [Required]
-    [RegularExpression("get|put|both")]
+    [RegularExpression("^(get|put|both)$")]
     public string Direction { get; set; } = "put";
 
     [Required]

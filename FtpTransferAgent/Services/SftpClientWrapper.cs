@@ -20,6 +20,9 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     // テスト用に既存の SftpClient を渡せるようにする
     public SftpClientWrapper(TransferOptions options, ILogger<SftpClientWrapper> logger, SftpClient? client = null)
     {
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(logger);
+        
         _logger = logger;
 
         if (client != null)
@@ -55,7 +58,7 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     {
         if (!_client.IsConnected)
         {
-            await Task.Run(() => _client.Connect());
+            await Task.Run(() => _client.Connect()).ConfigureAwait(false);
         }
     }
     
@@ -72,7 +75,11 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     private void EnsureDirectory(string path)
     {
         var dir = Path.GetDirectoryName(path)?.Replace('\\', '/');
-        if (string.IsNullOrEmpty(dir) || _client.Exists(dir))
+        if (string.IsNullOrEmpty(dir))
+        {
+            return;
+        }
+        if (_client.Exists(dir))
         {
             return;
         }
@@ -91,32 +98,30 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     // ファイルを一時名でアップロードしてからリネーム
     public async Task UploadAsync(string localPath, string remotePath, CancellationToken ct)
     {
-        await EnsureConnectedAsync();
+        await EnsureConnectedAsync().ConfigureAwait(false);
         EnsureDirectory(remotePath);
         
         // 一意な一時ファイル名で衝突防止
         var temp = $"{remotePath}.tmp.{Guid.NewGuid():N}";
         
         await using var fs = File.OpenRead(localPath);
-        await Task.Run(() => {
-            _client.UploadFile(fs, temp, true);
-            if (_client.Exists(remotePath))
-            {
-                _client.DeleteFile(remotePath);
-            }
-            _client.RenameFile(temp, remotePath);
-        }, ct);
+        _client.UploadFile(fs, temp, true);
+        if (_client.Exists(remotePath))
+        {
+            _client.DeleteFile(remotePath);
+        }
+        _client.RenameFile(temp, remotePath);
     }
 
     // ダウンロードも一時ファイル経由で行う
     public async Task DownloadAsync(string remotePath, string localPath, CancellationToken ct)
     {
-        await EnsureConnectedAsync();
+        await EnsureConnectedAsync().ConfigureAwait(false);
         var temp = $"{localPath}.tmp.{Guid.NewGuid():N}";
         
         await using (var fs = File.Create(temp))
         {
-            await Task.Run(() => _client.DownloadFile(remotePath, fs), ct);
+            _client.DownloadFile(remotePath, fs);
         }
         
         File.Move(temp, localPath, true);
@@ -125,11 +130,11 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     // リモートファイルのハッシュ値を取得（ストリーミング処理でメモリ効率化）
     public async Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = false)
     {
-        await EnsureConnectedAsync();
+        await EnsureConnectedAsync().ConfigureAwait(false);
         
         // 大容量ファイルの場合はストリーミング処理
-        await using var stream = await Task.Run(() => _client.OpenRead(remotePath), ct);
-        return await HashUtil.ComputeHashAsync(stream, algorithm, ct);
+        using var stream = _client.OpenRead(remotePath);
+        return await HashUtil.ComputeHashAsync(stream, algorithm, ct).ConfigureAwait(false);
     }
 
     // 指定ディレクトリのファイル一覧を取得

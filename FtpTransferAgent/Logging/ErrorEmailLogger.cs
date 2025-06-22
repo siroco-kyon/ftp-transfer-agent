@@ -50,31 +50,36 @@ internal sealed class ErrorEmailLogger : ILogger
         }
 
         var message = formatter(state, exception);
-        try
+        
+        // 非同期でメール送信（リソースを確実に管理）
+        _ = Task.Run(async () =>
         {
-            using var client = new SmtpClient(_options.RelayHost, _options.RelayPort)
+            try
             {
-                EnableSsl = _options.UseTls
-            };
-            if (!string.IsNullOrEmpty(_options.Username))
-            {
-                client.Credentials = new NetworkCredential(_options.Username, _options.Password);
+                using var client = new SmtpClient(_options.RelayHost, _options.RelayPort)
+                {
+                    EnableSsl = _options.UseTls
+                };
+                if (!string.IsNullOrEmpty(_options.Username))
+                {
+                    client.Credentials = new NetworkCredential(_options.Username, _options.Password);
+                }
+                using var mail = new MailMessage
+                {
+                    From = new MailAddress(_options.From),
+                    Subject = $"[{_category}] Error",
+                    Body = message + (exception != null ? "\n" + exception : string.Empty)
+                };
+                foreach (var to in _options.To)
+                {
+                    mail.To.Add(to);
+                }
+                await client.SendMailAsync(mail);
             }
-            using var mail = new MailMessage
+            catch
             {
-                From = new MailAddress(_options.From),
-                Subject = $"[{_category}] Error",
-                Body = message + (exception != null ? "\n" + exception : string.Empty)
-            };
-            foreach (var to in _options.To)
-            {
-                mail.To.Add(to);
+                // ignore async mail errors to avoid recursive logging
             }
-            client.Send(mail);
-        }
-        catch
-        {
-            // ignore mail errors to avoid recursive logging
-        }
+        });
     }
 }

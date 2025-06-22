@@ -18,6 +18,6 @@ public class SmtpOptions
     public string Password { get; set; } = string.Empty;
     [EmailAddress]
     public string From { get; set; } = string.Empty;
-    [Required]
+    [MinLength(1, ErrorMessage = "At least one recipient email address is required")]
     public string[] To { get; set; } = Array.Empty<string>();
 }

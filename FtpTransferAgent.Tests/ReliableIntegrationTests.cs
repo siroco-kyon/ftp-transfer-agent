@@ -209,9 +209,9 @@ public class ReliableIntegrationTests : IDisposable
             x => x.Log(
                 LogLevel.Error,
                 It.IsAny<EventId>(),
-                It.Is<It.IsAnyType>((v, t) => v.ToString().Contains("Hash mismatch")),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Hash mismatch")),
                 It.IsAny<Exception>(),
-                It.IsAny<Func<It.IsAnyType, Exception, string>>()),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
             Times.AtLeastOnce);
     }
 

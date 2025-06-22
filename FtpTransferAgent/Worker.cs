@@ -2,7 +2,9 @@ using System.IO;
 using System.Threading.Channels;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 namespace FtpTransferAgent;
@@ -43,9 +45,12 @@ public class Worker : BackgroundService
     // テスト用にクライアント生成処理をオーバーライドできるようメソッド化
     protected virtual IFileTransferClient CreateClient()
     {
-        return _transfer.Mode.ToLower() == "sftp"
-            ? new SftpClientWrapper(_transfer, _services.GetRequiredService<ILogger<SftpClientWrapper>>())
-            : new AsyncFtpClientWrapper(_transfer, _services.GetRequiredService<ILogger<AsyncFtpClientWrapper>>());
+        return _transfer.Mode.ToLowerInvariant() switch
+        {
+            "sftp" => new SftpClientWrapper(_transfer, _services.GetRequiredService<ILogger<SftpClientWrapper>>()),
+            "ftp" => new AsyncFtpClientWrapper(_transfer, _services.GetRequiredService<ILogger<AsyncFtpClientWrapper>>()),
+            _ => throw new ArgumentException($"Unsupported transfer mode: {_transfer.Mode}")
+        };
     }
 
     // バックグラウンド処理の本体
@@ -63,11 +68,11 @@ public class Worker : BackgroundService
             var id = Guid.NewGuid();
             if (item.Action == TransferAction.Upload)
             {
-                await ProcessUploadAsync(client, item, id, token);
+                await ProcessUploadAsync(client, item, id, token).ConfigureAwait(false);
             }
             else
             {
-                await ProcessDownloadAsync(client, item, id, token);
+                await ProcessDownloadAsync(client, item, id, token).ConfigureAwait(false);
             }
         }, stoppingToken);
 
@@ -109,7 +114,7 @@ public class Worker : BackgroundService
         {
             try
             {
-                var files = await client.ListFilesAsync(_transfer.RemotePath, stoppingToken);
+                var files = await client.ListFilesAsync(_transfer.RemotePath, stoppingToken).ConfigureAwait(false);
                 foreach (var f in files)
                 {
                     _channel.Writer.TryWrite(new TransferItem(f, TransferAction.Download));
@@ -124,7 +129,7 @@ public class Worker : BackgroundService
 
         // 書き込みを完了してすべての転送が終わるのを待機
         _channel.Writer.Complete();
-        await queueTask;
+        await queueTask.ConfigureAwait(false);
 
         // すべての処理が完了したらアプリケーションを停止
         _lifetime.StopApplication();
@@ -143,15 +148,15 @@ public class Worker : BackgroundService
         _logger.LogInformation("[{Id}] Starting upload {File} to {Remote}", id, item.Path, remotePath);
 
         // 事前にローカルファイルのハッシュを計算
-        var localHash = await HashUtil.ComputeHashAsync(item.Path, _hash.Algorithm, token);
+        var localHash = await HashUtil.ComputeHashAsync(item.Path, _hash.Algorithm, token).ConfigureAwait(false);
         _logger.LogDebug("[{Id}] Local hash calculated: {Hash}", id, localHash);
 
         // アップロード実行
-        await client.UploadAsync(item.Path, remotePath, token);
+        await client.UploadAsync(item.Path, remotePath, token).ConfigureAwait(false);
         _logger.LogInformation("[{Id}] Upload completed for {File}", id, item.Path);
 
         // リモートファイルのハッシュを取得して検証
-        var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token, false);
+        var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token, false).ConfigureAwait(false);
         _logger.LogDebug("[{Id}] Remote hash calculated: {Hash}", id, remoteHash);
 
         if (string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
@@ -189,9 +194,20 @@ public class Worker : BackgroundService
     {
         // パストラバーサル攻撃対策
         var fileName = Path.GetFileName(item.Path);
-        if (string.IsNullOrEmpty(fileName) || fileName.Contains("..") || Path.IsPathRooted(fileName))
+        if (string.IsNullOrEmpty(fileName))
         {
-            throw new ArgumentException($"Invalid or unsafe file name: {fileName}");
+            throw new ArgumentException($"Invalid file name: {item.Path}");
+        }
+        
+        // ファイル名の安全性をチェック（パストラバーサル攻撃対策）
+        var safePath = Path.Combine(_watch.Path, fileName);
+        var fullPath = Path.GetFullPath(safePath);
+        var watchFullPath = Path.GetFullPath(_watch.Path);
+        
+        if (!fullPath.StartsWith(watchFullPath + Path.DirectorySeparatorChar) && 
+            !string.Equals(fullPath, watchFullPath, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new ArgumentException($"Unsafe file path detected: {fileName}");
         }
         
         var localPath = Path.Combine(_watch.Path, fileName);
@@ -199,15 +215,15 @@ public class Worker : BackgroundService
         _logger.LogInformation("[{Id}] Starting download {Remote} to {Local}", id, item.Path, localPath);
 
         // 事前にリモートファイルのハッシュを計算
-        var remoteHash = await client.GetRemoteHashAsync(item.Path, _hash.Algorithm, token, false);
+        var remoteHash = await client.GetRemoteHashAsync(item.Path, _hash.Algorithm, token, false).ConfigureAwait(false);
         _logger.LogDebug("[{Id}] Remote hash calculated: {Hash}", id, remoteHash);
 
         // ダウンロード実行
-        await client.DownloadAsync(item.Path, localPath, token);
+        await client.DownloadAsync(item.Path, localPath, token).ConfigureAwait(false);
         _logger.LogInformation("[{Id}] Download completed for {Remote}", id, item.Path);
 
         // ローカルファイルのハッシュを計算して検証
-        var localHash = await HashUtil.ComputeHashAsync(localPath, _hash.Algorithm, token);
+        var localHash = await HashUtil.ComputeHashAsync(localPath, _hash.Algorithm, token).ConfigureAwait(false);
         _logger.LogDebug("[{Id}] Local hash calculated: {Hash}", id, localHash);
 
         if (string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
@@ -215,7 +231,7 @@ public class Worker : BackgroundService
             _logger.LogInformation("[{Id}] Hash verification successful for {Remote}", id, item.Path);
             if (_cleanup.DeleteRemoteAfterDownload)
             {
-                await client.DeleteAsync(item.Path, token);
+                await client.DeleteAsync(item.Path, token).ConfigureAwait(false);
                 _logger.LogInformation("[{Id}] Deleted remote file {Remote}", id, item.Path);
             }
         }

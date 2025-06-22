@@ -73,7 +73,8 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
         var now = DateTime.UtcNow.Date;
         if (_writer == null)
         {
-            _writer = new StreamWriter(new FileStream(GetPath(), FileMode.Append, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
+            var fs = new FileStream(GetPath(), FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+            _writer = new StreamWriter(fs) { AutoFlush = true };
             _currentDate = now;
             return;
         }
@@ -82,14 +83,25 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
             _writer.Dispose();
             _index = 0;
             _currentDate = now;
-            _writer = new StreamWriter(new FileStream(GetPath(), FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
+            var fs1 = new FileStream(GetPath(), FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+            _writer = new StreamWriter(fs1) { AutoFlush = true };
             return;
         }
-        if (new FileInfo(GetPath()).Length >= _options.MaxBytes)
+        
+        // ファイルサイズチェックを安全に行う
+        try
         {
-            _writer.Dispose();
-            _index++;
-            _writer = new StreamWriter(new FileStream(GetPath(), FileMode.Create, FileAccess.Write, FileShare.ReadWrite)) { AutoFlush = true };
+            if (new FileInfo(GetPath()).Length >= _options.MaxBytes)
+            {
+                _writer.Dispose();
+                _index++;
+                var fs2 = new FileStream(GetPath(), FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
+                _writer = new StreamWriter(fs2) { AutoFlush = true };
+            }
+        }
+        catch (IOException)
+        {
+            // ファイルアクセス中の場合は次回チェック
         }
     }
 
