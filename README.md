@@ -1,120 +1,198 @@
 # FtpTransferAgent
 
-## 概要
+.NET 8 で構築されたバッチ型ファイル転送ツールで、指定フォルダ内のファイルを FTP/SFTP 経由で確実に転送します。
 
-`FtpTransferAgent` は .NET 8 で実装されたコンソールツールで、指定したフォルダに存在するファイルを FTP もしくは SFTP 経由で転送します。アップロードだけでなくダウンロードにも対応しており、転送後はハッシュ値を検証し、必要に応じてローカルファイルやリモートファイルの削除も行います。アプリケーションの各種挙動は `appsettings.json` によって設定できます。
+## 主な特徴
 
-## 主な構成ファイル
+- 🚀 **バッチ処理型**: 起動時に一回だけ処理を実行して終了（常駐しない）
+- 📤📥 **双方向転送**: アップロード・ダウンロード・両方向転送に対応
+- 🔐 **SFTP 鍵認証**: パスワード認証と鍵認証の両方をサポート
+- 🔒 **整合性検証**: MD5/SHA256 ハッシュによる転送後検証
+- 🔄 **自動再試行**: Polly による指数バックオフ再試行
+- ⚡ **並列転送**: 最大16ファイルの同時転送
+- 📝 **ローリングログ**: 日付・サイズベースのログローテーション
+- 📧 **エラー通知**: SMTP によるエラーメール送信
+- 🗑️ **自動削除**: 転送成功後の任意のファイル削除
 
-- **Program.cs** - アプリケーションのエントリーポイント。各種設定クラスを DI コンテナに登録し、`Worker` サービスを起動します。
-- **Worker.cs** - 実際の処理を行うクラス。以下の流れで動作します。
-  1. `IFileTransferClient`（FTP または SFTP のラッパークラス）を生成
-  2. `TransferQueue` を開始し、キュー内のファイルをアップロードまたはダウンロード
-  3. 指定フォルダに存在するファイルを列挙してキューに追加
-  4. 転送後にハッシュ値を比較し、一致すれば `CleanupOptions` に従い削除
-- **Services/**
-  - `AsyncFtpClientWrapper`・`SftpClientWrapper` - それぞれ FTP/SFTP 用のクライアントを実装。アップロード・ダウンロード処理とハッシュ取得機能を提供します。
-  - ~~`FolderWatcher`~~ - かつてフォルダ監視に使用していたコンポーネント（現在は未使用）。
-  - `TransferQueue` - `Channel` と `Polly` を使った再試行付きの処理キューです。並列転送数を指定できます。
-  - `HashUtil` - ファイルの MD5/SHA256 ハッシュを計算するユーティリティ。
-- **Configuration/** - 各種設定項目を表すクラス群。`appsettings.json` からバインドされます。
-- **config.schema.json** - 設定ファイルの JSON スキーマ。必須項目や値の制約が記載されています。
+## システム要件
 
-## 依存関係
+- .NET 8 Runtime または SDK
+- 対応OS: Windows、Linux、macOS
+- メモリ: 最小 512MB（推奨 1GB 以上）
 
-`dotnet restore` を実行すると以下の NuGet パッケージが自動的に取得されます。
+## クイックスタート
 
-- [FluentFTP](https://github.com/robinrodricks/FluentFTP) 52.1.0
-- [SSH.NET](https://github.com/sshnet/SSH.NET) 2025.0.0
-- [Polly](https://github.com/App-vNext/Polly) 8.6.0
-- Microsoft.Extensions.Hosting 9.0.6
-- Microsoft.Extensions.Options.DataAnnotations 9.0.6
+### 1. ビルドと実行
 
-テストを実行する場合は Python 3 と `pyftpdlib` が必要です。
+```bash
+# 依存関係の復元
+dotnet restore
 
-## 設定ファイル例
+# ビルド
+dotnet build --configuration Release
 
-`appsettings.json` では次のように設定を記述します（一部抜粋）。
+# 実行
+dotnet run --project FtpTransferAgent
+```
+
+### 2. 設定ファイルの作成
+
+`appsettings.json` を作成して転送設定を記述：
+
 ```json
 {
   "Watch": {
     "Path": "./watch",
     "IncludeSubfolders": false,
-    "AllowedExtensions": [".txt"]
+    "AllowedExtensions": [".txt", ".csv"]
   },
   "Transfer": {
-    "Mode": "sftp",
-    "Direction": "both",
-    "Host": "localhost",
-    "Port": 22,
+    "Mode": "ftp",
+    "Direction": "put",
+    "Host": "ftp.example.com",
+    "Port": 21,
     "Username": "user",
-    "PrivateKeyPath": "./id_ed25519",
-    "RemotePath": "/remote",
-    "Concurrency": 2,
-    "PreserveFolderStructure": false
+    "Password": "password",
+    "RemotePath": "/upload",
+    "Concurrency": 2
   },
   "Hash": {
-    "Algorithm": "MD5",
-    "UseServerCommand": false
+    "Algorithm": "MD5"
   }
 }
 ```
-`PrivateKeyPath` には SFTP 接続に使用する秘密鍵ファイルを指定します。鍵はアプリケーションから読み取り可能な場所に保存してください。鍵の生成例は以下の通りです。
+
+### 3. 定期実行の設定（推奨）
+
+本ツールはバッチ処理型のため、継続的な転送には定期実行を設定してください。
+
+**Linux/macOS (cron):**
 ```bash
-$ ssh-keygen -t ed25519 -f id_ed25519
-$ ssh-copy-id -i id_ed25519.pub user@host
+# 5分ごとに実行
+*/5 * * * * /path/to/FtpTransferAgent
+
+# 毎時0分に実行  
+0 * * * * /path/to/FtpTransferAgent
 ```
-`Transfer.Concurrency` を増やすと同時に処理する転送数を変更できます。詳細は同ファイルおよび `config.schema.json` を参照してください。
 
-`PreserveFolderStructure` を `true` にすると、`Watch.IncludeSubfolders` を有効にした場合に
-ローカルのフォルダ構成を保持したままアップロードします。
+**Windows (タスクスケジューラー):**
+```powershell
+# 5分間隔で実行するタスクを作成
+schtasks /create /tn "FtpTransferAgent" /tr "C:\path\to\FtpTransferAgent.exe" /sc minute /mo 5
+```
 
-`Hash.UseServerCommand` を `false` にすると、サーバーにハッシュ計算機能が無い場合でもファイルを取得してローカルでハッシュを計算します。
+## 設定項目
 
-## ログ設定
+### 転送設定（Transfer）
 
-`Logging.RollingFilePath` でファイルログの保存先を指定できます。さらに
-`MaxBytes` を設定すると、同一日のログファイルがこのサイズを超えた際に
-自動的にローテーションされます。
+| 項目 | 必須 | 説明 | 例 |
+|------|------|------|-----|
+| Mode | ✓ | プロトコル ("ftp" または "sftp") | "sftp" |
+| Direction | ✓ | 転送方向 ("get"/"put"/"both") | "both" |
+| Host | ✓ | サーバーホスト名 | "ftp.example.com" |
+| Username | ✓ | ユーザー名 | "ftpuser" |
+| Password | △ | パスワード (FTP必須、SFTP条件付き) | "password" |
+| PrivateKeyPath | - | SFTP秘密鍵ファイルパス | "./id_ed25519" |
+| RemotePath | ✓ | リモートディレクトリ | "/upload" |
+| Concurrency | - | 並列転送数 (1-16) | 4 |
 
-## エラーメール通知
+### SFTP 鍵認証の設定
 
-`Smtp.Enabled` を `true` にすると、`LogLevel.Error` 以上のログが出力された際に
-設定した宛先へメールが送信されます。SMTP サーバー情報や送信元/送信先は
-`Smtp` セクションで指定します。
-
-## ビルドと実行
-
-.NET 8 SDK がインストールされた環境で以下を実行します。
 ```bash
-# 依存関係の復元
-$ dotnet restore
+# 鍵ペアの生成
+ssh-keygen -t ed25519 -f id_ed25519
 
-# ビルド
-$ dotnet build --configuration Release
+# 公開鍵をサーバーに登録
+ssh-copy-id -i id_ed25519.pub user@server
 
-# 実行
-$ dotnet run --project FtpTransferAgent
+# 設定ファイルで秘密鍵を指定
+"PrivateKeyPath": "./id_ed25519"
 ```
+
+### その他の主要設定
+
+```json
+{
+  "Retry": {
+    "MaxAttempts": 3,        // 最大再試行回数
+    "DelaySeconds": 5        // 再試行間隔（秒）
+  },
+  "Hash": {
+    "Algorithm": "SHA256",   // ハッシュアルゴリズム (MD5/SHA256)
+    "UseServerCommand": false // サーバーコマンド使用フラグ
+  },
+  "Cleanup": {
+    "DeleteAfterVerify": true,           // アップロード成功後ローカル削除
+    "DeleteRemoteAfterDownload": false   // ダウンロード成功後リモート削除
+  },
+  "Logging": {
+    "Level": "Information",              // ログレベル
+    "RollingFilePath": "logs/app-.log",  // ログファイルパス
+    "MaxBytes": 10485760                 // ローテーションサイズ
+  }
+}
+```
+
+## 動作フロー
+
+1. **起動時**: 設定ファイル読み込み、FTP/SFTPクライアント初期化
+2. **ファイル列挙**: Watch.Path内のファイル検出、またはリモートファイル一覧取得
+3. **並列転送**: 指定並列度でファイル転送実行
+4. **整合性検証**: ハッシュ値比較による転送結果検証
+5. **後処理**: 設定に応じてファイル削除
+6. **終了**: 全処理完了後にアプリケーション終了
 
 ## テスト
 
-統合テストでは Python 製の FTP サーバーを利用するため、事前に `pyftpdlib` をインストールしておきます。
+統合テストでは Python の FTP サーバーを使用します。
 
 ```bash
-$ pip install pyftpdlib
-$ dotnet build
-$ dotnet test --no-build --verbosity normal
+# Python FTP サーバーのインストール
+pip install pyftpdlib
+
+# テスト実行
+dotnet test --configuration Release --verbosity normal
 ```
 
-## よくあるエラーと対処法
+## 公開・配布
 
-- **接続エラーが発生する**: ホスト名・ポート・認証情報が正しいか確認してください。
-- **アップロードに失敗する**: SFTP ではアップロード先ディレクトリが存在しないとエラーになります。必要に応じてリモート側で事前に作成してください。
+```bash
+# プラットフォーム別の自己完結型実行ファイル作成
+dotnet publish -c Release -r win-x64 --self-contained
+dotnet publish -c Release -r linux-x64 --self-contained
+dotnet publish -c Release -r osx-x64 --self-contained
+```
 
- - **ハッシュ検証に失敗する**: 一部の FTP サーバーではハッシュ計算コマンドをサポートしていません。その際は `Hash.UseServerCommand` を `false` に設定すると、サーバーコマンドを使わずファイルをダウンロードしてハッシュを計算します。
+## よくある問題
 
+### ファイルが転送されない
+- `AllowedExtensions` の設定を確認
+- `Watch.Path` が正しいパスか確認
+- ファイルが他プロセスで使用中でないか確認
+
+### 接続エラー
+- ホスト名・ポート番号・認証情報を確認
+- ネットワーク接続とファイアウォール設定を確認
+
+### ハッシュ検証エラー
+- `Hash.UseServerCommand` を `false` に設定してローカル計算を試行
+- ネットワークの安定性を確認
+
+## 依存関係
+
+- [FluentFTP](https://github.com/robinrodricks/FluentFTP) 52.1.0 - FTP クライアント
+- [SSH.NET](https://github.com/sshnet/SSH.NET) 2025.0.0 - SFTP クライアント  
+- [Polly](https://github.com/App-vNext/Polly) 8.6.0 - 再試行ライブラリ
+- Microsoft.Extensions.Hosting 9.0.6 - ホスティングフレームワーク
+- Microsoft.Extensions.Options.DataAnnotations 9.0.6 - 設定検証
 
 ## ライセンス
 
 このプロジェクトは MIT ライセンスの下で公開されています。
+
+## 注意事項
+
+- **バッチ処理型**: 本ツールは起動時に一度だけ処理を実行して終了します
+- **定期実行推奨**: 継続的な転送には cron やタスクスケジューラーでの定期実行を設定してください
+- **リアルタイム監視なし**: ファイルの変更をリアルタイムで監視する機能はありません
+- **セキュリティ**: パスワードは環境変数や秘密管理ツールでの管理を推奨します
