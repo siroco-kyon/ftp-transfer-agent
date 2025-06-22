@@ -1,6 +1,8 @@
 bin/
 obj/
 .vscode/
+.vs/
 .env
 *.user
+*.suo
 *.log
