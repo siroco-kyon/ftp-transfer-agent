@@ -51,10 +51,10 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
     {
         await EnsureConnectedAsync(ct).ConfigureAwait(false);
         await EnsureDirectoryAsync(remotePath, ct).ConfigureAwait(false);
-        
+
         // 一意な一時ファイル名で衝突防止
         var tempPath = $"{remotePath}.tmp.{Guid.NewGuid():N}";
-        
+
         await _client.UploadFile(localPath, tempPath, FtpRemoteExists.Overwrite, true, FtpVerify.None, null, ct).ConfigureAwait(false);
         await _client.MoveFile(tempPath, remotePath, FtpRemoteExists.Overwrite, ct).ConfigureAwait(false);
     }

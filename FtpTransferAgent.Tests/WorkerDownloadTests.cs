@@ -37,7 +37,7 @@ public class WorkerDownloadTests
 
         var remoteFile = "/remote/sample.txt";
         var localPath = Path.Combine(dir, "sample.txt");
-        
+
         // メモリストリームを早期Disposeしないように修正
         string remoteHash;
         {

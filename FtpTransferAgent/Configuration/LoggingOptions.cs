@@ -10,10 +10,10 @@ public class LoggingOptions
     [Required]
     [RegularExpression("^(Trace|Debug|Information|Warning|Error|Critical|None)$")]
     public string Level { get; set; } = "Information";
-    
+
     [Required]
     public string RollingFilePath { get; set; } = string.Empty;
-    
+
     /// <summary>
     /// ログファイルをローテーションする最大サイズ（バイト）。
     /// 既定値は 10MB。

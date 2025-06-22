@@ -22,7 +22,7 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(logger);
-        
+
         _logger = logger;
 
         if (client != null)
@@ -61,7 +61,7 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
             await Task.Run(() => _client.Connect()).ConfigureAwait(false);
         }
     }
-    
+
     // 同期版は既存コード互換性のため保持
     private void EnsureConnected()
     {
@@ -100,10 +100,10 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     {
         await EnsureConnectedAsync().ConfigureAwait(false);
         EnsureDirectory(remotePath);
-        
+
         // 一意な一時ファイル名で衝突防止
         var temp = $"{remotePath}.tmp.{Guid.NewGuid():N}";
-        
+
         await using var fs = File.OpenRead(localPath);
         _client.UploadFile(fs, temp, true);
         if (_client.Exists(remotePath))
@@ -118,12 +118,12 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     {
         await EnsureConnectedAsync().ConfigureAwait(false);
         var temp = $"{localPath}.tmp.{Guid.NewGuid():N}";
-        
+
         await using (var fs = File.Create(temp))
         {
             _client.DownloadFile(remotePath, fs);
         }
-        
+
         File.Move(temp, localPath, true);
     }
 
@@ -131,7 +131,7 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     public async Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = false)
     {
         await EnsureConnectedAsync().ConfigureAwait(false);
-        
+
         // 大容量ファイルの場合はストリーミング処理
         using var stream = _client.OpenRead(remotePath);
         return await HashUtil.ComputeHashAsync(stream, algorithm, ct).ConfigureAwait(false);

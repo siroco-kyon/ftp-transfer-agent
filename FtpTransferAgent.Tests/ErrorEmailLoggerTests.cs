@@ -258,28 +258,28 @@ public class SmtpClientWrapper : ISmtpClientWrapper
         };
     }
 
-    public string Host 
-    { 
-        get => _smtpClient.Host ?? string.Empty; 
-        set => _smtpClient.Host = value; 
+    public string Host
+    {
+        get => _smtpClient.Host ?? string.Empty;
+        set => _smtpClient.Host = value;
     }
-    
-    public int Port 
-    { 
-        get => _smtpClient.Port; 
-        set => _smtpClient.Port = value; 
+
+    public int Port
+    {
+        get => _smtpClient.Port;
+        set => _smtpClient.Port = value;
     }
-    
-    public bool EnableSsl 
-    { 
-        get => _smtpClient.EnableSsl; 
-        set => _smtpClient.EnableSsl = value; 
+
+    public bool EnableSsl
+    {
+        get => _smtpClient.EnableSsl;
+        set => _smtpClient.EnableSsl = value;
     }
-    
-    public ICredentialsByHost? Credentials 
-    { 
-        get => _smtpClient.Credentials; 
-        set => _smtpClient.Credentials = value; 
+
+    public ICredentialsByHost? Credentials
+    {
+        get => _smtpClient.Credentials;
+        set => _smtpClient.Credentials = value;
     }
 
     public async Task SendMailAsync(MailMessage message)
@@ -321,7 +321,7 @@ public class TestableErrorEmailLogger : ILogger
         }
 
         var message = formatter(state, exception);
-        
+
         // テスト用に同期的にメール送信
         try
         {

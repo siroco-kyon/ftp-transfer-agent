@@ -212,11 +212,11 @@ public class ConfigurationValidationTests
     public void SmtpOptions_ShouldValidateEmailAddresses()
     {
         // Valid email configuration
-        var validOptions = new SmtpOptions 
-        { 
-            RelayHost = "smtp.test.com", 
-            RelayPort = 587, 
-            From = "test@example.com", 
+        var validOptions = new SmtpOptions
+        {
+            RelayHost = "smtp.test.com",
+            RelayPort = 587,
+            From = "test@example.com",
             To = new[] { "admin@example.com" },
             Username = "user",
             Password = "pass"
@@ -228,11 +228,11 @@ public class ConfigurationValidationTests
         var invalidFromEmails = new[] { "invalid-email", "@example.com", "test@", "" };
         foreach (var email in invalidFromEmails)
         {
-            var options = new SmtpOptions 
-            { 
-                RelayHost = "smtp.test.com", 
-                RelayPort = 587, 
-                From = email, 
+            var options = new SmtpOptions
+            {
+                RelayHost = "smtp.test.com",
+                RelayPort = 587,
+                From = email,
                 To = new[] { "admin@example.com" },
                 Username = "user",
                 Password = "pass"
@@ -249,11 +249,11 @@ public class ConfigurationValidationTests
         var validPorts = new[] { 25, 587, 465, 2525 };
         foreach (var port in validPorts)
         {
-            var options = new SmtpOptions 
-            { 
-                RelayHost = "smtp.test.com", 
-                RelayPort = port, 
-                From = "test@example.com", 
+            var options = new SmtpOptions
+            {
+                RelayHost = "smtp.test.com",
+                RelayPort = port,
+                From = "test@example.com",
                 To = new[] { "admin@example.com" },
                 Username = "user",
                 Password = "pass"
@@ -266,11 +266,11 @@ public class ConfigurationValidationTests
         var invalidPorts = new[] { 0, -1, 65536, 100000 };
         foreach (var port in invalidPorts)
         {
-            var options = new SmtpOptions 
-            { 
-                RelayHost = "smtp.test.com", 
-                RelayPort = port, 
-                From = "test@example.com", 
+            var options = new SmtpOptions
+            {
+                RelayHost = "smtp.test.com",
+                RelayPort = port,
+                From = "test@example.com",
                 To = new[] { "admin@example.com" },
                 Username = "user",
                 Password = "pass"
@@ -317,10 +317,10 @@ public class ConfigurationValidationTests
     public void CleanupOptions_ShouldHaveNoValidationErrors()
     {
         // CleanupOptionsは単純なbooleanプロパティのみなので、常に有効
-        var options = new CleanupOptions 
-        { 
-            DeleteAfterVerify = true, 
-            DeleteRemoteAfterDownload = false 
+        var options = new CleanupOptions
+        {
+            DeleteAfterVerify = true,
+            DeleteRemoteAfterDownload = false
         };
         var validation = ValidateObject(options);
         Assert.Empty(validation);
