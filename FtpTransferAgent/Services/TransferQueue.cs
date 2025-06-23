@@ -18,15 +18,19 @@ public class TransferQueue
     private readonly ILogger<TransferQueue> _logger;
     private readonly int _concurrency;
     private readonly ConcurrentDictionary<string, bool> _processedItems = new();
+    private readonly ConcurrentDictionary<string, DateTime> _activeItems = new();
+    private int _totalEnqueued = 0;
+    private int _totalCompleted = 0;
+    private int _totalFailed = 0;
 
     public TransferQueue(Channel<TransferItem> channel, RetryOptions options, ILogger<TransferQueue> logger, int concurrency = 1)
     {
         _reader = channel.Reader;
         _logger = logger;
         _concurrency = Math.Max(1, Math.Min(concurrency, 16)); // 最大16に制限
-        // 例外発生時にリトライするポリシー
+        // リトライ可能な例外のみリトライするポリシー
         _policy = Policy
-            .Handle<Exception>()
+            .Handle<Exception>(ex => RetryableExceptionClassifier.IsRetryable(ex))
             .WaitAndRetryAsync(
                 retryCount: options.MaxAttempts,
                 sleepDurationProvider: attempt => TimeSpan.FromSeconds(options.DelaySeconds * Math.Pow(2, attempt - 1)), // 指数バックオフ（初回は基本遅延）
@@ -68,6 +72,10 @@ public class TransferQueue
                             continue;
                         }
 
+                        // アクティブアイテムとして追跡開始
+                        _activeItems.TryAdd(itemKey, DateTime.UtcNow);
+                        Interlocked.Increment(ref _totalEnqueued);
+
                         var context = new Context(itemKey) { ["ItemPath"] = item.Path };
                         try
                         {
@@ -76,11 +84,25 @@ public class TransferQueue
                                 _logger.LogDebug("Worker {WorkerId} processing {ItemKey}", workerId, itemKey);
                                 await handler(item, t).ConfigureAwait(false);
                             }, context, token).ConfigureAwait(false);
+                            
                             _logger.LogDebug("Worker {WorkerId} completed {ItemKey}", workerId, itemKey);
+                            _activeItems.TryRemove(itemKey, out _);
+                            Interlocked.Increment(ref _totalCompleted);
                         }
                         catch (Exception ex)
                         {
-                            _logger.LogError(ex, "Worker {WorkerId} failed to process {ItemKey} after all retries", workerId, itemKey);
+                            _activeItems.TryRemove(itemKey, out _);
+                            Interlocked.Increment(ref _totalFailed);
+                            
+                            if (RetryableExceptionClassifier.IsRetryable(ex))
+                            {
+                                _logger.LogError(ex, "Worker {WorkerId} failed to process {ItemKey} after all retries (Retryable)", workerId, itemKey);
+                            }
+                            else
+                            {
+                                _logger.LogError(ex, "Worker {WorkerId} failed to process {ItemKey} - Non-retryable error", workerId, itemKey);
+                            }
+                            
                             // 失敗したアイテムは処理済みとして保持（無限リトライ防止）
                             // リトライが必要な場合は手動でアプリケーションを再起動
                             throw;
@@ -98,8 +120,45 @@ public class TransferQueue
     /// <summary>
     /// 処理結果の統計情報を取得
     /// </summary>
-    public (int ProcessedCount, int TotalItems) GetStatistics()
+    public TransferStatistics GetStatistics()
     {
-        return (_processedItems.Count, _processedItems.Count);
+        return new TransferStatistics
+        {
+            TotalEnqueued = _totalEnqueued,
+            TotalCompleted = _totalCompleted,
+            TotalFailed = _totalFailed,
+            ActiveItems = _activeItems.Count,
+            ProcessedItems = _processedItems.Count,
+            MemoryUsageMB = GC.GetTotalMemory(false) / (1024 * 1024),
+            ActiveWorkers = _concurrency
+        };
     }
+
+    /// <summary>
+    /// 長時間実行中のアイテムを検出
+    /// </summary>
+    public IEnumerable<(string ItemKey, TimeSpan Duration)> GetLongRunningItems(TimeSpan threshold)
+    {
+        var now = DateTime.UtcNow;
+        return _activeItems
+            .Where(kvp => now - kvp.Value > threshold)
+            .Select(kvp => (kvp.Key, now - kvp.Value));
+    }
+}
+
+/// <summary>
+/// 転送統計情報
+/// </summary>
+public class TransferStatistics
+{
+    public int TotalEnqueued { get; set; }
+    public int TotalCompleted { get; set; }
+    public int TotalFailed { get; set; }
+    public int ActiveItems { get; set; }
+    public int ProcessedItems { get; set; }
+    public long MemoryUsageMB { get; set; }
+    public int ActiveWorkers { get; set; }
+    
+    public double SuccessRate => TotalEnqueued > 0 ? (double)TotalCompleted / TotalEnqueued * 100 : 0;
+    public int RemainingItems => TotalEnqueued - TotalCompleted - TotalFailed;
 }

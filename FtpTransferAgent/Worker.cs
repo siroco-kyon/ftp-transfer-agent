@@ -42,13 +42,13 @@ public class Worker : BackgroundService
         _lifetime = lifetime;
     }
 
-    // テスト用にクライアント生成処理をオーバーライドできるようメソッド化
+    // DI を活用してクライアントファクトリパターンを実装
     protected virtual IFileTransferClient CreateClient()
     {
         return _transfer.Mode.ToLowerInvariant() switch
         {
-            "sftp" => new SftpClientWrapper(_transfer, _services.GetRequiredService<ILogger<SftpClientWrapper>>()),
-            "ftp" => new AsyncFtpClientWrapper(_transfer, _services.GetRequiredService<ILogger<AsyncFtpClientWrapper>>()),
+            "sftp" => ActivatorUtilities.CreateInstance<SftpClientWrapper>(_services, _transfer),
+            "ftp" => ActivatorUtilities.CreateInstance<AsyncFtpClientWrapper>(_services, _transfer),
             _ => throw new ArgumentException($"Unsupported transfer mode: {_transfer.Mode}")
         };
     }
@@ -62,6 +62,10 @@ public class Worker : BackgroundService
         // 再試行付きの転送キューを開始
         var queueLogger = _services.GetRequiredService<ILogger<TransferQueue>>();
         var queue = new TransferQueue(_channel, _retry, queueLogger, _transfer.Concurrency);
+        
+        // パフォーマンス監視タスクを開始
+        var monitorTask = StartPerformanceMonitoringAsync(queue, stoppingToken);
+        
         var queueTask = queue.StartAsync(async (item, token) =>
         {
             // 各転送処理の識別子
@@ -130,6 +134,11 @@ public class Worker : BackgroundService
         // 書き込みを完了してすべての転送が終わるのを待機
         _channel.Writer.Complete();
         await queueTask.ConfigureAwait(false);
+
+        // 最終統計情報をログ出力
+        var finalStats = queue.GetStatistics();
+        _logger.LogInformation("Transfer completed. Total: {Total}, Success: {Success}, Failed: {Failed}, Success Rate: {Rate:F1}%",
+            finalStats.TotalEnqueued, finalStats.TotalCompleted, finalStats.TotalFailed, finalStats.SuccessRate);
 
         // すべての処理が完了したらアプリケーションを停止
         _lifetime.StopApplication();
@@ -240,6 +249,48 @@ public class Worker : BackgroundService
             var error = $"Hash mismatch for {item.Path}: Remote={remoteHash}, Local={localHash}";
             _logger.LogError("[{Id}] {Error}", id, error);
             throw new InvalidOperationException(error);
+        }
+    }
+
+    /// <summary>
+    /// パフォーマンス監視タスクを開始
+    /// </summary>
+    private async Task StartPerformanceMonitoringAsync(TransferQueue queue, CancellationToken cancellationToken)
+    {
+        try
+        {
+            while (!cancellationToken.IsCancellationRequested)
+            {
+                await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken).ConfigureAwait(false);
+                
+                var stats = queue.GetStatistics();
+                if (stats.TotalEnqueued > 0)
+                {
+                    _logger.LogInformation("Transfer Progress - Total: {Total}, Completed: {Completed}, Failed: {Failed}, Active: {Active}, Memory: {Memory}MB, Success Rate: {Rate:F1}%",
+                        stats.TotalEnqueued, stats.TotalCompleted, stats.TotalFailed, stats.ActiveItems, stats.MemoryUsageMB, stats.SuccessRate);
+                }
+
+                // 長時間実行中のアイテムを警告
+                var longRunningItems = queue.GetLongRunningItems(TimeSpan.FromMinutes(5));
+                foreach (var (itemKey, duration) in longRunningItems)
+                {
+                    _logger.LogWarning("Long running transfer detected: {ItemKey} running for {Duration}", itemKey, duration);
+                }
+
+                // メモリ使用量が高い場合は警告
+                if (stats.MemoryUsageMB > 500)
+                {
+                    _logger.LogWarning("High memory usage detected: {Memory}MB", stats.MemoryUsageMB);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // 正常な終了処理
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Performance monitoring task failed");
         }
     }
 

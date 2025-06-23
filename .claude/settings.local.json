@@ -7,7 +7,12 @@
       "Bash(dotnet build:*)",
       "Bash(python:*)",
       "Bash(apt-get:*)",
-      "Bash(apt-get install:*)"
+      "Bash(apt-get install:*)",
+      "Bash(rg:*)",
+      "Bash(dotnet test:*)",
+      "Bash(ls:*)",
+      "Bash(snap list:*)",
+      "Bash(apt list:*)"
     ],
     "deny": []
   }

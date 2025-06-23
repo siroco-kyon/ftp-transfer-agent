@@ -40,6 +40,9 @@ if (smtp.Enabled)
     builder.Logging.AddProvider(new ErrorEmailLoggerProvider(smtp));
 }
 
+// 設定バリデーターを登録
+builder.Services.AddSingleton<ConfigurationValidator>();
+
 // バックグラウンド処理を行う Worker を登録
 builder.Services.AddHostedService<Worker>();
 
@@ -47,6 +50,37 @@ builder.Services.AddHostedService<Worker>();
 try
 {
     var host = builder.Build();
+    
+    // 設定の包括的バリデーションを実行
+    var validator = host.Services.GetRequiredService<ConfigurationValidator>();
+    var watchOptions = host.Services.GetRequiredService<IOptions<WatchOptions>>().Value;
+    var transferOptions = host.Services.GetRequiredService<IOptions<TransferOptions>>().Value;
+    var retryOptions = host.Services.GetRequiredService<IOptions<RetryOptions>>().Value;
+    var hashOptions = host.Services.GetRequiredService<IOptions<HashOptions>>().Value;
+    var cleanupOptions = host.Services.GetRequiredService<IOptions<CleanupOptions>>().Value;
+    
+    var validationResult = validator.ValidateConfiguration(
+        watchOptions, transferOptions, retryOptions, hashOptions, cleanupOptions);
+    
+    if (!validationResult.IsValid)
+    {
+        Console.WriteLine("Configuration validation failed:");
+        foreach (var error in validationResult.Errors)
+        {
+            Console.WriteLine($"ERROR: {error}");
+        }
+        Environment.Exit(1);
+    }
+    
+    if (validationResult.HasWarnings)
+    {
+        Console.WriteLine("Configuration warnings:");
+        foreach (var warning in validationResult.Warnings)
+        {
+            Console.WriteLine($"WARNING: {warning}");
+        }
+    }
+    
     host.Run();
 }
 catch (Exception ex)
