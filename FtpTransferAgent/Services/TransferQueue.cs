@@ -19,6 +19,7 @@ public class TransferQueue
     private readonly int _concurrency;
     private readonly ConcurrentDictionary<string, bool> _processedItems = new();
     private readonly ConcurrentDictionary<string, DateTime> _activeItems = new();
+    private readonly ConcurrentBag<Exception> _criticalExceptions = new();
     private int _totalEnqueued = 0;
     private int _totalCompleted = 0;
     private int _totalFailed = 0;
@@ -64,7 +65,7 @@ public class TransferQueue
                 {
                     while (_reader.TryRead(out var item))
                     {
-                        // 重複処理を防ぐ
+                        // 重複処理を防ぐ（アトミックな処理保証）
                         var itemKey = $"{item.Action}:{item.Path}";
                         if (!_processedItems.TryAdd(itemKey, true))
                         {
@@ -72,9 +73,10 @@ public class TransferQueue
                             continue;
                         }
 
-                        // アクティブアイテムとして追跡開始
-                        _activeItems.TryAdd(itemKey, DateTime.UtcNow);
-                        Interlocked.Increment(ref _totalEnqueued);
+                        // アクティブアイテムとして追跡開始（処理済み登録後に確実に実行）
+                        var startTime = DateTime.UtcNow;
+                        _activeItems.TryAdd(itemKey, startTime);
+                        var enqueuedCount = Interlocked.Increment(ref _totalEnqueued);
 
                         var context = new Context(itemKey) { ["ItemPath"] = item.Path };
                         try
@@ -101,11 +103,12 @@ public class TransferQueue
                             else
                             {
                                 _logger.LogError(ex, "Worker {WorkerId} failed to process {ItemKey} - Non-retryable error", workerId, itemKey);
+                                // クリティカルエラーは記録するが他のワーカーの処理は継続
+                                _criticalExceptions.Add(ex);
                             }
                             
+                            // 例外を再スローせず、他のワーカーの処理を継続させる
                             // 失敗したアイテムは処理済みとして保持（無限リトライ防止）
-                            // リトライが必要な場合は手動でアプリケーションを再起動
-                            throw;
                         }
                     }
                 }
@@ -130,8 +133,17 @@ public class TransferQueue
             ActiveItems = _activeItems.Count,
             ProcessedItems = _processedItems.Count,
             MemoryUsageMB = GC.GetTotalMemory(false) / (1024 * 1024),
-            ActiveWorkers = _concurrency
+            ActiveWorkers = _concurrency,
+            CriticalErrorCount = _criticalExceptions.Count
         };
+    }
+    
+    /// <summary>
+    /// クリティカルエラーの一覧を取得
+    /// </summary>
+    public IEnumerable<Exception> GetCriticalExceptions()
+    {
+        return _criticalExceptions;
     }
 
     /// <summary>
@@ -158,6 +170,7 @@ public class TransferStatistics
     public int ProcessedItems { get; set; }
     public long MemoryUsageMB { get; set; }
     public int ActiveWorkers { get; set; }
+    public int CriticalErrorCount { get; set; }
     
     public double SuccessRate => TotalEnqueued > 0 ? (double)TotalCompleted / TotalEnqueued * 100 : 0;
     public int RemainingItems => TotalEnqueued - TotalCompleted - TotalFailed;

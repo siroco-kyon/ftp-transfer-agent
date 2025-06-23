@@ -12,7 +12,8 @@
       "Bash(dotnet test:*)",
       "Bash(ls:*)",
       "Bash(snap list:*)",
-      "Bash(apt list:*)"
+      "Bash(apt list:*)",
+      "Bash(grep:*)"
     ],
     "deny": []
   }

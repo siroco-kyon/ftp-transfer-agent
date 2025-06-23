@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Security;
 using FluentFTP.Exceptions;
 using Renci.SshNet.Common;
 
@@ -31,8 +32,8 @@ public static class RetryableExceptionClassifier
             UnauthorizedAccessException => true, // ファイルロック等の一時的な問題の可能性
             
             // 設定やセキュリティ関連の例外（リトライ不可）
+            ArgumentNullException => false, // より具体的な例外を先に配置
             ArgumentException => false,
-            ArgumentNullException => false,
             InvalidOperationException => false,
             DirectoryNotFoundException => false,
             SecurityException => false,
@@ -47,27 +48,31 @@ public static class RetryableExceptionClassifier
     /// </summary>
     private static bool IsRetryableFtpException(FtpException ftpException)
     {
-        // FTPの応答コードに基づいて判定
-        var code = ftpException.CompletionCode;
-        return code switch
+        // FluentFTPの例外メッセージやタイプに基づいて判定
+        var message = ftpException.Message;
+        
+        // 一時的なエラーの可能性が高いメッセージパターン
+        if (message.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("connection", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("network", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("busy", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("unavailable", StringComparison.OrdinalIgnoreCase))
         {
-            "421" => true,  // Service not available, closing control connection
-            "425" => true,  // Can't open data connection
-            "426" => true,  // Connection closed; transfer aborted
-            "450" => true,  // Requested file action not taken. File unavailable (e.g., file busy)
-            "451" => true,  // Requested action aborted: local error in processing
-            "452" => true,  // Requested action not taken. Insufficient storage space in system
-            "500" => false, // Syntax error, command unrecognized
-            "501" => false, // Syntax error in parameters or arguments
-            "502" => false, // Command not implemented
-            "503" => false, // Bad sequence of commands
-            "530" => false, // Not logged in
-            "550" => false, // Requested action not taken. File unavailable (e.g., file not found, no access)
-            "551" => false, // Requested action aborted: page type unknown
-            "552" => false, // Requested file action aborted. Exceeded storage allocation
-            "553" => false, // Requested action not taken. File name not allowed
-            _ => true       // 不明なコードは安全のためリトライする
-        };
+            return true;
+        }
+        
+        // 設定や認証エラーの可能性が高いメッセージパターン
+        if (message.Contains("login", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("authentication", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("permission", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("not found", StringComparison.OrdinalIgnoreCase) ||
+            message.Contains("syntax", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+        
+        // 不明な場合は安全のためリトライする
+        return true;
     }
     
     /// <summary>

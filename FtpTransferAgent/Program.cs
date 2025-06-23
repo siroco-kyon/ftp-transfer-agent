@@ -1,7 +1,10 @@
 using FtpTransferAgent;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 
 // アプリケーションのエントリーポイント
 
@@ -59,7 +62,7 @@ try
     var hashOptions = host.Services.GetRequiredService<IOptions<HashOptions>>().Value;
     var cleanupOptions = host.Services.GetRequiredService<IOptions<CleanupOptions>>().Value;
     
-    var validationResult = validator.ValidateConfiguration(
+    ConfigurationValidationResult validationResult = validator.ValidateConfiguration(
         watchOptions, transferOptions, retryOptions, hashOptions, cleanupOptions);
     
     if (!validationResult.IsValid)

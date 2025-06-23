@@ -6,7 +6,8 @@ namespace FtpTransferAgent.Configuration;
 /// <summary>
 /// 転送処理に関する設定
 /// </summary>
-public class TransferOptions : IValidatableObject
+[TransferOptionsValidation]
+public class TransferOptions
 {
     [Required]
     [RegularExpression("^(ftp|sftp)$")]
@@ -52,20 +53,4 @@ public class TransferOptions : IValidatableObject
     /// </summary>
     public bool PreserveFolderStructure { get; set; }
 
-    public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
-    {
-        if (Mode == "ftp" && string.IsNullOrEmpty(Password))
-        {
-            yield return new ValidationResult(
-                "Password is required for FTP mode",
-                new[] { nameof(Password) });
-        }
-
-        if (Mode == "sftp" && string.IsNullOrEmpty(Password) && string.IsNullOrEmpty(PrivateKeyPath))
-        {
-            yield return new ValidationResult(
-                "Password or PrivateKeyPath must be specified for SFTP mode",
-                new[] { nameof(Password), nameof(PrivateKeyPath) });
-        }
-    }
 }

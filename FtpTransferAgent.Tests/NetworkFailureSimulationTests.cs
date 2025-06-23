@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Sockets;
+using System.Threading.Channels;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Services;
 using Microsoft.Extensions.Logging;
@@ -37,6 +38,7 @@ public class NetworkFailureSimulationTests
         // 常にタイムアウトする処理
         async Task FailingHandler(TransferItem item, CancellationToken ct)
         {
+            await Task.Yield(); // 非同期であることを明示
             callCount++;
             throw new TimeoutException("Network timeout");
         }
@@ -45,8 +47,9 @@ public class NetworkFailureSimulationTests
         channel.Writer.TryWrite(new TransferItem("test.txt", TransferAction.Upload));
         channel.Writer.Complete();
 
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var exception = await Assert.ThrowsAsync<TimeoutException>(() => 
-            queue.StartAsync(FailingHandler, CancellationToken.None));
+            queue.StartAsync(FailingHandler, cts.Token));
 
         // リトライ回数が正しいことを確認（初回実行 + 3回リトライ = 4回）
         Assert.Equal(4, callCount);
@@ -63,6 +66,7 @@ public class NetworkFailureSimulationTests
         // 2回失敗して3回目で成功する処理
         async Task RecoveringHandler(TransferItem item, CancellationToken ct)
         {
+            await Task.Yield(); // 非同期であることを明示
             callCount++;
             if (callCount <= 2)
             {
@@ -95,6 +99,7 @@ public class NetworkFailureSimulationTests
         // 設定エラー（リトライ不可）
         async Task NonRetryableHandler(TransferItem item, CancellationToken ct)
         {
+            await Task.Yield(); // 非同期であることを明示
             callCount++;
             throw new ArgumentException("Invalid configuration");
         }
@@ -103,11 +108,19 @@ public class NetworkFailureSimulationTests
         channel.Writer.TryWrite(new TransferItem("test.txt", TransferAction.Upload));
         channel.Writer.Complete();
 
-        var exception = await Assert.ThrowsAsync<ArgumentException>(() => 
-            queue.StartAsync(NonRetryableHandler, CancellationToken.None));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        await queue.StartAsync(NonRetryableHandler, cts.Token);
 
         // リトライしないことを確認（1回のみ実行）
         Assert.Equal(1, callCount);
+        
+        // クリティカルエラーが記録されていることを確認
+        var stats = queue.GetStatistics();
+        Assert.Equal(1, stats.CriticalErrorCount);
+        
+        var criticalExceptions = queue.GetCriticalExceptions().ToList();
+        Assert.Single(criticalExceptions);
+        Assert.IsType<ArgumentException>(criticalExceptions.First());
     }
 
     [Fact]
@@ -122,6 +135,8 @@ public class NetworkFailureSimulationTests
         // 各ファイルで異なる失敗パターン
         async Task VariableFailureHandler(TransferItem item, CancellationToken ct)
         {
+            await Task.Yield(); // 非同期であることを明示
+            
             lock (lockObject)
             {
                 callCounts.TryGetValue(item.Path, out var count);
@@ -153,8 +168,9 @@ public class NetworkFailureSimulationTests
         channel.Writer.Complete();
 
         // file3.txtで非リトライ可能例外が発生するが、他のファイルは処理される
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         await Assert.ThrowsAnyAsync<Exception>(() => 
-            queue.StartAsync(VariableFailureHandler, CancellationToken.None));
+            queue.StartAsync(VariableFailureHandler, cts.Token));
 
         // Assert
         var stats = queue.GetStatistics();

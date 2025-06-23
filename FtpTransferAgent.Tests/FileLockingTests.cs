@@ -64,10 +64,10 @@ public class FileLockingTests : IDisposable
     [Fact]
     public void RetryableExceptionClassifier_ShouldIdentifyFileLockExceptions()
     {
-        // Arrange
-        var sharingViolationException = new IOException("The process cannot access the file because it is being used by another process.");
-        var lockViolationException = new IOException("The process cannot access the file because another process has locked a portion of the file.");
-        var diskFullException = new IOException("There is not enough space on the disk.");
+        // Arrange - プラットフォーム依存を考慮した例外作成
+        var sharingViolationException = CreateIOExceptionWithHResult(unchecked((int)0x80070020));
+        var lockViolationException = CreateIOExceptionWithHResult(unchecked((int)0x80070021));
+        var diskFullException = CreateIOExceptionWithHResult(unchecked((int)0x80070070));
         var genericIOException = new IOException("Generic IO error");
         
         // Act & Assert
@@ -75,6 +75,14 @@ public class FileLockingTests : IDisposable
         Assert.True(RetryableExceptionClassifier.IsRetryable(lockViolationException));
         Assert.True(RetryableExceptionClassifier.IsRetryable(diskFullException));
         Assert.False(RetryableExceptionClassifier.IsRetryable(genericIOException)); // HResultが設定されていない場合
+    }
+    
+    private static IOException CreateIOExceptionWithHResult(int hResult)
+    {
+        var ex = new IOException("Test exception");
+        // HResultプロパティを設定するためリフレクションを使用
+        typeof(Exception).GetProperty("HResult")?.SetValue(ex, hResult);
+        return ex;
     }
 
     [Fact]

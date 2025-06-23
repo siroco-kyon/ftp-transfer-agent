@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Security;
 using Microsoft.Extensions.Logging;
 
 namespace FtpTransferAgent.Configuration;
@@ -18,14 +19,14 @@ public class ConfigurationValidator
     /// <summary>
     /// 設定の包括的なバリデーションを実行
     /// </summary>
-    public ValidationResult ValidateConfiguration(
+    public ConfigurationValidationResult ValidateConfiguration(
         WatchOptions watch,
         TransferOptions transfer,
         RetryOptions retry,
         HashOptions hash,
         CleanupOptions cleanup)
     {
-        var result = new ValidationResult();
+        var result = new ConfigurationValidationResult();
 
         // 基本的な設定チェック
         ValidateBasicConfiguration(watch, transfer, result);
@@ -42,7 +43,7 @@ public class ConfigurationValidator
         return result;
     }
 
-    private void ValidateBasicConfiguration(WatchOptions watch, TransferOptions transfer, ValidationResult result)
+    private void ValidateBasicConfiguration(WatchOptions watch, TransferOptions transfer, ConfigurationValidationResult result)
     {
         // ローカルパスの存在チェック
         if (transfer.Direction is "put" or "both")
@@ -77,7 +78,7 @@ public class ConfigurationValidator
         }
     }
 
-    private void ValidatePerformanceConfiguration(TransferOptions transfer, RetryOptions retry, ValidationResult result)
+    private void ValidatePerformanceConfiguration(TransferOptions transfer, RetryOptions retry, ConfigurationValidationResult result)
     {
         // 並行処理とリトライ設定の組み合わせチェック
         if (transfer.Concurrency > 8 && retry.MaxAttempts > 5)
@@ -102,7 +103,7 @@ public class ConfigurationValidator
         }
     }
 
-    private void ValidateSecurityConfiguration(TransferOptions transfer, CleanupOptions cleanup, ValidationResult result)
+    private void ValidateSecurityConfiguration(TransferOptions transfer, CleanupOptions cleanup, ConfigurationValidationResult result)
     {
         // 認証情報の安全性チェック
         if (transfer.Mode == "ftp" && !string.IsNullOrEmpty(transfer.Password))
@@ -135,7 +136,7 @@ public class ConfigurationValidator
         TransferOptions transfer,
         HashOptions hash,
         CleanupOptions cleanup,
-        ValidationResult result)
+        ConfigurationValidationResult result)
     {
         // ハッシュ検証なしでファイル削除を有効にしている場合
         if (cleanup.DeleteAfterVerify && string.IsNullOrEmpty(hash.Algorithm))
@@ -216,10 +217,35 @@ public class ConfigurationValidator
     {
         try
         {
-            using var fs = File.OpenRead(path);
-            return true;
+            if (Directory.Exists(path))
+            {
+                Directory.GetFiles(path, "*", SearchOption.TopDirectoryOnly);
+                return true;
+            }
+            else if (File.Exists(path))
+            {
+                using var fs = File.OpenRead(path);
+                return true;
+            }
+            return false;
         }
         catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return false;
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (SecurityException)
         {
             return false;
         }
@@ -233,7 +259,7 @@ public class ConfigurationValidator
 /// <summary>
 /// 設定バリデーションの結果
 /// </summary>
-public class ValidationResult
+public class ConfigurationValidationResult
 {
     public List<string> Errors { get; } = new();
     public List<string> Warnings { get; } = new();

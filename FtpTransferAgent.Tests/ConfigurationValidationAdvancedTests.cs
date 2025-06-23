@@ -41,7 +41,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         var cleanup = new CleanupOptions { DeleteAfterVerify = false };
 
         // Act
-        var result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
 
         // Assert
         Assert.True(result.IsValid);
@@ -66,7 +66,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         var cleanup = new CleanupOptions();
 
         // Act
-        var result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
 
         // Assert
         Assert.False(result.IsValid);
@@ -92,7 +92,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         var cleanup = new CleanupOptions();
 
         // Act
-        var result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
 
         // Assert
         Assert.True(result.IsValid);
@@ -119,7 +119,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         var cleanup = new CleanupOptions();
 
         // Act
-        var result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
 
         // Assert
         Assert.True(result.HasWarnings);
@@ -143,7 +143,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         var cleanup = new CleanupOptions();
 
         // Act
-        var result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
 
         // Assert
         Assert.True(result.HasWarnings);
@@ -167,7 +167,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         var cleanup = new CleanupOptions { DeleteAfterVerify = true }; // ファイル削除有効
 
         // Act
-        var result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
 
         // Assert
         Assert.False(result.IsValid);
@@ -195,7 +195,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         var cleanup = new CleanupOptions();
 
         // Act
-        var result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
 
         // Assert
         Assert.False(result.IsValid);
@@ -220,7 +220,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         var cleanup = new CleanupOptions();
 
         // Act
-        var result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
 
         // Assert
         Assert.False(result.IsValid);
@@ -249,7 +249,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         var cleanup = new CleanupOptions();
 
         // Act
-        var result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
 
         // Assert
         Assert.True(result.IsValid);
@@ -336,7 +336,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         var cleanup = new CleanupOptions();
 
         // Act
-        var result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
 
         // Assert
         Assert.False(result.IsValid);

@@ -137,8 +137,15 @@ public class Worker : BackgroundService
 
         // 最終統計情報をログ出力
         var finalStats = queue.GetStatistics();
-        _logger.LogInformation("Transfer completed. Total: {Total}, Success: {Success}, Failed: {Failed}, Success Rate: {Rate:F1}%",
-            finalStats.TotalEnqueued, finalStats.TotalCompleted, finalStats.TotalFailed, finalStats.SuccessRate);
+        _logger.LogInformation("Transfer completed. Total: {Total}, Success: {Success}, Failed: {Failed}, Critical Errors: {Critical}, Success Rate: {Rate:F1}%",
+            finalStats.TotalEnqueued, finalStats.TotalCompleted, finalStats.TotalFailed, finalStats.CriticalErrorCount, finalStats.SuccessRate);
+        
+        // クリティカルエラーがあれば詳細をログ出力
+        var criticalExceptions = queue.GetCriticalExceptions();
+        foreach (var ex in criticalExceptions)
+        {
+            _logger.LogError(ex, "Critical error occurred during transfer: {Message}", ex.Message);
+        }
 
         // すべての処理が完了したらアプリケーションを停止
         _lifetime.StopApplication();
