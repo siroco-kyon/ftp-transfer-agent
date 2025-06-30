@@ -63,7 +63,8 @@ public class TransferQueue
             {
                 while (await _reader.WaitToReadAsync(token).ConfigureAwait(false))
                 {
-                    while (_reader.TryRead(out var item))
+                    // 一度に一つのアイテムのみ処理して真の並列処理を実現
+                    if (_reader.TryRead(out var item))
                     {
                         // 重複処理を防ぐ（アトミックな処理保証）
                         var itemKey = $"{item.Action}:{item.Path}";

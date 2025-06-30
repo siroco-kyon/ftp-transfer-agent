@@ -57,17 +57,18 @@ public class ParallelTransferQueueTests
 
         var attemptCount = 0;
 
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        // Act
+        await queue.StartAsync((transferItem, token) =>
         {
-            await queue.StartAsync((transferItem, token) =>
-            {
-                attemptCount++;
-                throw new InvalidOperationException("Test error");
-            }, CancellationToken.None);
-        });
+            attemptCount++;
+            throw new TimeoutException("Network timeout"); // リトライ可能な例外を使用
+        }, CancellationToken.None);
 
+        // Assert - 並列処理改善後は例外が再スローされずに統計情報に記録される
         Assert.Equal(3, attemptCount); // 初回 + 2回リトライ
+        var stats = queue.GetStatistics();
+        Assert.Equal(1, stats.TotalFailed);
+        Assert.Equal(0, stats.CriticalErrorCount); // TimeoutExceptionはクリティカルエラーではない
     }
 
     [Fact]
