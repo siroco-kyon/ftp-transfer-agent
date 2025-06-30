@@ -198,11 +198,8 @@ public class ReliableIntegrationTests : IDisposable
         // Act & Assert
         var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60)); // 統合テストに十分な時間を設定
 
-        // ハッシュミスマッチによる例外が発生することを確認
-        await Assert.ThrowsAnyAsync<Exception>(async () =>
-        {
-            await worker.TestExecuteAsync(cts.Token);
-        });
+        // 並列処理改善後は例外が再スローされない
+        await worker.TestExecuteAsync(cts.Token);
 
         // エラーログが出力されることを確認
         mockLogger.Verify(

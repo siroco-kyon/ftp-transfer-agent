@@ -23,13 +23,13 @@ public class TransferQueueTests
         int attempt = 0;
         int processed = 0;
 
-        // ハンドラー内で 1 度失敗させてリトライさせる
+        // ハンドラー内で 1 度失敗させてリトライさせる（リトライ可能な例外を使用）
         var queueTask = queue.StartAsync(async (item, ct) =>
         {
             attempt++;
             if (attempt < 2)
             {
-                throw new Exception("fail");
+                throw new TimeoutException("Network timeout - retryable");
             }
             await Task.Delay(10);
             processed++;
@@ -40,7 +40,10 @@ public class TransferQueueTests
         channel.Writer.Complete();
 
         await queueTask;
-        Assert.Equal(1, processed);
+        
+        // 並列処理改善後は統計情報で成功を確認
+        var stats = queue.GetStatistics();
+        Assert.Equal(1, stats.TotalCompleted);
         Assert.True(attempt >= 2);
     }
 }

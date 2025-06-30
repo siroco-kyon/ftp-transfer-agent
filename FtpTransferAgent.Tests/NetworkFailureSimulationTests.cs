@@ -43,16 +43,18 @@ public class NetworkFailureSimulationTests
             throw new TimeoutException("Network timeout");
         }
 
-        // Act & Assert
+        // Act
         channel.Writer.TryWrite(new TransferItem("test.txt", TransferAction.Upload));
         channel.Writer.Complete();
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var exception = await Assert.ThrowsAsync<TimeoutException>(() =>
-            queue.StartAsync(FailingHandler, cts.Token));
+        await queue.StartAsync(FailingHandler, cts.Token);
 
-        // リトライ回数が正しいことを確認（初回実行 + 3回リトライ = 4回）
-        Assert.Equal(4, callCount);
+        // Assert - 並列処理改善後は例外が再スローされず統計情報で確認
+        Assert.Equal(4, callCount); // リトライ回数が正しいことを確認（初回実行 + 3回リトライ = 4回）
+        var stats = queue.GetStatistics();
+        Assert.Equal(1, stats.TotalFailed);
+        Assert.Equal(0, stats.CriticalErrorCount); // TimeoutExceptionはクリティカルエラーではない
     }
 
     [Fact]
@@ -169,14 +171,14 @@ public class NetworkFailureSimulationTests
 
         // file3.txtで非リトライ可能例外が発生するが、他のファイルは処理される
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await Assert.ThrowsAnyAsync<Exception>(() =>
-            queue.StartAsync(VariableFailureHandler, cts.Token));
+        await queue.StartAsync(VariableFailureHandler, cts.Token);
 
-        // Assert
+        // Assert - 並列処理改善後は例外が再スローされず統計情報で確認
         var stats = queue.GetStatistics();
         Assert.Equal(4, stats.TotalEnqueued);
         Assert.True(stats.TotalCompleted >= 2); // file1, file2, file4のうち少なくとも2つは成功
         Assert.True(stats.TotalFailed >= 1);    // file3は失敗
+        Assert.True(stats.CriticalErrorCount >= 1); // file3でクリティカルエラー発生
     }
 
     [Fact]

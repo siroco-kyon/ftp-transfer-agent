@@ -54,7 +54,8 @@ public class WorkerFailureTests
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider,
             logger, lifetime, new NoDisposeClient(mock.Object));
 
-        await Assert.ThrowsAsync<Exception>(() => worker.RunAsync(CancellationToken.None));
+        // 並列処理改善後は例外が再スローされない
+        await worker.RunAsync(CancellationToken.None);
 
         mock.Verify(c => c.UploadAsync(file, remotePath, It.IsAny<CancellationToken>()), Times.Exactly(3));
         Assert.True(File.Exists(file));

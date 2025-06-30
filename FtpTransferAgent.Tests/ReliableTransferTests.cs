@@ -71,18 +71,18 @@ public class ReliableTransferTests : IDisposable
 
         var attemptCount = 0;
 
-        // Act & Assert
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(async () =>
+        // Act - 並列処理改善後は例外が再スローされない
+        await queue.StartAsync((transferItem, token) =>
         {
-            await queue.StartAsync((transferItem, token) =>
-            {
-                attemptCount++;
-                throw new InvalidOperationException("Test error");
-            }, CancellationToken.None);
-        });
+            attemptCount++;
+            throw new TimeoutException("Network timeout - retryable");
+        }, CancellationToken.None);
 
-        // リトライが指定回数実行されることを確認
+        // Assert - 統計情報でリトライ動作と失敗を確認
         Assert.Equal(options.MaxAttempts + 1, attemptCount); // 初回 + リトライ
+        var stats = queue.GetStatistics();
+        Assert.Equal(1, stats.TotalFailed);
+        Assert.Equal(0, stats.CriticalErrorCount); // TimeoutExceptionはクリティカルエラーではない
     }
 
     [Fact]
