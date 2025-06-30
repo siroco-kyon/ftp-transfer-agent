@@ -42,7 +42,7 @@ public class WorkerFailureTests
         mock.Setup(c => c.UploadAsync(file, remotePath, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         mock.Setup(c => c.GetRemoteHashAsync(remotePath, "MD5", It.IsAny<CancellationToken>(), false))
-            .ThrowsAsync(new Exception("hash error"));
+            .ThrowsAsync(new TimeoutException("Network timeout during hash calculation")); // リトライ可能な例外に変更
         mock.Setup(c => c.Dispose());
 
         var services = new ServiceCollection();
