@@ -17,7 +17,7 @@ dotnet build --configuration Release
 # Run the application
 dotnet run --project FtpTransferAgent
 
-# Format code
+# Format code (matches CI pipeline)
 dotnet format --no-restore --verify-no-changes
 ```
 
@@ -126,7 +126,13 @@ The application uses `appsettings.json` with these main sections:
 - **Testing Coverage**: Extensive tests including `ParallelProcessingIntegrationTests`, network simulation, file locking, and configuration validation
 - **Use Task Scheduler**: For continuous operation, schedule this batch processor at regular intervals
 
-## Build and Testing Status
-- **Build**: Successfully compiles with .NET 8
-- **Dependencies**: All external library dependencies properly resolved (FluentFTP, SSH.NET, Polly)
-- **Warnings**: Async/await warnings resolved in test code
+## Dependencies and Build Status
+- **Target Framework**: .NET 8.0 (Worker SDK)
+- **External Libraries**: 
+  - FluentFTP 52.1.0 - FTP client functionality
+  - SSH.NET 2025.0.0 - SFTP client functionality
+  - Polly 8.6.0 - Retry and resilience patterns
+  - Microsoft.Extensions.Hosting 9.0.6 - Background service hosting
+  - Microsoft.Extensions.Options.DataAnnotations 9.0.6 - Configuration validation
+- **Test Dependencies**: pyftpdlib (Python FTP server for integration tests)
+- **CI/CD**: GitHub Actions with Ubuntu runner, includes format verification and Python FTP server setup

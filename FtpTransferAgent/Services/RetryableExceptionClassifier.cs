@@ -26,23 +26,23 @@ public static class RetryableExceptionClassifier
             HttpRequestException => true,
             SshConnectionException => true,
             FtpException ftpEx when IsRetryableFtpException(ftpEx) => true,
-            
+
             // ファイルシステム関連の一時的な例外（リトライ可能）
             IOException ioEx when IsRetryableIOException(ioEx) => true,
             UnauthorizedAccessException => true, // ファイルロック等の一時的な問題の可能性
-            
+
             // 設定やセキュリティ関連の例外（リトライ不可）
             ArgumentNullException => false, // より具体的な例外を先に配置
             ArgumentException => false,
             InvalidOperationException => false,
             DirectoryNotFoundException => false,
             SecurityException => false,
-            
+
             // その他の例外は基底クラスをチェック
             _ => IsRetryableByInnerException(exception)
         };
     }
-    
+
     /// <summary>
     /// FTP例外がリトライ可能かどうかを判定
     /// </summary>
@@ -50,7 +50,7 @@ public static class RetryableExceptionClassifier
     {
         // FluentFTPの例外メッセージやタイプに基づいて判定
         var message = ftpException.Message;
-        
+
         // 一時的なエラーの可能性が高いメッセージパターン
         if (message.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
             message.Contains("connection", StringComparison.OrdinalIgnoreCase) ||
@@ -60,7 +60,7 @@ public static class RetryableExceptionClassifier
         {
             return true;
         }
-        
+
         // 設定や認証エラーの可能性が高いメッセージパターン
         if (message.Contains("login", StringComparison.OrdinalIgnoreCase) ||
             message.Contains("authentication", StringComparison.OrdinalIgnoreCase) ||
@@ -70,11 +70,11 @@ public static class RetryableExceptionClassifier
         {
             return false;
         }
-        
+
         // 不明な場合は安全のためリトライする
         return true;
     }
-    
+
     /// <summary>
     /// IO例外がリトライ可能かどうかを判定
     /// </summary>
@@ -91,7 +91,7 @@ public static class RetryableExceptionClassifier
             _ => false
         };
     }
-    
+
     /// <summary>
     /// 内部例外を再帰的にチェックしてリトライ可能性を判定
     /// </summary>
@@ -102,7 +102,7 @@ public static class RetryableExceptionClassifier
         {
             return false;
         }
-        
+
         return IsRetryable(innerException);
     }
 }

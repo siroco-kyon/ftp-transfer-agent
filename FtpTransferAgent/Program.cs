@@ -53,7 +53,7 @@ builder.Services.AddHostedService<Worker>();
 try
 {
     var host = builder.Build();
-    
+
     // 設定の包括的バリデーションを実行
     var validator = host.Services.GetRequiredService<ConfigurationValidator>();
     var watchOptions = host.Services.GetRequiredService<IOptions<WatchOptions>>().Value;
@@ -61,10 +61,10 @@ try
     var retryOptions = host.Services.GetRequiredService<IOptions<RetryOptions>>().Value;
     var hashOptions = host.Services.GetRequiredService<IOptions<HashOptions>>().Value;
     var cleanupOptions = host.Services.GetRequiredService<IOptions<CleanupOptions>>().Value;
-    
+
     ConfigurationValidationResult validationResult = validator.ValidateConfiguration(
         watchOptions, transferOptions, retryOptions, hashOptions, cleanupOptions);
-    
+
     if (!validationResult.IsValid)
     {
         Console.WriteLine("Configuration validation failed:");
@@ -74,7 +74,7 @@ try
         }
         Environment.Exit(1);
     }
-    
+
     if (validationResult.HasWarnings)
     {
         Console.WriteLine("Configuration warnings:");
@@ -83,7 +83,7 @@ try
             Console.WriteLine($"WARNING: {warning}");
         }
     }
-    
+
     host.Run();
 }
 catch (Exception ex)

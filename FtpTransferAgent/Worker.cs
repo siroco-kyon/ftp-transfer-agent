@@ -62,10 +62,10 @@ public class Worker : BackgroundService
         // 再試行付きの転送キューを開始
         var queueLogger = _services.GetRequiredService<ILogger<TransferQueue>>();
         var queue = new TransferQueue(_channel, _retry, queueLogger, _transfer.Concurrency);
-        
+
         // パフォーマンス監視タスクを開始
         var monitorTask = StartPerformanceMonitoringAsync(queue, stoppingToken);
-        
+
         var queueTask = queue.StartAsync(async (item, token) =>
         {
             // 各転送処理の識別子
@@ -139,7 +139,7 @@ public class Worker : BackgroundService
         var finalStats = queue.GetStatistics();
         _logger.LogInformation("Transfer completed. Total: {Total}, Success: {Success}, Failed: {Failed}, Critical Errors: {Critical}, Success Rate: {Rate:F1}%",
             finalStats.TotalEnqueued, finalStats.TotalCompleted, finalStats.TotalFailed, finalStats.CriticalErrorCount, finalStats.SuccessRate);
-        
+
         // クリティカルエラーがあれば詳細をログ出力
         var criticalExceptions = queue.GetCriticalExceptions();
         foreach (var ex in criticalExceptions)
@@ -269,7 +269,7 @@ public class Worker : BackgroundService
             while (!cancellationToken.IsCancellationRequested)
             {
                 await Task.Delay(TimeSpan.FromMinutes(1), cancellationToken).ConfigureAwait(false);
-                
+
                 var stats = queue.GetStatistics();
                 if (stats.TotalEnqueued > 0)
                 {

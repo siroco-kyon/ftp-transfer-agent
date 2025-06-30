@@ -22,8 +22,8 @@ public class TransferOptionsValidationAttribute : ValidationAttribute
         }
 
         // SFTP モードの場合はパスワードまたは秘密鍵が必須
-        if (options.Mode == "sftp" && 
-            string.IsNullOrEmpty(options.Password) && 
+        if (options.Mode == "sftp" &&
+            string.IsNullOrEmpty(options.Password) &&
             string.IsNullOrEmpty(options.PrivateKeyPath))
         {
             ErrorMessage = "Password or PrivateKeyPath must be specified for SFTP mode";

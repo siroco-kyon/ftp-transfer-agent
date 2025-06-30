@@ -86,7 +86,7 @@ public class TransferQueue
                                 _logger.LogDebug("Worker {WorkerId} processing {ItemKey}", workerId, itemKey);
                                 await handler(item, t).ConfigureAwait(false);
                             }, context, token).ConfigureAwait(false);
-                            
+
                             _logger.LogDebug("Worker {WorkerId} completed {ItemKey}", workerId, itemKey);
                             _activeItems.TryRemove(itemKey, out _);
                             Interlocked.Increment(ref _totalCompleted);
@@ -95,7 +95,7 @@ public class TransferQueue
                         {
                             _activeItems.TryRemove(itemKey, out _);
                             Interlocked.Increment(ref _totalFailed);
-                            
+
                             if (RetryableExceptionClassifier.IsRetryable(ex))
                             {
                                 _logger.LogError(ex, "Worker {WorkerId} failed to process {ItemKey} after all retries (Retryable)", workerId, itemKey);
@@ -106,7 +106,7 @@ public class TransferQueue
                                 // クリティカルエラーは記録するが他のワーカーの処理は継続
                                 _criticalExceptions.Add(ex);
                             }
-                            
+
                             // 例外を再スローせず、他のワーカーの処理を継続させる
                             // 失敗したアイテムは処理済みとして保持（無限リトライ防止）
                         }
@@ -137,7 +137,7 @@ public class TransferQueue
             CriticalErrorCount = _criticalExceptions.Count
         };
     }
-    
+
     /// <summary>
     /// クリティカルエラーの一覧を取得
     /// </summary>
@@ -171,7 +171,7 @@ public class TransferStatistics
     public long MemoryUsageMB { get; set; }
     public int ActiveWorkers { get; set; }
     public int CriticalErrorCount { get; set; }
-    
+
     public double SuccessRate => TotalEnqueued > 0 ? (double)TotalCompleted / TotalEnqueued * 100 : 0;
     public int RemainingItems => TotalEnqueued - TotalCompleted - TotalFailed;
 }

@@ -64,7 +64,7 @@ public class ConfigurationValidator
             var invalidExtensions = watch.AllowedExtensions
                 .Where(ext => string.IsNullOrWhiteSpace(ext) || ext.Contains(' '))
                 .ToList();
-            
+
             if (invalidExtensions.Any())
             {
                 result.Errors.Add($"Invalid file extensions: {string.Join(", ", invalidExtensions)}");
@@ -183,7 +183,7 @@ public class ConfigurationValidator
         }
 
         // 認証設定の変更
-        if (oldConfig.Username != newConfig.Username || 
+        if (oldConfig.Username != newConfig.Username ||
             oldConfig.Password != newConfig.Password ||
             oldConfig.PrivateKeyPath != newConfig.PrivateKeyPath)
         {
@@ -196,7 +196,7 @@ public class ConfigurationValidator
         {
             assessment.RequiresRestart = true;
             assessment.Impacts.Add($"Concurrency changed from {oldConfig.Concurrency} to {newConfig.Concurrency}");
-            
+
             if (newConfig.Concurrency > oldConfig.Concurrency * 2)
             {
                 assessment.Warnings.Add("Significant increase in concurrency may impact server performance");
@@ -263,7 +263,7 @@ public class ConfigurationValidationResult
 {
     public List<string> Errors { get; } = new();
     public List<string> Warnings { get; } = new();
-    
+
     public bool IsValid => !Errors.Any();
     public bool HasWarnings => Warnings.Any();
 }

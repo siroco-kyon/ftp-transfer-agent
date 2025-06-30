@@ -48,7 +48,7 @@ public class NetworkFailureSimulationTests
         channel.Writer.Complete();
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var exception = await Assert.ThrowsAsync<TimeoutException>(() => 
+        var exception = await Assert.ThrowsAsync<TimeoutException>(() =>
             queue.StartAsync(FailingHandler, cts.Token));
 
         // リトライ回数が正しいことを確認（初回実行 + 3回リトライ = 4回）
@@ -113,11 +113,11 @@ public class NetworkFailureSimulationTests
 
         // リトライしないことを確認（1回のみ実行）
         Assert.Equal(1, callCount);
-        
+
         // クリティカルエラーが記録されていることを確認
         var stats = queue.GetStatistics();
         Assert.Equal(1, stats.CriticalErrorCount);
-        
+
         var criticalExceptions = queue.GetCriticalExceptions().ToList();
         Assert.Single(criticalExceptions);
         Assert.IsType<ArgumentException>(criticalExceptions.First());
@@ -136,7 +136,7 @@ public class NetworkFailureSimulationTests
         async Task VariableFailureHandler(TransferItem item, CancellationToken ct)
         {
             await Task.Yield(); // 非同期であることを明示
-            
+
             lock (lockObject)
             {
                 callCounts.TryGetValue(item.Path, out var count);
@@ -144,7 +144,7 @@ public class NetworkFailureSimulationTests
             }
 
             var currentCount = callCounts[item.Path];
-            
+
             switch (item.Path)
             {
                 case "file1.txt":
@@ -169,7 +169,7 @@ public class NetworkFailureSimulationTests
 
         // file3.txtで非リトライ可能例外が発生するが、他のファイルは処理される
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        await Assert.ThrowsAnyAsync<Exception>(() => 
+        await Assert.ThrowsAnyAsync<Exception>(() =>
             queue.StartAsync(VariableFailureHandler, cts.Token));
 
         // Assert
@@ -183,23 +183,23 @@ public class NetworkFailureSimulationTests
     public void RetryableExceptionClassifier_ShouldClassifyCorrectly()
     {
         // Arrange & Act & Assert
-        
+
         // リトライ可能な例外
         Assert.True(RetryableExceptionClassifier.IsRetryable(new SocketException()));
         Assert.True(RetryableExceptionClassifier.IsRetryable(new TimeoutException()));
         Assert.True(RetryableExceptionClassifier.IsRetryable(new HttpRequestException()));
         Assert.True(RetryableExceptionClassifier.IsRetryable(new UnauthorizedAccessException()));
-        
+
         // リトライ不可能な例外
         Assert.False(RetryableExceptionClassifier.IsRetryable(new ArgumentException()));
         Assert.False(RetryableExceptionClassifier.IsRetryable(new ArgumentNullException()));
         Assert.False(RetryableExceptionClassifier.IsRetryable(new InvalidOperationException()));
         Assert.False(RetryableExceptionClassifier.IsRetryable(new DirectoryNotFoundException()));
-        
+
         // 内部例外のチェック
         var wrapperException = new Exception("Wrapper", new SocketException());
         Assert.True(RetryableExceptionClassifier.IsRetryable(wrapperException));
-        
+
         var nonRetryableWrapper = new Exception("Wrapper", new ArgumentException());
         Assert.False(RetryableExceptionClassifier.IsRetryable(nonRetryableWrapper));
     }
@@ -222,7 +222,7 @@ public class NetworkFailureSimulationTests
         channel.Writer.Complete();
 
         var transferTask = queue.StartAsync(LongRunningHandler, CancellationToken.None);
-        
+
         // 少し待ってから長時間実行中のアイテムをチェック
         await Task.Delay(TimeSpan.FromSeconds(1));
         var longRunningItems = queue.GetLongRunningItems(TimeSpan.FromMilliseconds(500));
@@ -230,7 +230,7 @@ public class NetworkFailureSimulationTests
         // Assert
         Assert.Single(longRunningItems);
         Assert.Contains("long-running.txt", longRunningItems.First().ItemKey);
-        
+
         // 処理完了を待つ
         await transferTask;
     }
@@ -241,10 +241,10 @@ public class NetworkFailureSimulationTests
         // Arrange
         var channel = Channel.CreateBounded<TransferItem>(1);
         var queue = new TransferQueue(channel, _retryOptions, _loggerMock.Object, 1);
-        
+
         // Act
         var initialStats = queue.GetStatistics();
-        
+
         // Assert
         Assert.Equal(0, initialStats.TotalEnqueued);
         Assert.Equal(0, initialStats.TotalCompleted);

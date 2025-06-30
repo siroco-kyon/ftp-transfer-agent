@@ -26,7 +26,7 @@ public class ParallelProcessingIntegrationTests : IDisposable
         var services = new ServiceCollection();
         services.AddLogging(builder => builder.AddConsole().SetMinimumLevel(LogLevel.Debug));
         services.Configure<WatchOptions>(options => options.Path = _testDirectory);
-        services.Configure<TransferOptions>(options => 
+        services.Configure<TransferOptions>(options =>
         {
             options.Mode = "ftp";
             options.Direction = "put";
@@ -35,7 +35,7 @@ public class ParallelProcessingIntegrationTests : IDisposable
             options.Password = "test";
             options.Concurrency = 4;
         });
-        services.Configure<RetryOptions>(options => 
+        services.Configure<RetryOptions>(options =>
         {
             options.MaxAttempts = 2;
             options.DelaySeconds = 1;
@@ -196,7 +196,7 @@ public class ParallelProcessingIntegrationTests : IDisposable
         // Assert
         var stats = queue.GetStatistics();
         Assert.True(stats.MemoryUsageMB > 0);
-        
+
         var memoryIncrease = GC.GetTotalMemory(false) - initialMemory;
         Assert.True(memoryIncrease > 0);
     }
@@ -206,28 +206,28 @@ public class ParallelProcessingIntegrationTests : IDisposable
     {
         // Arrange
         var validator = _serviceProvider.GetRequiredService<ConfigurationValidator>();
-        
+
         // 問題のある設定の組み合わせ
-        var watch = new WatchOptions 
-        { 
+        var watch = new WatchOptions
+        {
             Path = _testDirectory,
             IncludeSubfolders = true,
             AllowedExtensions = new[] { "txt", "csv", "" } // 空の拡張子
         };
-        var transfer = new TransferOptions 
-        { 
+        var transfer = new TransferOptions
+        {
             Mode = "ftp", // セキュリティ警告対象
             Direction = "both", // 双方向
-            Host = "example.com", 
-            Username = "user", 
+            Host = "example.com",
+            Username = "user",
             Password = "plaintext",
             Concurrency = 12, // 高い並列度
             Port = 21
         };
         var retry = new RetryOptions { MaxAttempts = 8, DelaySeconds = 2 }; // 高いリトライ回数
         var hash = new HashOptions { Algorithm = "SHA256" };
-        var cleanup = new CleanupOptions 
-        { 
+        var cleanup = new CleanupOptions
+        {
             DeleteAfterVerify = true,
             DeleteRemoteAfterDownload = true // 両方向削除
         };
@@ -238,7 +238,7 @@ public class ParallelProcessingIntegrationTests : IDisposable
         // Assert
         Assert.False(result.IsValid); // 無効な拡張子によりエラー
         Assert.True(result.HasWarnings); // 複数の警告
-        
+
         Assert.Contains(result.Errors, e => e.Contains("Invalid file extensions"));
         Assert.Contains(result.Warnings, w => w.Contains("FTP transmits passwords"));
         Assert.Contains(result.Warnings, w => w.Contains("High concurrency"));
@@ -250,18 +250,18 @@ public class ParallelProcessingIntegrationTests : IDisposable
     {
         // Arrange
         var validator = _serviceProvider.GetRequiredService<ConfigurationValidator>();
-        
-        var oldConfig = new TransferOptions 
-        { 
+
+        var oldConfig = new TransferOptions
+        {
             Host = "old.example.com",
             Port = 21,
             Username = "olduser",
             Concurrency = 2,
             Direction = "put"
         };
-        
-        var newConfig = new TransferOptions 
-        { 
+
+        var newConfig = new TransferOptions
+        {
             Host = "new.example.com", // 変更
             Port = 22, // 変更
             Username = "newuser", // 変更
@@ -294,7 +294,7 @@ public class ParallelProcessingIntegrationTests : IDisposable
         {
             // テスト後のクリーンアップエラーは無視
         }
-        
+
         _serviceProvider?.Dispose();
     }
 }

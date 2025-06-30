@@ -27,14 +27,14 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     {
         // Arrange
         var watch = new WatchOptions { Path = _testDirectory, AllowedExtensions = new[] { "txt", "csv" } };
-        var transfer = new TransferOptions 
-        { 
-            Mode = "sftp", 
-            Direction = "put", 
-            Host = "example.com", 
-            Username = "user", 
+        var transfer = new TransferOptions
+        {
+            Mode = "sftp",
+            Direction = "put",
+            Host = "example.com",
+            Username = "user",
             Password = "pass",
-            Concurrency = 2 
+            Concurrency = 2
         };
         var retry = new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 };
         var hash = new HashOptions { Algorithm = "SHA256" };
@@ -53,13 +53,13 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     {
         // Arrange
         var watch = new WatchOptions { Path = "/non/existent/path" };
-        var transfer = new TransferOptions 
-        { 
-            Mode = "ftp", 
-            Direction = "put", 
-            Host = "example.com", 
-            Username = "user", 
-            Password = "pass" 
+        var transfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "example.com",
+            Username = "user",
+            Password = "pass"
         };
         var retry = new RetryOptions();
         var hash = new HashOptions();
@@ -78,14 +78,14 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     {
         // Arrange
         var watch = new WatchOptions { Path = _testDirectory };
-        var transfer = new TransferOptions 
-        { 
-            Mode = "ftp", 
-            Direction = "put", 
-            Host = "example.com", 
-            Username = "user", 
+        var transfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "example.com",
+            Username = "user",
             Password = "pass",
-            Concurrency = 10 
+            Concurrency = 10
         };
         var retry = new RetryOptions { MaxAttempts = 10 };
         var hash = new HashOptions();
@@ -105,14 +105,14 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     {
         // Arrange
         var watch = new WatchOptions { Path = _testDirectory };
-        var transfer = new TransferOptions 
-        { 
-            Mode = "sftp", 
-            Direction = "both", 
-            Host = "example.com", 
-            Username = "user", 
+        var transfer = new TransferOptions
+        {
+            Mode = "sftp",
+            Direction = "both",
+            Host = "example.com",
+            Username = "user",
             Password = "pass",
-            Concurrency = 8 
+            Concurrency = 8
         };
         var retry = new RetryOptions();
         var hash = new HashOptions();
@@ -131,12 +131,12 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     {
         // Arrange
         var watch = new WatchOptions { Path = _testDirectory };
-        var transfer = new TransferOptions 
-        { 
-            Mode = "ftp", 
-            Host = "example.com", 
-            Username = "user", 
-            Password = "plaintext_password" 
+        var transfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Host = "example.com",
+            Username = "user",
+            Password = "plaintext_password"
         };
         var retry = new RetryOptions();
         var hash = new HashOptions();
@@ -155,12 +155,12 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     {
         // Arrange
         var watch = new WatchOptions { Path = _testDirectory };
-        var transfer = new TransferOptions 
-        { 
-            Mode = "sftp", 
-            Host = "example.com", 
-            Username = "user", 
-            Password = "pass" 
+        var transfer = new TransferOptions
+        {
+            Mode = "sftp",
+            Host = "example.com",
+            Username = "user",
+            Password = "pass"
         };
         var retry = new RetryOptions();
         var hash = new HashOptions { Algorithm = "" }; // ハッシュ無効
@@ -178,17 +178,17 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     public void ValidateConfiguration_WithInvalidExtensions_ShouldFail()
     {
         // Arrange
-        var watch = new WatchOptions 
-        { 
-            Path = _testDirectory, 
-            AllowedExtensions = new[] { "txt", "", " ", "valid.ext" } 
+        var watch = new WatchOptions
+        {
+            Path = _testDirectory,
+            AllowedExtensions = new[] { "txt", "", " ", "valid.ext" }
         };
-        var transfer = new TransferOptions 
-        { 
-            Mode = "ftp", 
-            Host = "example.com", 
-            Username = "user", 
-            Password = "pass" 
+        var transfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Host = "example.com",
+            Username = "user",
+            Password = "pass"
         };
         var retry = new RetryOptions();
         var hash = new HashOptions();
@@ -207,11 +207,11 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     {
         // Arrange
         var watch = new WatchOptions { Path = _testDirectory };
-        var transfer = new TransferOptions 
-        { 
-            Mode = "ftp", 
-            Host = "example.com", 
-            Username = "user", 
+        var transfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Host = "example.com",
+            Username = "user",
             Password = "pass",
             Port = 70000 // 無効なポート番号
         };
@@ -237,12 +237,12 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     {
         // Arrange
         var watch = new WatchOptions { Path = _testDirectory };
-        var transfer = new TransferOptions 
-        { 
-            Mode = "ftp", 
-            Host = "example.com", 
-            Username = "user", 
-            Password = "pass" 
+        var transfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Host = "example.com",
+            Username = "user",
+            Password = "pass"
         };
         var retry = new RetryOptions { DelaySeconds = delaySeconds };
         var hash = new HashOptions();
@@ -254,7 +254,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         // Assert
         Assert.True(result.IsValid);
         Assert.Equal(shouldWarn, result.HasWarnings);
-        
+
         if (shouldWarn)
         {
             Assert.Contains(result.Warnings, w => w.Contains("retry delay"));
@@ -265,17 +265,17 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     public void AssessConfigurationChange_WithConnectionChanges_ShouldRequireRestart()
     {
         // Arrange
-        var oldConfig = new TransferOptions 
-        { 
-            Host = "old.example.com", 
-            Port = 21, 
+        var oldConfig = new TransferOptions
+        {
+            Host = "old.example.com",
+            Port = 21,
             Username = "old_user",
             Concurrency = 1
         };
-        var newConfig = new TransferOptions 
-        { 
-            Host = "new.example.com", 
-            Port = 22, 
+        var newConfig = new TransferOptions
+        {
+            Host = "new.example.com",
+            Port = 22,
             Username = "new_user",
             Concurrency = 1
         };
@@ -324,10 +324,10 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     {
         // Arrange
         var watch = new WatchOptions { Path = _testDirectory };
-        var transfer = new TransferOptions 
-        { 
-            Mode = "sftp", 
-            Host = "example.com", 
+        var transfer = new TransferOptions
+        {
+            Mode = "sftp",
+            Host = "example.com",
             Username = "user",
             PrivateKeyPath = "/non/existent/key.pem" // 存在しない鍵ファイル
         };
