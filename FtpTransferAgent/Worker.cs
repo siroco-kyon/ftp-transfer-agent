@@ -173,9 +173,18 @@ public class Worker : BackgroundService
         {
             try
             {
-                var files = await client.ListFilesAsync(_transfer.RemotePath, stoppingToken).ConfigureAwait(false);
+                var files = await client.ListFilesAsync(_transfer.RemotePath, stoppingToken, _watch.IncludeSubfolders).ConfigureAwait(false);
+                
+                // AllowedExtensionsが指定されている場合はフィルタを適用
+                var exts = _watch.AllowedExtensions.Select(e => e.StartsWith(".") ? e : $".{e}").ToArray();
+                
                 foreach (var f in files)
                 {
+                    if (exts.Length > 0 && !exts.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+                    
                     _channel.Writer.TryWrite(new TransferItem(f, TransferAction.Download));
                 }
             }
@@ -227,7 +236,7 @@ public class Worker : BackgroundService
         _logger.LogInformation("[{Id}] Upload completed for {File}", id, item.Path);
 
         // リモートファイルのハッシュを取得して検証
-        var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token, false).ConfigureAwait(false);
+        var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token, _hash.UseServerCommand).ConfigureAwait(false);
         _logger.LogDebug("[{Id}] Remote hash calculated: {Hash}", id, remoteHash);
 
         if (string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
@@ -263,30 +272,66 @@ public class Worker : BackgroundService
     /// </summary>
     private async Task ProcessDownloadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token)
     {
-        // パストラバーサル攻撃対策
-        var fileName = Path.GetFileName(item.Path);
-        if (string.IsNullOrEmpty(fileName))
+        string localPath;
+        
+        if (_transfer.PreserveFolderStructure && _watch.IncludeSubfolders)
         {
-            throw new ArgumentException($"Invalid file name: {item.Path}");
+            // サブディレクトリ構造を保持する場合
+            var relativePath = Path.GetRelativePath(_transfer.RemotePath, item.Path);
+            
+            // パストラバーサル攻撃対策
+            if (relativePath.Contains("..") || Path.IsPathRooted(relativePath))
+            {
+                throw new ArgumentException($"Unsafe relative path detected: {relativePath}");
+            }
+            
+            var safePath = Path.Combine(_watch.Path, relativePath);
+            var fullPath = Path.GetFullPath(safePath);
+            var watchFullPath = Path.GetFullPath(_watch.Path);
+            
+            if (!fullPath.StartsWith(watchFullPath + Path.DirectorySeparatorChar) &&
+                !string.Equals(fullPath, watchFullPath, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException($"Unsafe file path detected: {relativePath}");
+            }
+            
+            localPath = safePath;
+            
+            // ディレクトリが存在しない場合は作成
+            var localDir = Path.GetDirectoryName(localPath);
+            if (!string.IsNullOrEmpty(localDir) && !Directory.Exists(localDir))
+            {
+                Directory.CreateDirectory(localDir);
+                _logger.LogDebug("[{Id}] Created directory: {Directory}", id, localDir);
+            }
         }
-
-        // ファイル名の安全性をチェック（パストラバーサル攻撃対策）
-        var safePath = Path.Combine(_watch.Path, fileName);
-        var fullPath = Path.GetFullPath(safePath);
-        var watchFullPath = Path.GetFullPath(_watch.Path);
-
-        if (!fullPath.StartsWith(watchFullPath + Path.DirectorySeparatorChar) &&
-            !string.Equals(fullPath, watchFullPath, StringComparison.OrdinalIgnoreCase))
+        else
         {
-            throw new ArgumentException($"Unsafe file path detected: {fileName}");
-        }
+            // 従来の動作（ファイル名のみ使用）
+            var fileName = Path.GetFileName(item.Path);
+            if (string.IsNullOrEmpty(fileName))
+            {
+                throw new ArgumentException($"Invalid file name: {item.Path}");
+            }
 
-        var localPath = Path.Combine(_watch.Path, fileName);
+            // ファイル名の安全性をチェック（パストラバーサル攻撃対策）
+            var safePath = Path.Combine(_watch.Path, fileName);
+            var fullPath = Path.GetFullPath(safePath);
+            var watchFullPath = Path.GetFullPath(_watch.Path);
+
+            if (!fullPath.StartsWith(watchFullPath + Path.DirectorySeparatorChar) &&
+                !string.Equals(fullPath, watchFullPath, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException($"Unsafe file path detected: {fileName}");
+            }
+
+            localPath = safePath;
+        }
 
         _logger.LogInformation("[{Id}] Starting download {Remote} to {Local}", id, item.Path, localPath);
 
         // 事前にリモートファイルのハッシュを計算
-        var remoteHash = await client.GetRemoteHashAsync(item.Path, _hash.Algorithm, token, false).ConfigureAwait(false);
+        var remoteHash = await client.GetRemoteHashAsync(item.Path, _hash.Algorithm, token, _hash.UseServerCommand).ConfigureAwait(false);
         _logger.LogDebug("[{Id}] Remote hash calculated: {Hash}", id, remoteHash);
 
         // ダウンロード実行

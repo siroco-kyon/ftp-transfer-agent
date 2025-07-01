@@ -21,6 +21,15 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
     {
         _logger = logger;
         _client = client ?? new AsyncFtpClient(options.Host, options.Username, options.Password, options.Port);
+        
+        // タイムアウト設定を適用
+        if (client == null)
+        {
+            _client.Config.ConnectTimeout = options.TimeoutSeconds * 1000;
+            _client.Config.ReadTimeout = options.TimeoutSeconds * 1000;
+            _client.Config.DataConnectionConnectTimeout = options.TimeoutSeconds * 1000;
+            _client.Config.DataConnectionReadTimeout = options.TimeoutSeconds * 1000;
+        }
     }
 
     // 接続されていなければ接続を確立
@@ -68,22 +77,88 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
         File.Move(temp, localPath, true);
     }
 
-    // リモートファイルのハッシュ値を取得（常にダウンロードして計算）
+    // リモートファイルのハッシュ値を取得
     public async Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = false)
     {
         await EnsureConnectedAsync(ct).ConfigureAwait(false);
-        // サーバーのハッシュコマンドは使用せず、常にファイルをダウンロードして計算
+        
+        if (useServerCommand)
+        {
+            try
+            {
+                // サーバーサイドハッシュコマンドを試行
+                var serverHash = await TryGetServerHashAsync(remotePath, algorithm, ct).ConfigureAwait(false);
+                if (!string.IsNullOrEmpty(serverHash))
+                {
+                    return serverHash;
+                }
+            }
+            catch
+            {
+                // サーバーサイドハッシュが失敗した場合はローカル計算にフォールバック
+            }
+        }
+        
+        // ローカルでハッシュを計算
         await using var stream = await _client.OpenRead(remotePath, FtpDataType.Binary, 0, true, ct).ConfigureAwait(false);
         var result = await HashUtil.ComputeHashAsync(stream, algorithm, ct).ConfigureAwait(false);
         return result;
     }
+    
+    private async Task<string?> TryGetServerHashAsync(string remotePath, string algorithm, CancellationToken ct)
+    {
+        try
+        {
+            // FluentFTPのGetChecksum機能を使用
+            var hashType = algorithm.ToUpperInvariant() switch
+            {
+                "MD5" => FtpHashAlgorithm.MD5,
+                "SHA256" => FtpHashAlgorithm.SHA256,
+                "SHA512" => FtpHashAlgorithm.SHA512,
+                _ => throw new ArgumentException($"Unsupported hash algorithm: {algorithm}")
+            };
+            
+            var checksum = await _client.GetChecksum(remotePath, hashType, ct).ConfigureAwait(false);
+            return checksum?.Value;
+        }
+        catch
+        {
+            return null;
+        }
+    }
 
     // 指定ディレクトリのファイル一覧を取得
-    public async Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct)
+    public async Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct, bool includeSubdirectories = false)
     {
         await EnsureConnectedAsync(ct).ConfigureAwait(false);
-        var listing = await _client.GetListing(remotePath, ct).ConfigureAwait(false);
-        return listing.Where(i => i.Type == FtpObjectType.File).Select(i => i.FullName);
+        
+        if (!includeSubdirectories)
+        {
+            var listing = await _client.GetListing(remotePath, ct).ConfigureAwait(false);
+            return listing.Where(i => i.Type == FtpObjectType.File).Select(i => i.FullName);
+        }
+        
+        // サブディレクトリを含む再帰的な検索
+        var allFiles = new List<string>();
+        await ListFilesRecursiveAsync(remotePath, allFiles, ct).ConfigureAwait(false);
+        return allFiles;
+    }
+    
+    private async Task ListFilesRecursiveAsync(string currentPath, List<string> allFiles, CancellationToken ct)
+    {
+        var listing = await _client.GetListing(currentPath, ct).ConfigureAwait(false);
+        
+        foreach (var item in listing)
+        {
+            if (item.Type == FtpObjectType.File)
+            {
+                allFiles.Add(item.FullName);
+            }
+            else if (item.Type == FtpObjectType.Directory)
+            {
+                await ListFilesRecursiveAsync(item.FullName, allFiles, ct).ConfigureAwait(false);
+            }
+        }
     }
 
     public async Task DeleteAsync(string remotePath, CancellationToken ct)

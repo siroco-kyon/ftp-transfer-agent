@@ -43,13 +43,22 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
                 : new PrivateKeyFile(options.PrivateKeyPath, options.PrivateKeyPassphrase);
             methods.Add(new PrivateKeyAuthenticationMethod(options.Username, keyFile));
 
-            var conn = new ConnectionInfo(options.Host, options.Port, options.Username, methods.ToArray());
+            var conn = new ConnectionInfo(options.Host, options.Port, options.Username, methods.ToArray())
+            {
+                Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds)
+            };
             _client = new SftpClient(conn);
+            _client.OperationTimeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         }
         else
         {
             var password = options.Password ?? throw new ArgumentNullException(nameof(options.Password));
-            _client = new SftpClient(options.Host, options.Port, options.Username, password);
+            var conn = new ConnectionInfo(options.Host, options.Port, options.Username, new PasswordAuthenticationMethod(options.Username, password))
+            {
+                Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds)
+            };
+            _client = new SftpClient(conn);
+            _client.OperationTimeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         }
     }
 
@@ -138,13 +147,39 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     }
 
     // 指定ディレクトリのファイル一覧を取得
-    public Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct)
+    public Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct, bool includeSubdirectories = false)
     {
         EnsureConnected();
-        var files = _client.ListDirectory(remotePath)
-            .Where(f => !f.IsDirectory && !f.IsSymbolicLink)
-            .Select(f => f.FullName);
-        return Task.FromResult((IEnumerable<string>)files.ToArray());
+        
+        if (!includeSubdirectories)
+        {
+            var files = _client.ListDirectory(remotePath)
+                .Where(f => !f.IsDirectory && !f.IsSymbolicLink)
+                .Select(f => f.FullName);
+            return Task.FromResult((IEnumerable<string>)files.ToArray());
+        }
+        
+        // サブディレクトリを含む再帰的な検索
+        var allFiles = new List<string>();
+        ListFilesRecursive(remotePath, allFiles);
+        return Task.FromResult((IEnumerable<string>)allFiles);
+    }
+    
+    private void ListFilesRecursive(string currentPath, List<string> allFiles)
+    {
+        var entries = _client.ListDirectory(currentPath);
+        
+        foreach (var entry in entries)
+        {
+            if (!entry.IsDirectory && !entry.IsSymbolicLink)
+            {
+                allFiles.Add(entry.FullName);
+            }
+            else if (entry.IsDirectory && entry.Name != "." && entry.Name != "..")
+            {
+                ListFilesRecursive(entry.FullName, allFiles);
+            }
+        }
     }
 
     public Task DeleteAsync(string remotePath, CancellationToken ct)

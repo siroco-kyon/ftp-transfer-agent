@@ -220,6 +220,63 @@ public class ConfigurationValidator
         {
             result.Warnings.Add("High concurrency with subfolder scanning may cause high memory usage");
         }
+
+        // ダウンロード方向でのサブディレクトリ設定検証
+        if (transfer.Direction is "get" or "both")
+        {
+            if (watch.IncludeSubfolders && !transfer.PreserveFolderStructure)
+            {
+                result.Warnings.Add("IncludeSubfolders is enabled for download but PreserveFolderStructure is disabled. Files from subdirectories will be saved to root directory and may overwrite each other.");
+            }
+            
+            if (!watch.IncludeSubfolders && transfer.PreserveFolderStructure)
+            {
+                result.Warnings.Add("PreserveFolderStructure is enabled for download but IncludeSubfolders is disabled. Only root directory files will be downloaded.");
+            }
+        }
+
+        // アップロード方向でのサブディレクトリ設定検証
+        if (transfer.Direction is "put" or "both")
+        {
+            if (watch.IncludeSubfolders && !transfer.PreserveFolderStructure)
+            {
+                result.Warnings.Add("IncludeSubfolders is enabled for upload but PreserveFolderStructure is disabled. All files will be uploaded to remote root directory.");
+            }
+        }
+        
+        // UseServerCommand設定の適用範囲チェック
+        if (hash.UseServerCommand && transfer.Mode == "sftp")
+        {
+            result.Warnings.Add("UseServerCommand is enabled but SFTP does not support server-side hash commands. Local hash calculation will be used.");
+        }
+        
+        // タイムアウト設定の妥当性チェック
+        if (transfer.TimeoutSeconds < 30)
+        {
+            result.Warnings.Add("Very short timeout may cause failures with large files or slow networks.");
+        }
+        else if (transfer.TimeoutSeconds > 1800)
+        {
+            result.Warnings.Add("Very long timeout may mask network connectivity issues.");
+        }
+        
+        // AllowedExtensions設定が空の場合の警告
+        if (watch.AllowedExtensions.Length == 0)
+        {
+            result.Warnings.Add("No file extensions specified in AllowedExtensions. All files will be processed.");
+        }
+        
+        // ENDファイル機能とダウンロード方向の組み合わせ
+        if (watch.TransferEndFiles && transfer.Direction is "get" or "both")
+        {
+            result.Warnings.Add("TransferEndFiles is enabled but END file feature only works for upload (put) direction.");
+        }
+        
+        // 並列度とタイムアウトの組み合わせ警告
+        if (transfer.Concurrency > 8 && transfer.TimeoutSeconds < 120)
+        {
+            result.Warnings.Add("High concurrency with short timeout may cause connection pool exhaustion.");
+        }
     }
 
     /// <summary>

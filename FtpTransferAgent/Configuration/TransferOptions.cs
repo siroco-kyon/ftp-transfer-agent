@@ -53,4 +53,10 @@ public class TransferOptions
     /// </summary>
     public bool PreserveFolderStructure { get; set; }
 
+    /// <summary>
+    /// 接続およびデータ転送のタイムアウト時間（秒）
+    /// </summary>
+    [Range(1, 3600)]
+    public int TimeoutSeconds { get; set; } = 120;
+
 }

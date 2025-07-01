@@ -46,7 +46,7 @@ public class WorkerDownloadTests
         }
 
         var mock = new Mock<IFileTransferClient>();
-        mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>()))
+        mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new[] { remoteFile });
         mock.Setup(c => c.DownloadAsync(remoteFile, localPath, It.IsAny<CancellationToken>()))
             .Callback<string, string, CancellationToken>((_, lp, _) =>
@@ -86,6 +86,181 @@ public class WorkerDownloadTests
         }
     }
 
+    [Fact]
+    public async Task ExecuteAsync_DownloadsSubdirectoryFilesWithPreserveFolderStructure()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        
+        var watch = Options.Create(new WatchOptions 
+        { 
+            Path = dir, 
+            IncludeSubfolders = true 
+        });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "get",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 1,
+            PreserveFolderStructure = true
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
+        var hashOpt = Options.Create(new HashOptions { Algorithm = "MD5" });
+        var cleanup = Options.Create(new CleanupOptions());
+
+        var remoteFiles = new[]
+        {
+            "/remote/file1.txt",
+            "/remote/subdir/file2.txt",
+            "/remote/subdir/nested/file3.txt"
+        };
+        
+        var remoteContent = "test data";
+        string remoteHash;
+        {
+            await using var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(remoteContent));
+            remoteHash = await HashUtil.ComputeHashAsync(ms, "MD5", CancellationToken.None);
+        }
+
+        var mock = new Mock<IFileTransferClient>();
+        mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), true))
+            .ReturnsAsync(remoteFiles);
+
+        foreach (var remoteFile in remoteFiles)
+        {
+            mock.Setup(c => c.GetRemoteHashAsync(remoteFile, "MD5", It.IsAny<CancellationToken>(), false))
+                .ReturnsAsync(remoteHash);
+            mock.Setup(c => c.DownloadAsync(remoteFile, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Callback<string, string, CancellationToken>((remote, local, ct) =>
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(local)!);
+                    File.WriteAllText(local, remoteContent);
+                });
+        }
+
+        var services = new ServiceCollection()
+            .AddSingleton(watch)
+            .AddSingleton(transfer)
+            .AddSingleton(retry)
+            .AddSingleton(hashOpt)
+            .AddSingleton(cleanup)
+            .AddSingleton<ILogger<Worker>>(new Mock<ILogger<Worker>>().Object)
+            .AddSingleton<IHostApplicationLifetime>(new DummyLifetime())
+            .BuildServiceProvider();
+
+        var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, services,
+            new Mock<ILogger<Worker>>().Object, new DummyLifetime(), new NoDisposeClient(mock.Object));
+
+        await worker.RunAsync(CancellationToken.None);
+
+        // 期待されるローカルファイルパスを確認
+        var expectedFiles = new[]
+        {
+            Path.Combine(dir, "file1.txt"),
+            Path.Combine(dir, "subdir", "file2.txt"),
+            Path.Combine(dir, "subdir", "nested", "file3.txt")
+        };
+
+        foreach (var expectedFile in expectedFiles)
+        {
+            Assert.True(File.Exists(expectedFile), $"Expected file not found: {expectedFile}");
+            Assert.Equal(remoteContent, File.ReadAllText(expectedFile));
+        }
+
+        Directory.Delete(dir, true);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DownloadsSubdirectoryFilesWithoutPreserveFolderStructure()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        
+        var watch = Options.Create(new WatchOptions 
+        { 
+            Path = dir, 
+            IncludeSubfolders = true 
+        });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "get",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 1,
+            PreserveFolderStructure = false
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
+        var hashOpt = Options.Create(new HashOptions { Algorithm = "MD5" });
+        var cleanup = Options.Create(new CleanupOptions());
+
+        var remoteFiles = new[]
+        {
+            "/remote/file1.txt",
+            "/remote/subdir/file2.txt",
+            "/remote/subdir/nested/file3.txt"
+        };
+        
+        var remoteContent = "test data";
+        string remoteHash;
+        {
+            await using var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(remoteContent));
+            remoteHash = await HashUtil.ComputeHashAsync(ms, "MD5", CancellationToken.None);
+        }
+
+        var mock = new Mock<IFileTransferClient>();
+        mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), true))
+            .ReturnsAsync(remoteFiles);
+
+        foreach (var remoteFile in remoteFiles)
+        {
+            mock.Setup(c => c.GetRemoteHashAsync(remoteFile, "MD5", It.IsAny<CancellationToken>(), false))
+                .ReturnsAsync(remoteHash);
+            mock.Setup(c => c.DownloadAsync(remoteFile, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Callback<string, string, CancellationToken>((remote, local, ct) =>
+                {
+                    File.WriteAllText(local, remoteContent);
+                });
+        }
+
+        var services = new ServiceCollection()
+            .AddSingleton(watch)
+            .AddSingleton(transfer)
+            .AddSingleton(retry)
+            .AddSingleton(hashOpt)
+            .AddSingleton(cleanup)
+            .AddSingleton<ILogger<Worker>>(new Mock<ILogger<Worker>>().Object)
+            .AddSingleton<IHostApplicationLifetime>(new DummyLifetime())
+            .BuildServiceProvider();
+
+        var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, services,
+            new Mock<ILogger<Worker>>().Object, new DummyLifetime(), new NoDisposeClient(mock.Object));
+
+        await worker.RunAsync(CancellationToken.None);
+
+        // すべてのファイルがルートディレクトリに保存されることを確認
+        var expectedFiles = new[]
+        {
+            Path.Combine(dir, "file1.txt"),
+            Path.Combine(dir, "file2.txt"),
+            Path.Combine(dir, "file3.txt")
+        };
+
+        foreach (var expectedFile in expectedFiles)
+        {
+            Assert.True(File.Exists(expectedFile), $"Expected file not found: {expectedFile}");
+            Assert.Equal(remoteContent, File.ReadAllText(expectedFile));
+        }
+
+        Directory.Delete(dir, true);
+    }
+
     private class TestWorker : Worker
     {
         private readonly IFileTransferClient _client;
@@ -106,7 +281,7 @@ public class WorkerDownloadTests
         public Task UploadAsync(string localPath, string remotePath, CancellationToken ct) => _inner.UploadAsync(localPath, remotePath, ct);
         public Task DownloadAsync(string remotePath, string localPath, CancellationToken ct) => _inner.DownloadAsync(remotePath, localPath, ct);
         public Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = false) => _inner.GetRemoteHashAsync(remotePath, algorithm, ct, useServerCommand);
-        public Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct) => _inner.ListFilesAsync(remotePath, ct);
+        public Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct, bool includeSubdirectories = false) => _inner.ListFilesAsync(remotePath, ct, includeSubdirectories);
         public Task DeleteAsync(string remotePath, CancellationToken ct) => _inner.DeleteAsync(remotePath, ct);
     }
 
