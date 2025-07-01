@@ -149,6 +149,7 @@ public class WorkerDownloadTests
             .AddSingleton(hashOpt)
             .AddSingleton(cleanup)
             .AddSingleton<ILogger<Worker>>(new Mock<ILogger<Worker>>().Object)
+            .AddSingleton<ILogger<TransferQueue>>(new Mock<ILogger<TransferQueue>>().Object)
             .AddSingleton<IHostApplicationLifetime>(new DummyLifetime())
             .BuildServiceProvider();
 
@@ -236,6 +237,7 @@ public class WorkerDownloadTests
             .AddSingleton(hashOpt)
             .AddSingleton(cleanup)
             .AddSingleton<ILogger<Worker>>(new Mock<ILogger<Worker>>().Object)
+            .AddSingleton<ILogger<TransferQueue>>(new Mock<ILogger<TransferQueue>>().Object)
             .AddSingleton<IHostApplicationLifetime>(new DummyLifetime())
             .BuildServiceProvider();
 
