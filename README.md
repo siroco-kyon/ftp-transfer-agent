@@ -10,6 +10,8 @@
 - 🔒 **整合性検証**: MD5/SHA256 ハッシュによる転送後検証
 - 🔄 **自動再試行**: Polly による指数バックオフ再試行
 - ⚡ **並列転送**: 最大16ファイルの同時転送
+- 🎯 **ENDファイル制御**: ENDファイルがある場合のみ転送する制御機能（順序保証付き）
+- 📤 **ENDファイル転送**: ENDファイル自体の転送制御と順序保証（TransferEndFiles）
 - 📝 **ローリングログ**: 日付・サイズベースのログローテーション
 - 📧 **エラー通知**: SMTP によるエラーメール送信
 - 🗑️ **自動削除**: 転送成功後の任意のファイル削除
@@ -44,7 +46,10 @@ dotnet run --project FtpTransferAgent
   "Watch": {
     "Path": "./watch",
     "IncludeSubfolders": false,
-    "AllowedExtensions": [".txt", ".csv"]
+    "AllowedExtensions": [".txt", ".csv"],
+    "RequireEndFile": false,
+    "EndFileExtensions": [".END", ".end", ".TRG", ".trg"],
+    "TransferEndFiles": false
   },
   "Transfer": {
     "Mode": "ftp",
@@ -136,11 +141,13 @@ ssh-copy-id -i id_ed25519.pub user@server
 ## 動作フロー
 
 1. **起動時**: 設定ファイル読み込み、FTP/SFTPクライアント初期化
-2. **ファイル列挙**: Watch.Path内のファイル検出、またはリモートファイル一覧取得
-3. **並列転送**: 指定並列度でファイル転送実行
-4. **整合性検証**: ハッシュ値比較による転送結果検証
-5. **後処理**: 設定に応じてファイル削除
-6. **終了**: 全処理完了後にアプリケーション終了
+2. **ファイル列挙**: Watch.Path内のファイル検出（アルファベット順ソート）、またはリモートファイル一覧取得
+3. **フィルタリング**: 拡張子フィルター、ENDファイル制御による対象ファイル絞り込み
+4. **2段階キューイング**: データファイルを先に転送キューに追加、その後でENDファイルを追加（TransferEndFiles有効時）
+5. **並列転送**: 指定並列度でファイル転送実行
+6. **整合性検証**: ハッシュ値比較による転送結果検証
+7. **後処理**: 設定に応じてファイル削除
+8. **終了**: 全処理完了後にアプリケーション終了
 
 ## テスト
 
@@ -163,12 +170,67 @@ dotnet publish -c Release -r linux-x64 --self-contained
 dotnet publish -c Release -r osx-x64 --self-contained
 ```
 
+## ENDファイル制御機能
+
+ENDファイル機能を使用すると、対応するENDファイルが存在する場合のみファイルを転送対象にできます。
+
+### 設定方法
+
+```json
+{
+  "Watch": {
+    "RequireEndFile": true,
+    "EndFileExtensions": [".END", ".end", ".TRG", ".trg"],
+    "TransferEndFiles": false
+  }
+}
+```
+
+### 基本動作例（TransferEndFiles: false）
+
+以下のファイルがある場合：
+- `data1.txt` + `data1.txt.END` → `data1.txt` が転送される（ENDファイルは転送されない）
+- `data2.txt` + `data2.txt.end` → `data2.txt` が転送される（ENDファイルは転送されない）
+- `data3.txt` + `data3.txt.TRG` → `data3.txt` が転送される（ENDファイルは転送されない）
+- `data4.txt` （ENDファイルなし） → 転送されない
+
+### ENDファイル転送機能（TransferEndFiles: true）
+
+```json
+{
+  "Watch": {
+    "RequireEndFile": true,
+    "EndFileExtensions": [".END", ".end"],
+    "TransferEndFiles": true
+  }
+}
+```
+
+以下のファイルがある場合：
+- `data1.txt` + `data1.txt.END` → `data1.txt` を先に転送、その後 `data1.txt.END` を転送
+- `data2.txt` + `data2.txt.end` → `data2.txt` を先に転送、その後 `data2.txt.end` を転送
+- `data3.txt` （ENDファイルなし） → 転送されない
+- `orphan.END` （対応するデータファイルなし） → 転送されない
+
+### 重要な特徴
+
+- この機能は**アップロード（Direction: "put"）でのみ有効**です
+- ダウンロード処理では無視されます
+- **転送順序保証**: データファイルが必ずENDファイルより先に転送されます
+- **2段階キューイング**: データファイルを先にキューに追加し、その後でENDファイルを追加
+- **対応関係チェック**: ENDファイルは対応するデータファイルが転送される場合のみ転送されます
+- **設定検証**: `TransferEndFiles`が有効でも`RequireEndFile`が無効の場合は警告が表示されます
+- **セキュリティ検証**: 悪意のある拡張子（パストラバーサルや長すぎる拡張子）は設定時に警告されます
+- カスタム拡張子は `EndFileExtensions` で設定可能
+
 ## よくある問題
 
 ### ファイルが転送されない
 - `AllowedExtensions` の設定を確認
 - `Watch.Path` が正しいパスか確認
 - ファイルが他プロセスで使用中でないか確認
+- `RequireEndFile` が `true` の場合、対応するENDファイルが存在するか確認
+- `TransferEndFiles` が `true` の場合、ENDファイルの転送順序が正しいか確認
 
 ### 接続エラー
 - ホスト名・ポート番号・認証情報を確認

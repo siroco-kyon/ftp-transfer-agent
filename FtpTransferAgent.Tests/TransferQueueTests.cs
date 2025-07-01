@@ -40,7 +40,7 @@ public class TransferQueueTests
         channel.Writer.Complete();
 
         await queueTask;
-        
+
         // 並列処理改善後は統計情報で成功を確認
         var stats = queue.GetStatistics();
         Assert.Equal(1, stats.TotalCompleted);

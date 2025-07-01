@@ -87,13 +87,68 @@ public class Worker : BackgroundService
             var option = _watch.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
             try
             {
-                foreach (var file in Directory.EnumerateFiles(_watch.Path, "*", option))
+                // ファイル順序を安定化し、ENDファイルが先に処理されないようにソート
+                var files = Directory.EnumerateFiles(_watch.Path, "*", option)
+                    .OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                // データファイルとENDファイルのペアを収集
+                var dataFiles = new List<string>();
+                var endFiles = new List<string>();
+
+                foreach (var file in files)
                 {
                     if (exts.Length > 0 && !exts.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
                     {
                         continue;
                     }
+
+                    if (IsEndFile(file))
+                    {
+                        // ENDファイルは別リストに保存
+                        if (_watch.TransferEndFiles)
+                        {
+                            endFiles.Add(file);
+                        }
+                        continue;
+                    }
+
+                    // ENDファイル検証が有効な場合は、対応するENDファイルの存在を確認
+                    if (_watch.RequireEndFile)
+                    {
+                        if (!HasEndFile(file))
+                        {
+                            _logger.LogDebug("Skipping file {File} - no corresponding END file found", file);
+                            continue;
+                        }
+                    }
+
+                    dataFiles.Add(file);
+                }
+
+                // 1. まずデータファイルを転送キューに追加
+                foreach (var file in dataFiles)
+                {
                     _channel.Writer.TryWrite(new TransferItem(file, TransferAction.Upload));
+                }
+
+                // 2. その後でENDファイルを転送キューに追加（TransferEndFiles が true の場合）
+                if (_watch.TransferEndFiles)
+                {
+                    foreach (var endFile in endFiles)
+                    {
+                        // 対応するデータファイルが存在する場合のみENDファイルを転送
+                        var dataFileName = GetDataFileForEndFile(endFile);
+                        if (dataFiles.Any(f => Path.GetFileNameWithoutExtension(f).Equals(dataFileName, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            _logger.LogDebug("Queueing END file {File} for transfer after data file", endFile);
+                            _channel.Writer.TryWrite(new TransferItem(endFile, TransferAction.Upload));
+                        }
+                        else
+                        {
+                            _logger.LogDebug("Skipping END file {File} - corresponding data file not being transferred", endFile);
+                        }
+                    }
                 }
             }
             catch (DirectoryNotFoundException ex)
@@ -257,6 +312,141 @@ public class Worker : BackgroundService
             _logger.LogError("[{Id}] {Error}", id, error);
             throw new InvalidOperationException(error);
         }
+    }
+
+    /// <summary>
+    /// 指定されたファイルがENDファイルかどうかを判定
+    /// </summary>
+    private bool IsEndFile(string filePath)
+    {
+        if (string.IsNullOrEmpty(filePath) || _watch.EndFileExtensions == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var extension = Path.GetExtension(filePath);
+            if (string.IsNullOrEmpty(extension))
+            {
+                return false;
+            }
+
+            return _watch.EndFileExtensions.Any(endExt =>
+            {
+                if (string.IsNullOrWhiteSpace(endExt))
+                {
+                    return false;
+                }
+                var normalizedEndExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
+                return string.Equals(extension, normalizedEndExt, StringComparison.OrdinalIgnoreCase);
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Error checking if file is END file for {FilePath}: {Error}", filePath, ex.Message);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// ENDファイルから対応するデータファイル名を取得
+    /// </summary>
+    private string GetDataFileForEndFile(string endFilePath)
+    {
+        if (string.IsNullOrEmpty(endFilePath) || _watch.EndFileExtensions == null)
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            var fileName = Path.GetFileName(endFilePath);
+            var extension = Path.GetExtension(endFilePath);
+
+            // ENDファイル拡張子を除去してデータファイル名を取得
+            foreach (var endExt in _watch.EndFileExtensions)
+            {
+                if (string.IsNullOrWhiteSpace(endExt))
+                {
+                    continue;
+                }
+
+                var normalizedEndExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
+                if (string.Equals(extension, normalizedEndExt, StringComparison.OrdinalIgnoreCase))
+                {
+                    // ENDファイル拡張子を除去してデータファイル名を返す
+                    return fileName.Substring(0, fileName.Length - normalizedEndExt.Length);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Error getting data file name for END file {EndFile}: {Error}", endFilePath, ex.Message);
+        }
+
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// 指定されたファイルに対応するENDファイルが存在するかどうかを確認
+    /// </summary>
+    private bool HasEndFile(string filePath)
+    {
+        // 入力値の検証
+        if (string.IsNullOrEmpty(filePath))
+        {
+            return false;
+        }
+
+        // ENDファイル拡張子が設定されていない場合
+        if (_watch.EndFileExtensions == null || _watch.EndFileExtensions.Length == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
+            var directory = Path.GetDirectoryName(filePath);
+
+            // ディレクトリまたはファイル名が取得できない場合
+            if (string.IsNullOrEmpty(directory) || string.IsNullOrEmpty(fileNameWithoutExtension))
+            {
+                return false;
+            }
+
+            foreach (var endExt in _watch.EndFileExtensions)
+            {
+                // null または空の拡張子をスキップ
+                if (string.IsNullOrWhiteSpace(endExt))
+                {
+                    continue;
+                }
+
+                var endFileExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
+                var endFilePath = Path.Combine(directory, fileNameWithoutExtension + endFileExt);
+
+                if (File.Exists(endFilePath))
+                {
+                    return true;
+                }
+            }
+        }
+        catch (ArgumentException ex)
+        {
+            // 不正なパス文字が含まれる場合
+            _logger.LogWarning("Invalid file path for END file check: {FilePath}. Error: {Error}", filePath, ex.Message);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            // その他の予期しないエラー
+            _logger.LogWarning("Error checking END file for {FilePath}: {Error}", filePath, ex.Message);
+            return false;
+        }
+
+        return false;
     }
 
     /// <summary>

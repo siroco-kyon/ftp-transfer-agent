@@ -1,5 +1,7 @@
 using System.ComponentModel.DataAnnotations;
 using FtpTransferAgent.Configuration;
+using Microsoft.Extensions.Logging;
+using Moq;
 using Xunit;
 
 namespace FtpTransferAgent.Tests;
@@ -324,6 +326,282 @@ public class ConfigurationValidationTests
         };
         var validation = ValidateObject(options);
         Assert.Empty(validation);
+    }
+
+    [Fact]
+    public void ConfigurationValidator_ShouldValidateTransferEndFilesSettings()
+    {
+        using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
+        var logger = loggerFactory.CreateLogger<ConfigurationValidator>();
+        var validator = new ConfigurationValidator(logger);
+
+        // Valid configuration: TransferEndFiles enabled with RequireEndFile
+        var testDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(testDir);
+        
+        var validWatch = new WatchOptions
+        {
+            Path = testDir,
+            RequireEndFile = true,
+            EndFileExtensions = new[] { ".END", ".TRG" },
+            TransferEndFiles = true
+        };
+        var transfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "localhost",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/upload"
+        };
+
+        ConfigurationValidationResult result;
+        try
+        {
+            result = validator.ValidateConfiguration(validWatch, transfer, new RetryOptions(), new HashOptions { Algorithm = "MD5" }, new CleanupOptions());
+        }
+        catch (Exception ex)
+        {
+            throw new Exception($"Validation failed with exception: {ex.Message}", ex);
+        }
+        
+        // デバッグ用: エラーと警告の内容を確認
+        if (!result.IsValid)
+        {
+            var errorMessage = $"Validation failed. Errors: [{string.Join(", ", result.Errors)}], Warnings: [{string.Join(", ", result.Warnings)}]";
+            throw new Exception(errorMessage);
+        }
+        
+        Assert.DoesNotContain(result.Warnings, w => w.Contains("TransferEndFiles"));
+
+        // Warning: TransferEndFiles enabled but RequireEndFile disabled
+        var warningWatch = new WatchOptions
+        {
+            Path = testDir, // 実在するディレクトリを使用
+            RequireEndFile = false,
+            EndFileExtensions = new[] { ".END", ".TRG" },
+            TransferEndFiles = true
+        };
+        var warningResult = validator.ValidateConfiguration(warningWatch, transfer, new RetryOptions(), new HashOptions { Algorithm = "MD5" }, new CleanupOptions());
+        
+        // デバッグ: warningResultがInvalidの場合のエラー内容確認
+        if (!warningResult.IsValid)
+        {
+            var errorMessage = $"Warning test failed. Errors: [{string.Join(", ", warningResult.Errors)}], Warnings: [{string.Join(", ", warningResult.Warnings)}]";
+            throw new Exception(errorMessage);
+        }
+        
+        Assert.Contains(warningResult.Warnings, w => w.Contains("TransferEndFiles is enabled but RequireEndFile is disabled"));
+
+        // Error: TransferEndFiles enabled but no EndFileExtensions
+        var errorWatch = new WatchOptions
+        {
+            Path = testDir, // 実在するディレクトリを使用
+            RequireEndFile = true,
+            EndFileExtensions = Array.Empty<string>(),
+            TransferEndFiles = true
+        };
+        var errorResult = validator.ValidateConfiguration(errorWatch, transfer, new RetryOptions(), new HashOptions { Algorithm = "MD5" }, new CleanupOptions());
+        Assert.False(errorResult.IsValid);
+        Assert.Contains(errorResult.Errors, e => e.Contains("TransferEndFiles is enabled but EndFileExtensions is empty"));
+
+        // Error: TransferEndFiles enabled but null EndFileExtensions
+        var nullExtensionsWatch = new WatchOptions
+        {
+            Path = testDir, // 実在するディレクトリを使用
+            RequireEndFile = true,
+            EndFileExtensions = null!,
+            TransferEndFiles = true
+        };
+        var nullResult = validator.ValidateConfiguration(nullExtensionsWatch, transfer, new RetryOptions(), new HashOptions { Algorithm = "MD5" }, new CleanupOptions());
+        Assert.False(nullResult.IsValid);
+        Assert.Contains(nullResult.Errors, e => e.Contains("TransferEndFiles is enabled but EndFileExtensions is empty"));
+
+        Directory.Delete(testDir, true);
+    }
+
+    [Fact]
+    public void WatchOptions_EndFileConfiguration_ShouldValidate()
+    {
+        // Valid END file configuration
+        var validOptions = new WatchOptions
+        {
+            Path = "/valid/path",
+            RequireEndFile = true,
+            EndFileExtensions = new[] { ".END", ".end" }
+        };
+        var validation = ValidateObject(validOptions);
+        Assert.Empty(validation);
+
+        // Valid configuration with custom extensions
+        var customOptions = new WatchOptions
+        {
+            Path = "/valid/path",
+            RequireEndFile = true,
+            EndFileExtensions = new[] { ".TRG", ".trg", ".DONE" }
+        };
+        var customValidation = ValidateObject(customOptions);
+        Assert.Empty(customValidation);
+
+        // Default configuration should be valid
+        var defaultOptions = new WatchOptions
+        {
+            Path = "/valid/path",
+            RequireEndFile = false
+        };
+        var defaultValidation = ValidateObject(defaultOptions);
+        Assert.Empty(defaultValidation);
+    }
+
+    [Fact]
+    public void ConfigurationValidator_ShouldValidateEndFileSettings()
+    {
+        var logger = new Mock<ILogger<ConfigurationValidator>>();
+        var validator = new ConfigurationValidator(logger.Object);
+
+        // Valid configuration
+        var validWatch = new WatchOptions
+        {
+            Path = Path.GetTempPath(),
+            RequireEndFile = true,
+            EndFileExtensions = new[] { ".END", ".end" }
+        };
+        var validTransfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "test.com",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote"
+        };
+        var retry = new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 };
+        var hash = new HashOptions { Algorithm = "MD5" };
+        var cleanup = new CleanupOptions();
+
+        var result = validator.ValidateConfiguration(validWatch, validTransfer, retry, hash, cleanup);
+        Assert.True(result.IsValid);
+
+        // Invalid configuration - RequireEndFile enabled but no extensions
+        var invalidWatch = new WatchOptions
+        {
+            Path = Path.GetTempPath(),
+            RequireEndFile = true,
+            EndFileExtensions = new string[0]
+        };
+
+        var invalidResult = validator.ValidateConfiguration(invalidWatch, validTransfer, retry, hash, cleanup);
+        Assert.False(invalidResult.IsValid);
+        Assert.Contains(invalidResult.Errors, e => e.Contains("END file extensions must be specified"));
+
+        // Warning for bidirectional transfer with END file feature
+        var bidirectionalTransfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "both",
+            Host = "test.com",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote"
+        };
+
+        var warningResult = validator.ValidateConfiguration(validWatch, bidirectionalTransfer, retry, hash, cleanup);
+        Assert.True(warningResult.IsValid);
+        Assert.Contains(warningResult.Warnings, w => w.Contains("END file verification is only supported for upload operations"));
+    }
+
+    [Fact]
+    public void ConfigurationValidator_ShouldDetectMaliciousEndFileExtensions()
+    {
+        var logger = new Mock<ILogger<ConfigurationValidator>>();
+        var validator = new ConfigurationValidator(logger.Object);
+
+        // 悪意のある拡張子を含む設定
+        var maliciousWatch = new WatchOptions 
+        { 
+            Path = Path.GetTempPath(),
+            RequireEndFile = true,
+            EndFileExtensions = new[] { ".END", "../.end", ".trg", "file/.exe", "file\\.bat", new string('A', 100) }
+        };
+        var validTransfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "test.com",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote"
+        };
+        var retry = new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 };
+        var hash = new HashOptions { Algorithm = "MD5" };
+        var cleanup = new CleanupOptions();
+
+        var result = validator.ValidateConfiguration(maliciousWatch, validTransfer, retry, hash, cleanup);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("Invalid END file extensions"));
+    }
+
+    [Fact]
+    public void ConfigurationValidator_ShouldDetectDuplicateEndFileExtensions()
+    {
+        var logger = new Mock<ILogger<ConfigurationValidator>>();
+        var validator = new ConfigurationValidator(logger.Object);
+
+        // 重複した拡張子を含む設定
+        var duplicateWatch = new WatchOptions 
+        { 
+            Path = Path.GetTempPath(),
+            RequireEndFile = true,
+            EndFileExtensions = new[] { ".END", ".end", ".END", ".TRG", ".trg" } // 大文字小文字の重複も検出
+        };
+        var validTransfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "test.com",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote"
+        };
+        var retry = new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 };
+        var hash = new HashOptions { Algorithm = "MD5" };
+        var cleanup = new CleanupOptions();
+
+        var result = validator.ValidateConfiguration(duplicateWatch, validTransfer, retry, hash, cleanup);
+        Assert.True(result.IsValid); // 重複は警告であってエラーではない
+        Assert.Contains(result.Warnings, w => w.Contains("Duplicate END file extensions found"));
+    }
+
+    [Fact]
+    public void ConfigurationValidator_ShouldHandleNullEndFileExtensions()
+    {
+        var logger = new Mock<ILogger<ConfigurationValidator>>();
+        var validator = new ConfigurationValidator(logger.Object);
+
+        // null値を含む拡張子配列
+        var nullWatch = new WatchOptions 
+        { 
+            Path = Path.GetTempPath(),
+            RequireEndFile = true,
+            EndFileExtensions = new[] { ".END", null!, "", "   ", ".TRG" }
+        };
+        var validTransfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "test.com",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote"
+        };
+        var retry = new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 };
+        var hash = new HashOptions { Algorithm = "MD5" };
+        var cleanup = new CleanupOptions();
+
+        var result = validator.ValidateConfiguration(nullWatch, validTransfer, retry, hash, cleanup);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("Invalid END file extensions") && e.Contains("<null>"));
     }
 
     private static List<ValidationResult> ValidateObject(object obj)

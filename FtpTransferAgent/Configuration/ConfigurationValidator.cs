@@ -71,6 +71,62 @@ public class ConfigurationValidator
             }
         }
 
+        // ENDファイル設定の有効性チェック
+        if (watch.RequireEndFile)
+        {
+            if (watch.EndFileExtensions == null || !watch.EndFileExtensions.Any())
+            {
+                result.Errors.Add("END file extensions must be specified when RequireEndFile is enabled");
+            }
+            else
+            {
+                var invalidEndExtensions = watch.EndFileExtensions
+                    .Where(ext => string.IsNullOrWhiteSpace(ext) || 
+                                  ext.Contains(' ') || 
+                                  ext.Contains("..") || 
+                                  ext.Contains('/') || 
+                                  ext.Contains('\\') ||
+                                  ext.Length > 50) // 異常に長い拡張子を防ぐ
+                    .Select(ext => ext ?? "<null>") // null値を安全に表示
+                    .ToList();
+
+                if (invalidEndExtensions.Any())
+                {
+                    result.Errors.Add($"Invalid END file extensions: {string.Join(", ", invalidEndExtensions)}");
+                }
+
+                // 重複チェック
+                var duplicateExtensions = watch.EndFileExtensions
+                    .Where(ext => !string.IsNullOrWhiteSpace(ext))
+                    .GroupBy(ext => ext.ToLowerInvariant())
+                    .Where(g => g.Count() > 1)
+                    .Select(g => g.Key)
+                    .ToList();
+
+                if (duplicateExtensions.Any())
+                {
+                    result.Warnings.Add($"Duplicate END file extensions found: {string.Join(", ", duplicateExtensions)}");
+                }
+            }
+
+            // ダウンロード処理では ENDファイル機能は使用できない
+            if (transfer.Direction is "get" or "both")
+            {
+                result.Warnings.Add("END file verification is only supported for upload operations and will be ignored for downloads");
+            }
+        }
+
+        // TransferEndFiles の設定検証（RequireEndFileに関係なく独立してチェック）
+        if (watch.TransferEndFiles && !watch.RequireEndFile)
+        {
+            result.Warnings.Add("TransferEndFiles is enabled but RequireEndFile is disabled. END files will be transferred even without corresponding data files");
+        }
+
+        if (watch.TransferEndFiles && (watch.EndFileExtensions == null || watch.EndFileExtensions.Length == 0))
+        {
+            result.Errors.Add("TransferEndFiles is enabled but EndFileExtensions is empty. Please specify END file extensions");
+        }
+
         // ポート番号の有効性チェック
         if (transfer.Port < 1 || transfer.Port > 65535)
         {
