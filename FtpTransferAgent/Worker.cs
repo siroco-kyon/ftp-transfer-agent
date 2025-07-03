@@ -335,15 +335,16 @@ public class Worker : BackgroundService
         {
             _logger.LogInformation("[{Id}] Hash verification successful for {File}", id, item.Path);
             
-            // ENDファイルは転送成功後常に削除、通常ファイルはDeleteAfterVerify設定に従う
-            var shouldDelete = IsEndFile(item.Path) || _cleanup.DeleteAfterVerify;
+            // ローカルファイルの削除判定
+            var isEndFile = IsEndFile(item.Path);
+            var shouldDeleteLocal = isEndFile || _cleanup.DeleteAfterVerify;
             
-            if (shouldDelete)
+            if (shouldDeleteLocal)
             {
                 try
                 {
                     File.Delete(item.Path);
-                    var fileType = IsEndFile(item.Path) ? "END file" : "local file";
+                    var fileType = isEndFile ? "END file" : "local file";
                     _logger.LogInformation("[{Id}] Deleted {FileType} {File}", id, fileType, item.Path);
                 }
                 catch (IOException ex)
@@ -353,6 +354,20 @@ public class Worker : BackgroundService
                 catch (UnauthorizedAccessException ex)
                 {
                     _logger.LogWarning("[{Id}] Access denied deleting local file {File}: {Error}", id, item.Path, ex.Message);
+                }
+            }
+            
+            // 転送先のENDファイル削除判定（アップロード後）
+            if (isEndFile && _cleanup.DeleteRemoteEndFiles)
+            {
+                try
+                {
+                    await client.DeleteAsync(remotePath, token).ConfigureAwait(false);
+                    _logger.LogInformation("[{Id}] Deleted remote END file {Remote}", id, remotePath);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning("[{Id}] Failed to delete remote END file {Remote}: {Error}", id, remotePath, ex.Message);
                 }
             }
         }
@@ -462,10 +477,27 @@ public class Worker : BackgroundService
         if (string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogInformation("[{Id}] Hash verification successful for {Remote}", id, item.Path);
-            if (_cleanup.DeleteRemoteAfterDownload)
+            
+            // ENDファイルまたは通常ファイルの削除判定
+            var isEndFileRemote = IsEndFileRemote(item.Path);
+            var shouldDeleteRemote = false;
+            
+            if (isEndFileRemote)
+            {
+                // ENDファイルの場合：DeleteRemoteEndFiles設定に従う
+                shouldDeleteRemote = _cleanup.DeleteRemoteEndFiles;
+            }
+            else
+            {
+                // 通常ファイルの場合：DeleteRemoteAfterDownload設定に従う
+                shouldDeleteRemote = _cleanup.DeleteRemoteAfterDownload;
+            }
+            
+            if (shouldDeleteRemote)
             {
                 await client.DeleteAsync(item.Path, token).ConfigureAwait(false);
-                _logger.LogInformation("[{Id}] Deleted remote file {Remote}", id, item.Path);
+                var fileType = isEndFileRemote ? "remote END file" : "remote file";
+                _logger.LogInformation("[{Id}] Deleted {FileType} {Remote}", id, fileType, item.Path);
             }
         }
         else
