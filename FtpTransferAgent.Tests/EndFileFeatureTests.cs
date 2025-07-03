@@ -66,7 +66,7 @@ public class EndFileFeatureTests
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
         var file = Path.Combine(dir, "test.txt");
-        var endFile = Path.Combine(dir, "test.END");
+        var endFile = Path.Combine(dir, "test.txt.END");
         await File.WriteAllTextAsync(file, "data");
         await File.WriteAllTextAsync(endFile, "");
         var localHash = await HashUtil.ComputeHashAsync(file, "SHA256", CancellationToken.None);
@@ -120,7 +120,7 @@ public class EndFileFeatureTests
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
         var file = Path.Combine(dir, "test.txt");
-        var endFile = Path.Combine(dir, "test.end");
+        var endFile = Path.Combine(dir, "test.txt.end");
         await File.WriteAllTextAsync(file, "data");
         await File.WriteAllTextAsync(endFile, "");
         var localHash = await HashUtil.ComputeHashAsync(file, "SHA256", CancellationToken.None);
@@ -174,7 +174,7 @@ public class EndFileFeatureTests
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
         var file = Path.Combine(dir, "test.txt");
-        var endFile = Path.Combine(dir, "test.TRG");
+        var endFile = Path.Combine(dir, "test.txt.TRG");
         await File.WriteAllTextAsync(file, "data");
         await File.WriteAllTextAsync(endFile, "");
         var localHash = await HashUtil.ComputeHashAsync(file, "SHA256", CancellationToken.None);
@@ -279,10 +279,12 @@ public class EndFileFeatureTests
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
         var file = Path.Combine(dir, "test.txt");
-        var endFile = Path.Combine(dir, "test.END");
-        var anotherEndFile = Path.Combine(dir, "another.TRG");
+        var endFile = Path.Combine(dir, "test.txt.END");
+        var anotherFile = Path.Combine(dir, "another.txt");
+        var anotherEndFile = Path.Combine(dir, "another.txt.TRG");
         await File.WriteAllTextAsync(file, "data");
         await File.WriteAllTextAsync(endFile, "");
+        await File.WriteAllTextAsync(anotherFile, "another data");
         await File.WriteAllTextAsync(anotherEndFile, "");
         var localHash = await HashUtil.ComputeHashAsync(file, "SHA256", CancellationToken.None);
 
@@ -342,9 +344,9 @@ public class EndFileFeatureTests
         var files = new[]
         {
             Path.Combine(dir, "b_data.txt"),
-            Path.Combine(dir, "a_data.END"), // ENDファイル（先頭に来る）
+            Path.Combine(dir, "a_data.txt.END"), // ENDファイル（先頭に来る）
             Path.Combine(dir, "c_data.txt"),
-            Path.Combine(dir, "b_data.END"), // ENDファイル
+            Path.Combine(dir, "b_data.txt.END"), // ENDファイル
             Path.Combine(dir, "a_data.txt")
         };
         
@@ -489,7 +491,7 @@ public class EndFileFeatureTests
         var mock = new Mock<IFileTransferClient>();
         // リモートファイル一覧（対応するENDファイルあり）
         mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
-            .ReturnsAsync(new[] { "/remote/test.txt", "/remote/test.END" });
+            .ReturnsAsync(new[] { "/remote/test.txt", "/remote/test.txt.END" });
         mock.Setup(c => c.DownloadAsync("/remote/test.txt", localTestFile, It.IsAny<CancellationToken>()))
             .Callback<string, string, CancellationToken>((_, lp, _) => File.WriteAllText(lp, testData))
             .Returns(Task.CompletedTask).Verifiable();
@@ -541,7 +543,7 @@ public class EndFileFeatureTests
         var cleanup = Options.Create(new CleanupOptions());
 
         var localTestFile = Path.Combine(dir, "test.txt");
-        var localEndFile = Path.Combine(dir, "test.END");
+        var localEndFile = Path.Combine(dir, "test.txt.END");
         var testData = "test data";
         var endData = "";
 
@@ -559,16 +561,16 @@ public class EndFileFeatureTests
         var mock = new Mock<IFileTransferClient>();
         // リモートファイル一覧（データファイルとENDファイル両方）
         mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
-            .ReturnsAsync(new[] { "/remote/test.txt", "/remote/test.END" });
+            .ReturnsAsync(new[] { "/remote/test.txt", "/remote/test.txt.END" });
         mock.Setup(c => c.DownloadAsync("/remote/test.txt", localTestFile, It.IsAny<CancellationToken>()))
             .Callback<string, string, CancellationToken>((_, lp, _) => File.WriteAllText(lp, testData))
             .Returns(Task.CompletedTask).Verifiable();
-        mock.Setup(c => c.DownloadAsync("/remote/test.END", localEndFile, It.IsAny<CancellationToken>()))
+        mock.Setup(c => c.DownloadAsync("/remote/test.txt.END", localEndFile, It.IsAny<CancellationToken>()))
             .Callback<string, string, CancellationToken>((_, lp, _) => File.WriteAllText(lp, endData))
             .Returns(Task.CompletedTask).Verifiable();
         mock.Setup(c => c.GetRemoteHashAsync("/remote/test.txt", "SHA256", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(testDataHash);
-        mock.Setup(c => c.GetRemoteHashAsync("/remote/test.END", "SHA256", It.IsAny<CancellationToken>(), false))
+        mock.Setup(c => c.GetRemoteHashAsync("/remote/test.txt.END", "SHA256", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(endDataHash);
         mock.Setup(c => c.Dispose());
 
@@ -617,7 +619,7 @@ public class EndFileFeatureTests
         var mock = new Mock<IFileTransferClient>();
         // リモートファイル一覧（対応するデータファイルがないENDファイルのみ）
         mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
-            .ReturnsAsync(new[] { "/remote/orphan.END" });
+            .ReturnsAsync(new[] { "/remote/orphan.txt.END" });
         mock.Setup(c => c.Dispose());
 
         var services = new ServiceCollection();

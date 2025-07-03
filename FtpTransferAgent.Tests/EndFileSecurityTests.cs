@@ -212,7 +212,7 @@ public class EndFileSecurityTests
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
         var file = Path.Combine(dir, "test.txt");
-        var endFile = Path.Combine(dir, "test.END");
+        var endFile = Path.Combine(dir, "test.txt.END");
         await File.WriteAllTextAsync(file, "data");
         await File.WriteAllTextAsync(endFile, "");
 
@@ -292,11 +292,11 @@ public class EndFileSecurityTests
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
         
         // ENDファイルとして認識されるべきファイル
-        Assert.True(worker.TestIsEndFile("test.END"));
-        Assert.True(worker.TestIsEndFile("test.end"));
-        Assert.True(worker.TestIsEndFile("test.TRG"));
-        Assert.True(worker.TestIsEndFile("test.trg"));
-        Assert.True(worker.TestIsEndFile("/path/to/file.END"));
+        Assert.True(worker.TestIsEndFile("test.txt.END"));
+        Assert.True(worker.TestIsEndFile("test.txt.end"));
+        Assert.True(worker.TestIsEndFile("test.txt.TRG"));
+        Assert.True(worker.TestIsEndFile("test.txt.trg"));
+        Assert.True(worker.TestIsEndFile("/path/to/file.txt.END"));
         
         // ENDファイルとして認識されないファイル
         Assert.False(worker.TestIsEndFile("test.txt"));

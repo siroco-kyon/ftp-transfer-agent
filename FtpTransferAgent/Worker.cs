@@ -142,7 +142,7 @@ public class Worker : BackgroundService
                     {
                         // 対応するデータファイルが存在する場合のみENDファイルを転送
                         var dataFileName = GetDataFileForEndFile(endFile);
-                        if (dataFiles.Any(f => string.Equals(Path.GetFileNameWithoutExtension(f), dataFileName, StringComparison.OrdinalIgnoreCase)))
+                        if (dataFiles.Any(f => string.Equals(Path.GetFileName(f), dataFileName, StringComparison.OrdinalIgnoreCase)))
                         {
                             _logger.LogDebug("Queueing END file {File} for transfer after data file", endFile);
                             _channel.Writer.TryWrite(new TransferItem(endFile, TransferAction.Upload));
@@ -235,7 +235,7 @@ public class Worker : BackgroundService
                     {
                         // 対応するデータファイルが存在する場合のみENDファイルを転送
                         var dataFileName = GetDataFileForEndFileRemote(endFile);
-                        if (dataFiles.Any(f => string.Equals(Path.GetFileNameWithoutExtension(f), dataFileName, StringComparison.OrdinalIgnoreCase)))
+                        if (dataFiles.Any(f => string.Equals(Path.GetFileName(f), dataFileName, StringComparison.OrdinalIgnoreCase)))
                         {
                             _logger.LogDebug("Queueing remote END file {File} for transfer after data file", endFile);
                             _channel.Writer.TryWrite(new TransferItem(endFile, TransferAction.Download));
@@ -601,11 +601,11 @@ public class Worker : BackgroundService
 
         try
         {
-            var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
+            var fileName = Path.GetFileName(filePath);
             var directory = Path.GetDirectoryName(filePath);
 
             // ディレクトリまたはファイル名が取得できない場合
-            if (string.IsNullOrEmpty(directory) || string.IsNullOrEmpty(fileNameWithoutExtension))
+            if (string.IsNullOrEmpty(directory) || string.IsNullOrEmpty(fileName))
             {
                 return false;
             }
@@ -619,7 +619,7 @@ public class Worker : BackgroundService
                 }
 
                 var endFileExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
-                var endFilePath = Path.Combine(directory, fileNameWithoutExtension + endFileExt);
+                var endFilePath = Path.Combine(directory, fileName + endFileExt);
 
                 if (File.Exists(endFilePath))
                 {
@@ -736,11 +736,11 @@ public class Worker : BackgroundService
 
         try
         {
-            var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
+            var fileName = Path.GetFileName(filePath);
             var directory = Path.GetDirectoryName(filePath) ?? string.Empty;
 
             // ファイル名が取得できない場合
-            if (string.IsNullOrEmpty(fileNameWithoutExtension))
+            if (string.IsNullOrEmpty(fileName))
             {
                 return false;
             }
@@ -754,7 +754,7 @@ public class Worker : BackgroundService
                 }
 
                 var endFileExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
-                var endFileName = fileNameWithoutExtension + endFileExt;
+                var endFileName = fileName + endFileExt;
                 
                 // リモートパスはUnix形式（/）を使用（パス正規化）
                 var normalizedDirectory = directory?.Replace('\\', '/');

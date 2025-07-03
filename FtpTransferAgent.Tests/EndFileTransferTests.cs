@@ -20,7 +20,7 @@ public class EndFileTransferTests
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
         var file = Path.Combine(dir, "test.txt");
-        var endFile = Path.Combine(dir, "test.END");
+        var endFile = Path.Combine(dir, "test.txt.END");
         await File.WriteAllTextAsync(file, "data");
         await File.WriteAllTextAsync(endFile, "");
         var localHash = await HashUtil.ComputeHashAsync(file, "SHA256", CancellationToken.None);
@@ -75,7 +75,7 @@ public class EndFileTransferTests
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
         var file = Path.Combine(dir, "test.txt");
-        var endFile = Path.Combine(dir, "test.END");
+        var endFile = Path.Combine(dir, "test.txt.END");
         await File.WriteAllTextAsync(file, "data");
         await File.WriteAllTextAsync(endFile, "end marker");
         var dataHash = await HashUtil.ComputeHashAsync(file, "SHA256", CancellationToken.None);
@@ -105,11 +105,11 @@ public class EndFileTransferTests
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.UploadAsync(file, "/remote/test.txt", It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        mock.Setup(c => c.UploadAsync(endFile, "/remote/test.END", It.IsAny<CancellationToken>()))
+        mock.Setup(c => c.UploadAsync(endFile, "/remote/test.txt.END", It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         mock.Setup(c => c.GetRemoteHashAsync("/remote/test.txt", "SHA256", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(dataHash);
-        mock.Setup(c => c.GetRemoteHashAsync("/remote/test.END", "SHA256", It.IsAny<CancellationToken>(), false))
+        mock.Setup(c => c.GetRemoteHashAsync("/remote/test.txt.END", "SHA256", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(endHash);
         mock.Setup(c => c.Dispose());
 
@@ -124,7 +124,7 @@ public class EndFileTransferTests
 
         // データファイルとENDファイルの両方が転送される
         mock.Verify(c => c.UploadAsync(file, "/remote/test.txt", It.IsAny<CancellationToken>()), Times.Once);
-        mock.Verify(c => c.UploadAsync(endFile, "/remote/test.END", It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(c => c.UploadAsync(endFile, "/remote/test.txt.END", It.IsAny<CancellationToken>()), Times.Once);
 
         Directory.Delete(dir, true);
     }
@@ -135,8 +135,8 @@ public class EndFileTransferTests
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
         var file1 = Path.Combine(dir, "test1.txt");
-        var endFile1 = Path.Combine(dir, "test1.END");
-        var endFileOrphan = Path.Combine(dir, "orphan.END"); // 対応するデータファイルなし
+        var endFile1 = Path.Combine(dir, "test1.txt.END");
+        var endFileOrphan = Path.Combine(dir, "orphan.txt.END"); // 対応するデータファイルなし
         await File.WriteAllTextAsync(file1, "data1");
         await File.WriteAllTextAsync(endFile1, "end1");
         await File.WriteAllTextAsync(endFileOrphan, "orphan");
@@ -168,11 +168,11 @@ public class EndFileTransferTests
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.UploadAsync(file1, "/remote/test1.txt", It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        mock.Setup(c => c.UploadAsync(endFile1, "/remote/test1.END", It.IsAny<CancellationToken>()))
+        mock.Setup(c => c.UploadAsync(endFile1, "/remote/test1.txt.END", It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
         mock.Setup(c => c.GetRemoteHashAsync("/remote/test1.txt", "SHA256", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(dataHash);
-        mock.Setup(c => c.GetRemoteHashAsync("/remote/test1.END", "SHA256", It.IsAny<CancellationToken>(), false))
+        mock.Setup(c => c.GetRemoteHashAsync("/remote/test1.txt.END", "SHA256", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(endHash);
         mock.Setup(c => c.Dispose());
 
@@ -185,9 +185,9 @@ public class EndFileTransferTests
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
         await worker.RunAsync(CancellationToken.None);
 
-        // test1.txtとtest1.ENDは転送される
+        // test1.txtとtest1.txt.ENDは転送される
         mock.Verify(c => c.UploadAsync(file1, "/remote/test1.txt", It.IsAny<CancellationToken>()), Times.Once);
-        mock.Verify(c => c.UploadAsync(endFile1, "/remote/test1.END", It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(c => c.UploadAsync(endFile1, "/remote/test1.txt.END", It.IsAny<CancellationToken>()), Times.Once);
         
         // orphan.ENDは対応するデータファイルがないため転送されない
         mock.Verify(c => c.UploadAsync(endFileOrphan, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
@@ -202,8 +202,8 @@ public class EndFileTransferTests
         Directory.CreateDirectory(dir);
         var file1 = Path.Combine(dir, "test1.txt");
         var file2 = Path.Combine(dir, "test2.txt");
-        var endFile1 = Path.Combine(dir, "test1.END");
-        var endFile2 = Path.Combine(dir, "test2.TRG");
+        var endFile1 = Path.Combine(dir, "test1.txt.END");
+        var endFile2 = Path.Combine(dir, "test2.txt.TRG");
         await File.WriteAllTextAsync(file1, "data1");
         await File.WriteAllTextAsync(file2, "data2");
         await File.WriteAllTextAsync(endFile1, "end1");
@@ -243,9 +243,9 @@ public class EndFileTransferTests
             .ReturnsAsync(hash1);
         mock.Setup(c => c.GetRemoteHashAsync("/remote/test2.txt", "SHA256", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(hash2);
-        mock.Setup(c => c.GetRemoteHashAsync("/remote/test1.END", "SHA256", It.IsAny<CancellationToken>(), false))
+        mock.Setup(c => c.GetRemoteHashAsync("/remote/test1.txt.END", "SHA256", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(endHash1);
-        mock.Setup(c => c.GetRemoteHashAsync("/remote/test2.TRG", "SHA256", It.IsAny<CancellationToken>(), false))
+        mock.Setup(c => c.GetRemoteHashAsync("/remote/test2.txt.TRG", "SHA256", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(endHash2);
         mock.Setup(c => c.Dispose());
 
@@ -261,8 +261,8 @@ public class EndFileTransferTests
         // 全ファイルが転送される（データファイル2つ + ENDファイル2つ）
         mock.Verify(c => c.UploadAsync(file1, "/remote/test1.txt", It.IsAny<CancellationToken>()), Times.Once);
         mock.Verify(c => c.UploadAsync(file2, "/remote/test2.txt", It.IsAny<CancellationToken>()), Times.Once);
-        mock.Verify(c => c.UploadAsync(endFile1, "/remote/test1.END", It.IsAny<CancellationToken>()), Times.Once);
-        mock.Verify(c => c.UploadAsync(endFile2, "/remote/test2.TRG", It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(c => c.UploadAsync(endFile1, "/remote/test1.txt.END", It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(c => c.UploadAsync(endFile2, "/remote/test2.txt.TRG", It.IsAny<CancellationToken>()), Times.Once);
 
         Directory.Delete(dir, true);
     }
@@ -372,5 +372,74 @@ public class EndFileTransferTests
             _stoppingTokenSource?.Dispose();
             _stoppedTokenSource?.Dispose();
         }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ProcessesCorrectEndFileNaming_DataFileDotTxtDotEND()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        var dataFile = Path.Combine(dir, "data1.txt");
+        var endFile = Path.Combine(dir, "data1.txt.END");
+        await File.WriteAllTextAsync(dataFile, "test data");
+        await File.WriteAllTextAsync(endFile, "");
+        var localHash = await HashUtil.ComputeHashAsync(dataFile, "SHA256", CancellationToken.None);
+        var endFileHash = await HashUtil.ComputeHashAsync(endFile, "SHA256", CancellationToken.None);
+
+        var watch = Options.Create(new WatchOptions
+        {
+            Path = dir,
+            RequireEndFile = true,
+            EndFileExtensions = new[] { ".END" },
+            TransferEndFiles = true
+        });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 1
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
+        var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
+        var cleanup = Options.Create(new CleanupOptions());
+
+        var mock = new Mock<IFileTransferClient>();
+        mock.Setup(c => c.UploadAsync(dataFile, "/remote/data1.txt", It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        mock.Setup(c => c.GetRemoteHashAsync("/remote/data1.txt", "SHA256", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(localHash);
+        mock.Setup(c => c.UploadAsync(endFile, "/remote/data1.txt.END", It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        mock.Setup(c => c.GetRemoteHashAsync("/remote/data1.txt.END", "SHA256", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(endFileHash);
+
+        var services = new ServiceCollection()
+            .AddSingleton(watch)
+            .AddSingleton(transfer)
+            .AddSingleton(retry)
+            .AddSingleton(hash)
+            .AddSingleton(cleanup)
+            .AddSingleton<ILogger<Worker>>(new Mock<ILogger<Worker>>().Object)
+            .AddSingleton<ILogger<TransferQueue>>(new Mock<ILogger<TransferQueue>>().Object)
+            .BuildServiceProvider();
+
+        using var lifetime = new DummyLifetime();
+        var worker = new TestWorker(watch, transfer, retry, hash, cleanup, services, new Mock<ILogger<Worker>>().Object, lifetime, new NoDisposeClient(mock.Object));
+
+        await worker.RunAsync(CancellationToken.None);
+
+        // data1.txtが転送されることを確認
+        mock.Verify(c => c.UploadAsync(dataFile, "/remote/data1.txt", It.IsAny<CancellationToken>()), Times.Once);
+        // data1.txt.ENDも転送されることを確認
+        mock.Verify(c => c.UploadAsync(endFile, "/remote/data1.txt.END", It.IsAny<CancellationToken>()), Times.Once);
+        
+        // ENDファイルが削除されることを確認
+        Assert.False(File.Exists(endFile), "END file should be deleted after successful transfer");
+
+        try { Directory.Delete(dir, true); } catch { }
     }
 }

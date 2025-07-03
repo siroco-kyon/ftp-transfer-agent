@@ -20,7 +20,8 @@
       "Bash(dotnet format:*)",
       "Bash(killall:*)",
       "Bash(time dotnet test --filter \"ClassName=ConfigurationValidationTests\" --verbosity quiet)",
-      "Bash(time dotnet test --filter \"ClassName=EndFileFeatureTests\" --verbosity quiet)"
+      "Bash(time dotnet test --filter \"ClassName=EndFileFeatureTests\" --verbosity quiet)",
+      "Bash(dotnet run:*)"
     ],
     "deny": []
   }
