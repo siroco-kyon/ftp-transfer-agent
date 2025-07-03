@@ -280,10 +280,16 @@ public class ConfigurationValidator
             result.Warnings.Add("No file extensions specified in AllowedExtensions. All files will be processed.");
         }
         
-        // ENDファイル機能の使用状況
-        if (watch.TransferEndFiles && watch.EndFileExtensions?.Length == 0)
+        // ENDファイル機能の使用状況（null安全性を確保）
+        if (watch.TransferEndFiles && (watch.EndFileExtensions == null || watch.EndFileExtensions.Length == 0))
         {
-            result.Warnings.Add("TransferEndFiles is enabled but no END file extensions are configured.");
+            result.Errors.Add("TransferEndFiles is enabled but no END file extensions are configured.");
+        }
+        
+        // ENDファイル機能の設定整合性チェック
+        if (watch.TransferEndFiles && !watch.RequireEndFile)
+        {
+            result.Warnings.Add("TransferEndFiles is enabled but RequireEndFile is disabled. This may result in unexpected behavior.");
         }
         
         // 並列度とタイムアウトの組み合わせ警告

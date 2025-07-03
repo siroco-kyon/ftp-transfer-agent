@@ -13,19 +13,20 @@ public static class HashUtil
     {
         using HashAlgorithm hasher = algorithm.ToUpper() switch
         {
+            "MD5" => MD5.Create(),
             "SHA256" => SHA256.Create(),
             "SHA512" => SHA512.Create(),
-            "MD5" => MD5.Create(), // 非推奨だが互換性のため保持
-            _ => throw new ArgumentException($"Unsupported hash algorithm: {algorithm}")
+            _ => throw new ArgumentException($"Unsupported hash algorithm: {algorithm}. Only MD5, SHA256, and SHA512 are supported.")
         };
 
         // ファイルサイズに応じてバッファサイズを調整
         var streamLength = stream.CanSeek ? stream.Length : 0;
         var bufferSize = streamLength switch
         {
-            < 1024 * 1024 => 8192,      // 1MB未満: 8KB
-            < 10 * 1024 * 1024 => 32768, // 10MB未満: 32KB
-            _ => 81920                    // 10MB以上: 80KB
+            < 1024 * 1024 => 8192,       // 1MB未満: 8KB
+            < 10 * 1024 * 1024 => 32768,  // 10MB未満: 32KB
+            < 100 * 1024 * 1024 => 131072, // 100MB未満: 128KB
+            _ => 262144                    // 100MB以上: 256KB
         };
 
         var buffer = new byte[bufferSize];

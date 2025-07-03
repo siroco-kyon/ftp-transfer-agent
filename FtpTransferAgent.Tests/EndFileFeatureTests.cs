@@ -459,6 +459,7 @@ public class EndFileFeatureTests
         {
             Path = dir,
             RequireEndFile = true,
+            AllowedExtensions = new[] { ".txt" },
             EndFileExtensions = new[] { ".END", ".end" }
         });
         var transfer = Options.Create(new TransferOptions
@@ -522,6 +523,7 @@ public class EndFileFeatureTests
             Path = dir,
             RequireEndFile = true,
             TransferEndFiles = true,
+            AllowedExtensions = new[] { ".txt" },
             EndFileExtensions = new[] { ".END", ".end" }
         });
         var transfer = Options.Create(new TransferOptions

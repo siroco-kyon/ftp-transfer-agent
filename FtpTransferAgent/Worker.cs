@@ -63,8 +63,9 @@ public class Worker : BackgroundService
         var queueLogger = _services.GetRequiredService<ILogger<TransferQueue>>();
         var queue = new TransferQueue(_channel, _retry, queueLogger, _transfer.Concurrency);
 
-        // パフォーマンス監視タスクを開始
-        var monitorTask = StartPerformanceMonitoringAsync(queue, stoppingToken);
+        // パフォーマンス監視用のCancellationTokenSourceを作成
+        using var monitorCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
+        var monitorTask = StartPerformanceMonitoringAsync(queue, monitorCts.Token);
 
         var queueTask = queue.StartAsync(async (item, token) =>
         {
@@ -98,11 +99,7 @@ public class Worker : BackgroundService
 
                 foreach (var file in files)
                 {
-                    if (exts.Length > 0 && !exts.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
+                    // ENDファイルかどうかを先にチェック
                     if (IsEndFile(file))
                     {
                         // ENDファイルは別リストに保存
@@ -110,6 +107,12 @@ public class Worker : BackgroundService
                         {
                             endFiles.Add(file);
                         }
+                        continue;
+                    }
+
+                    // 通常ファイルに対して拡張子フィルタリングを適用
+                    if (exts.Length > 0 && !exts.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
+                    {
                         continue;
                     }
 
@@ -139,7 +142,7 @@ public class Worker : BackgroundService
                     {
                         // 対応するデータファイルが存在する場合のみENDファイルを転送
                         var dataFileName = GetDataFileForEndFile(endFile);
-                        if (dataFiles.Any(f => Path.GetFileNameWithoutExtension(f).Equals(dataFileName, StringComparison.OrdinalIgnoreCase)))
+                        if (dataFiles.Any(f => string.Equals(Path.GetFileNameWithoutExtension(f), dataFileName, StringComparison.OrdinalIgnoreCase)))
                         {
                             _logger.LogDebug("Queueing END file {File} for transfer after data file", endFile);
                             _channel.Writer.TryWrite(new TransferItem(endFile, TransferAction.Upload));
@@ -189,11 +192,7 @@ public class Worker : BackgroundService
 
                 foreach (var file in sortedFiles)
                 {
-                    if (exts.Length > 0 && !exts.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
-                    {
-                        continue;
-                    }
-
+                    // ENDファイルかどうかを先にチェック
                     if (IsEndFileRemote(file))
                     {
                         // ENDファイルは別リストに保存
@@ -201,6 +200,12 @@ public class Worker : BackgroundService
                         {
                             endFiles.Add(file);
                         }
+                        continue;
+                    }
+
+                    // 通常ファイルに対して拡張子フィルタリングを適用
+                    if (exts.Length > 0 && !exts.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
+                    {
                         continue;
                     }
 
@@ -230,7 +235,7 @@ public class Worker : BackgroundService
                     {
                         // 対応するデータファイルが存在する場合のみENDファイルを転送
                         var dataFileName = GetDataFileForEndFileRemote(endFile);
-                        if (dataFiles.Any(f => Path.GetFileNameWithoutExtension(f).Equals(dataFileName, StringComparison.OrdinalIgnoreCase)))
+                        if (dataFiles.Any(f => string.Equals(Path.GetFileNameWithoutExtension(f), dataFileName, StringComparison.OrdinalIgnoreCase)))
                         {
                             _logger.LogDebug("Queueing remote END file {File} for transfer after data file", endFile);
                             _channel.Writer.TryWrite(new TransferItem(endFile, TransferAction.Download));
@@ -259,17 +264,30 @@ public class Worker : BackgroundService
             }
         }
 
-        // 書き込みを完了してすべての転送が終わるのを待機
+        // 書き込みを完了してキュー処理の完了を待機
         _channel.Writer.Complete();
         
         try
         {
-            // キューとモニタータスクの両方を適切に待機
-            await Task.WhenAll(queueTask, monitorTask).ConfigureAwait(false);
+            // まずキュー処理の完了を待機
+            await queueTask.ConfigureAwait(false);
+            
+            // キュー処理が完了したら監視タスクをキャンセル
+            monitorCts.Cancel();
+            
+            // 監視タスクの完了を少し待機（強制終了を避けるため）
+            try
+            {
+                await monitorTask.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                _logger.LogWarning("Performance monitoring task did not complete within timeout");
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError("Error during transfer or monitoring: {Error}", ex.Message);
+            _logger.LogError("Error during transfer: {Error}", ex.Message);
             throw;
         }
 
@@ -316,12 +334,17 @@ public class Worker : BackgroundService
         if (string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
         {
             _logger.LogInformation("[{Id}] Hash verification successful for {File}", id, item.Path);
-            if (_cleanup.DeleteAfterVerify)
+            
+            // ENDファイルは転送成功後常に削除、通常ファイルはDeleteAfterVerify設定に従う
+            var shouldDelete = IsEndFile(item.Path) || _cleanup.DeleteAfterVerify;
+            
+            if (shouldDelete)
             {
                 try
                 {
                     File.Delete(item.Path);
-                    _logger.LogInformation("[{Id}] Deleted local file {File}", id, item.Path);
+                    var fileType = IsEndFile(item.Path) ? "END file" : "local file";
+                    _logger.LogInformation("[{Id}] Deleted {FileType} {File}", id, fileType, item.Path);
                 }
                 catch (IOException ex)
                 {
@@ -353,8 +376,11 @@ public class Worker : BackgroundService
             // サブディレクトリ構造を保持する場合
             var relativePath = Path.GetRelativePath(_transfer.RemotePath, item.Path);
             
-            // パストラバーサル攻撃対策
-            if (relativePath.Contains("..") || Path.IsPathRooted(relativePath))
+            // パストラバーサル攻撃対策（包括的検証）
+            if (relativePath.Contains("..") || Path.IsPathRooted(relativePath) ||
+                relativePath.Contains("\\..\\") || relativePath.Contains("/../") ||
+                relativePath.StartsWith("..\\\\") ||
+                relativePath.StartsWith("../") || relativePath.EndsWith("\\..") || relativePath.EndsWith("/.."))
             {
                 throw new ArgumentException($"Unsafe relative path detected: {relativePath}");
             }
@@ -389,13 +415,13 @@ public class Worker : BackgroundService
             }
 
             // ファイル名の安全性をチェック（パストラバーサル攻撃対策）
-            // 危険な文字とパターンをチェック
+            // 危険な文字とパターンをチェック（プラットフォーム依存文字を考慮）
+            var invalidChars = Path.GetInvalidFileNameChars();
             if (fileName.Contains("..") || fileName.Contains('/') || fileName.Contains('\\') ||
-                fileName.Contains('<') || fileName.Contains('>') || fileName.Contains('|') ||
-                fileName.Contains(':') || fileName.Contains('*') || fileName.Contains('?') ||
-                fileName.Contains('"') || fileName.Any(c => c < 32))
+                fileName.Any(c => invalidChars.Contains(c)) || fileName.Any(c => c < 32) ||
+                fileName.Length > 255) // ファイル名長制限
             {
-                throw new ArgumentException($"Unsafe characters in file name: {fileName}");
+                throw new ArgumentException($"Unsafe or invalid characters in file name: {fileName}");
             }
 
             var safePath = Path.Combine(_watch.Path, fileName);
@@ -698,8 +724,11 @@ public class Worker : BackgroundService
                 var endFileExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
                 var endFileName = fileNameWithoutExtension + endFileExt;
                 
-                // リモートパスはUnix形式（/）を使用
-                var endFilePath = string.IsNullOrEmpty(directory) ? endFileName : $"{directory.Replace('\\', '/')}/{endFileName}";
+                // リモートパスはUnix形式（/）を使用（パス正規化）
+                var normalizedDirectory = directory?.Replace('\\', '/');
+                // ディレクトリが空でない場合、先頭の/を保持
+                var endFilePath = string.IsNullOrEmpty(normalizedDirectory) ? endFileName : 
+                    normalizedDirectory.StartsWith("/") ? $"{normalizedDirectory}/{endFileName}" : $"/{normalizedDirectory}/{endFileName}";
 
                 // リモートファイル一覧から対応するENDファイルを検索
                 if (remoteFiles.Any(f => string.Equals(f, endFilePath, StringComparison.OrdinalIgnoreCase)))

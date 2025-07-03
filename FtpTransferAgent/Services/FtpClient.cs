@@ -93,9 +93,15 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
                     return serverHash;
                 }
             }
-            catch
+            catch (FluentFTP.Exceptions.FtpException ex)
             {
-                // サーバーサイドハッシュが失敗した場合はローカル計算にフォールバック
+                // サーバーサイドハッシュコマンドがサポートされていない場合
+                _logger.LogDebug("Server hash command not supported for {Algorithm}: {Error}", algorithm, ex.Message);
+            }
+            catch (Exception ex)
+            {
+                // その他のエラーでサーバーサイドハッシュが失敗した場合
+                _logger.LogWarning("Server hash calculation failed, falling back to local calculation: {Error}", ex.Message);
             }
         }
         
