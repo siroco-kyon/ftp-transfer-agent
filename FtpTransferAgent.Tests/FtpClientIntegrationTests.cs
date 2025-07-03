@@ -24,7 +24,7 @@ public class FtpClientIntegrationTests
         var proc = Process.Start(psi)!;
 
         // サーバー起動を確実に待機する
-        var maxWaitTime = TimeSpan.FromSeconds(10);
+        var maxWaitTime = TimeSpan.FromSeconds(3);
         var startTime = DateTime.Now;
         var connected = false;
 
@@ -38,7 +38,7 @@ public class FtpClientIntegrationTests
             }
             catch
             {
-                await Task.Delay(200);
+                await Task.Delay(100);
             }
         }
 

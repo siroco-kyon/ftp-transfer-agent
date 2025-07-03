@@ -10,11 +10,11 @@ namespace FtpTransferAgent.Tests;
 public class HashUtilTests
 {
     /// <summary>
-    /// MD5 と SHA256 のハッシュ値が .NET の計算結果と一致することを確認する
+    /// SHA256 と SHA512 のハッシュ値が .NET の計算結果と一致することを確認する
     /// </summary>
     [Theory]
-    [InlineData("MD5")]
     [InlineData("SHA256")]
+    [InlineData("SHA512")]
     public async Task ComputeHashAsync_ReturnsExpectedHash(string algorithm)
     {
         // 一時ファイルを作成し既知のデータを書き込む
@@ -23,7 +23,7 @@ public class HashUtilTests
 
         // .NET 標準ライブラリを用いたハッシュ値
         string expected;
-        using (HashAlgorithm hasher = algorithm == "SHA256" ? SHA256.Create() : MD5.Create())
+        using (HashAlgorithm hasher = algorithm == "SHA256" ? SHA256.Create() : SHA512.Create())
         using (var stream = File.OpenRead(tempFile))
         {
             var hash = hasher.ComputeHash(stream);

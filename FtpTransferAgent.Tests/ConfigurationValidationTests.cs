@@ -143,7 +143,7 @@ public class ConfigurationValidationTests
     public void HashOptions_ShouldValidateAlgorithm()
     {
         // Valid algorithms
-        var validAlgorithms = new[] { "MD5", "SHA256", "SHA512" };
+        var validAlgorithms = new[] { "SHA256", "SHA512" };
         foreach (var algorithm in validAlgorithms)
         {
             var options = new HashOptions { Algorithm = algorithm };
@@ -152,7 +152,7 @@ public class ConfigurationValidationTests
         }
 
         // Invalid algorithms
-        var invalidAlgorithms = new[] { "SHA1", "sha256", "md5", "", "UNKNOWN" };
+        var invalidAlgorithms = new[] { "MD5", "SHA1", "sha256", "md5", "", "UNKNOWN" };
         foreach (var algorithm in invalidAlgorithms)
         {
             var options = new HashOptions { Algorithm = algorithm };
@@ -348,7 +348,7 @@ public class ConfigurationValidationTests
         };
         var transfer = new TransferOptions
         {
-            Mode = "ftp",
+            Mode = "sftp",
             Direction = "put",
             Host = "localhost",
             Username = "user",
@@ -359,7 +359,7 @@ public class ConfigurationValidationTests
         ConfigurationValidationResult result;
         try
         {
-            result = validator.ValidateConfiguration(validWatch, transfer, new RetryOptions(), new HashOptions { Algorithm = "MD5" }, new CleanupOptions());
+            result = validator.ValidateConfiguration(validWatch, transfer, new RetryOptions(), new HashOptions { Algorithm = "SHA256" }, new CleanupOptions());
         }
         catch (Exception ex)
         {
@@ -383,7 +383,7 @@ public class ConfigurationValidationTests
             EndFileExtensions = new[] { ".END", ".TRG" },
             TransferEndFiles = true
         };
-        var warningResult = validator.ValidateConfiguration(warningWatch, transfer, new RetryOptions(), new HashOptions { Algorithm = "MD5" }, new CleanupOptions());
+        var warningResult = validator.ValidateConfiguration(warningWatch, transfer, new RetryOptions(), new HashOptions { Algorithm = "SHA256" }, new CleanupOptions());
         
         // デバッグ: warningResultがInvalidの場合のエラー内容確認
         if (!warningResult.IsValid)
@@ -402,7 +402,7 @@ public class ConfigurationValidationTests
             EndFileExtensions = Array.Empty<string>(),
             TransferEndFiles = true
         };
-        var errorResult = validator.ValidateConfiguration(errorWatch, transfer, new RetryOptions(), new HashOptions { Algorithm = "MD5" }, new CleanupOptions());
+        var errorResult = validator.ValidateConfiguration(errorWatch, transfer, new RetryOptions(), new HashOptions { Algorithm = "SHA256" }, new CleanupOptions());
         Assert.False(errorResult.IsValid);
         Assert.Contains(errorResult.Errors, e => e.Contains("TransferEndFiles is enabled but EndFileExtensions is empty"));
 
@@ -414,7 +414,7 @@ public class ConfigurationValidationTests
             EndFileExtensions = null!,
             TransferEndFiles = true
         };
-        var nullResult = validator.ValidateConfiguration(nullExtensionsWatch, transfer, new RetryOptions(), new HashOptions { Algorithm = "MD5" }, new CleanupOptions());
+        var nullResult = validator.ValidateConfiguration(nullExtensionsWatch, transfer, new RetryOptions(), new HashOptions { Algorithm = "SHA256" }, new CleanupOptions());
         Assert.False(nullResult.IsValid);
         Assert.Contains(nullResult.Errors, e => e.Contains("TransferEndFiles is enabled but EndFileExtensions is empty"));
 
@@ -469,7 +469,7 @@ public class ConfigurationValidationTests
         };
         var validTransfer = new TransferOptions
         {
-            Mode = "ftp",
+            Mode = "sftp",
             Direction = "put",
             Host = "test.com",
             Username = "user",
@@ -477,7 +477,7 @@ public class ConfigurationValidationTests
             RemotePath = "/remote"
         };
         var retry = new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 };
-        var hash = new HashOptions { Algorithm = "MD5" };
+        var hash = new HashOptions { Algorithm = "SHA256" };
         var cleanup = new CleanupOptions();
 
         var result = validator.ValidateConfiguration(validWatch, validTransfer, retry, hash, cleanup);
@@ -495,20 +495,8 @@ public class ConfigurationValidationTests
         Assert.False(invalidResult.IsValid);
         Assert.Contains(invalidResult.Errors, e => e.Contains("END file extensions must be specified"));
 
-        // Warning for bidirectional transfer with END file feature
-        var bidirectionalTransfer = new TransferOptions
-        {
-            Mode = "ftp",
-            Direction = "both",
-            Host = "test.com",
-            Username = "user",
-            Password = "pass",
-            RemotePath = "/remote"
-        };
-
-        var warningResult = validator.ValidateConfiguration(validWatch, bidirectionalTransfer, retry, hash, cleanup);
-        Assert.True(warningResult.IsValid);
-        Assert.Contains(warningResult.Warnings, w => w.Contains("END file verification is only supported for upload operations"));
+        // Note: END file feature now works for both upload and download operations
+        // so no warning is expected for bidirectional transfers
     }
 
     [Fact]
@@ -534,7 +522,7 @@ public class ConfigurationValidationTests
             RemotePath = "/remote"
         };
         var retry = new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 };
-        var hash = new HashOptions { Algorithm = "MD5" };
+        var hash = new HashOptions { Algorithm = "SHA256" };
         var cleanup = new CleanupOptions();
 
         var result = validator.ValidateConfiguration(maliciousWatch, validTransfer, retry, hash, cleanup);
@@ -557,7 +545,7 @@ public class ConfigurationValidationTests
         };
         var validTransfer = new TransferOptions
         {
-            Mode = "ftp",
+            Mode = "sftp",
             Direction = "put",
             Host = "test.com",
             Username = "user",
@@ -565,7 +553,7 @@ public class ConfigurationValidationTests
             RemotePath = "/remote"
         };
         var retry = new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 };
-        var hash = new HashOptions { Algorithm = "MD5" };
+        var hash = new HashOptions { Algorithm = "SHA256" };
         var cleanup = new CleanupOptions();
 
         var result = validator.ValidateConfiguration(duplicateWatch, validTransfer, retry, hash, cleanup);
@@ -596,7 +584,7 @@ public class ConfigurationValidationTests
             RemotePath = "/remote"
         };
         var retry = new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 };
-        var hash = new HashOptions { Algorithm = "MD5" };
+        var hash = new HashOptions { Algorithm = "SHA256" };
         var cleanup = new CleanupOptions();
 
         var result = validator.ValidateConfiguration(nullWatch, validTransfer, retry, hash, cleanup);

@@ -40,7 +40,7 @@ public class ParallelProcessingIntegrationTests : IDisposable
             options.MaxAttempts = 2;
             options.DelaySeconds = 1;
         });
-        services.Configure<HashOptions>(options => options.Algorithm = "MD5");
+        services.Configure<HashOptions>(options => options.Algorithm = "SHA256");
         services.Configure<CleanupOptions>(options => options.DeleteAfterVerify = false);
         services.Configure<SmtpOptions>(options => options.Enabled = false);
         services.Configure<LoggingOptions>(options => options.Level = "Debug");
@@ -105,7 +105,7 @@ public class ParallelProcessingIntegrationTests : IDisposable
         }
         channel.Writer.Complete();
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         await queue.StartAsync(MixedHandler, cts.Token);
 
         // Assert
@@ -138,8 +138,8 @@ public class ParallelProcessingIntegrationTests : IDisposable
             var delay = item.Path switch
             {
                 "quick.txt" => 100,
-                "medium.txt" => 2000,
-                "slow.txt" => 5000,
+                "medium.txt" => 200,
+                "slow.txt" => 500,
                 _ => 50
             };
             await Task.Delay(delay, ct);
@@ -154,8 +154,8 @@ public class ParallelProcessingIntegrationTests : IDisposable
         var processingTask = queue.StartAsync(DelayedHandler, CancellationToken.None);
 
         // 少し待ってから長時間実行中のアイテムをチェック
-        await Task.Delay(1500);
-        var longRunningItems = queue.GetLongRunningItems(TimeSpan.FromSeconds(1)).ToList();
+        await Task.Delay(150);
+        var longRunningItems = queue.GetLongRunningItems(TimeSpan.FromMilliseconds(100)).ToList();
 
         // Assert
         Assert.NotEmpty(longRunningItems);

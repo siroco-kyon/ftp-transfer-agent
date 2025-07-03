@@ -178,15 +178,79 @@ public class Worker : BackgroundService
                 // AllowedExtensionsが指定されている場合はフィルタを適用
                 var exts = _watch.AllowedExtensions.Select(e => e.StartsWith(".") ? e : $".{e}").ToArray();
                 
-                foreach (var f in files)
+                // ファイル順序を安定化し、ENDファイルが先に処理されないようにソート
+                var sortedFiles = files
+                    .OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                // データファイルとENDファイルのペアを収集
+                var dataFiles = new List<string>();
+                var endFiles = new List<string>();
+
+                foreach (var file in sortedFiles)
                 {
-                    if (exts.Length > 0 && !exts.Contains(Path.GetExtension(f), StringComparer.OrdinalIgnoreCase))
+                    if (exts.Length > 0 && !exts.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
                     {
                         continue;
                     }
-                    
-                    _channel.Writer.TryWrite(new TransferItem(f, TransferAction.Download));
+
+                    if (IsEndFileRemote(file))
+                    {
+                        // ENDファイルは別リストに保存
+                        if (_watch.TransferEndFiles)
+                        {
+                            endFiles.Add(file);
+                        }
+                        continue;
+                    }
+
+                    // ENDファイル検証が有効な場合は、対応するENDファイルの存在を確認
+                    if (_watch.RequireEndFile)
+                    {
+                        if (!HasEndFileRemote(file, sortedFiles))
+                        {
+                            _logger.LogDebug("Skipping remote file {File} - no corresponding END file found", file);
+                            continue;
+                        }
+                    }
+
+                    dataFiles.Add(file);
                 }
+
+                // 1. まずデータファイルを転送キューに追加
+                foreach (var file in dataFiles)
+                {
+                    _channel.Writer.TryWrite(new TransferItem(file, TransferAction.Download));
+                }
+
+                // 2. その後でENDファイルを転送キューに追加（TransferEndFiles が true の場合）
+                if (_watch.TransferEndFiles)
+                {
+                    foreach (var endFile in endFiles)
+                    {
+                        // 対応するデータファイルが存在する場合のみENDファイルを転送
+                        var dataFileName = GetDataFileForEndFileRemote(endFile);
+                        if (dataFiles.Any(f => Path.GetFileNameWithoutExtension(f).Equals(dataFileName, StringComparison.OrdinalIgnoreCase)))
+                        {
+                            _logger.LogDebug("Queueing remote END file {File} for transfer after data file", endFile);
+                            _channel.Writer.TryWrite(new TransferItem(endFile, TransferAction.Download));
+                        }
+                        else
+                        {
+                            _logger.LogDebug("Skipping remote END file {File} - corresponding data file not being transferred", endFile);
+                        }
+                    }
+                }
+            }
+            catch (DirectoryNotFoundException ex)
+            {
+                _logger.LogError("Remote directory not found: {RemotePath}. Error: {Error}", _transfer.RemotePath, ex.Message);
+                throw;
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogError("Access denied to remote directory: {RemotePath}. Error: {Error}", _transfer.RemotePath, ex.Message);
+                throw;
             }
             catch (Exception ex)
             {
@@ -197,7 +261,17 @@ public class Worker : BackgroundService
 
         // 書き込みを完了してすべての転送が終わるのを待機
         _channel.Writer.Complete();
-        await queueTask.ConfigureAwait(false);
+        
+        try
+        {
+            // キューとモニタータスクの両方を適切に待機
+            await Task.WhenAll(queueTask, monitorTask).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Error during transfer or monitoring: {Error}", ex.Message);
+            throw;
+        }
 
         // 最終統計情報をログ出力
         var finalStats = queue.GetStatistics();
@@ -315,14 +389,31 @@ public class Worker : BackgroundService
             }
 
             // ファイル名の安全性をチェック（パストラバーサル攻撃対策）
+            // 危険な文字とパターンをチェック
+            if (fileName.Contains("..") || fileName.Contains('/') || fileName.Contains('\\') ||
+                fileName.Contains('<') || fileName.Contains('>') || fileName.Contains('|') ||
+                fileName.Contains(':') || fileName.Contains('*') || fileName.Contains('?') ||
+                fileName.Contains('"') || fileName.Any(c => c < 32))
+            {
+                throw new ArgumentException($"Unsafe characters in file name: {fileName}");
+            }
+
             var safePath = Path.Combine(_watch.Path, fileName);
             var fullPath = Path.GetFullPath(safePath);
             var watchFullPath = Path.GetFullPath(_watch.Path);
 
-            if (!fullPath.StartsWith(watchFullPath + Path.DirectorySeparatorChar) &&
+            // より厳密なパス検証
+            if (!fullPath.StartsWith(watchFullPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(fullPath, watchFullPath, StringComparison.OrdinalIgnoreCase))
             {
-                throw new ArgumentException($"Unsafe file path detected: {fileName}");
+                throw new ArgumentException($"Path traversal attempt detected: {fileName}");
+            }
+
+            // 最終的な安全性確認
+            var relativePath = Path.GetRelativePath(watchFullPath, fullPath);
+            if (relativePath.StartsWith("..") || Path.IsPathRooted(relativePath))
+            {
+                throw new ArgumentException($"Invalid relative path detected: {fileName}");
             }
 
             localPath = safePath;
@@ -489,6 +580,144 @@ public class Worker : BackgroundService
             // その他の予期しないエラー
             _logger.LogWarning("Error checking END file for {FilePath}: {Error}", filePath, ex.Message);
             return false;
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// 指定されたリモートファイルがENDファイルかどうかを判定
+    /// </summary>
+    private bool IsEndFileRemote(string filePath)
+    {
+        if (string.IsNullOrEmpty(filePath) || _watch.EndFileExtensions == null)
+        {
+            return false;
+        }
+
+        try
+        {
+            var extension = Path.GetExtension(filePath);
+            if (string.IsNullOrEmpty(extension))
+            {
+                return false;
+            }
+
+            return _watch.EndFileExtensions.Any(endExt =>
+            {
+                if (string.IsNullOrWhiteSpace(endExt))
+                {
+                    return false;
+                }
+                var normalizedEndExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
+                return string.Equals(extension, normalizedEndExt, StringComparison.OrdinalIgnoreCase);
+            });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Error checking if remote file is END file for {FilePath}: {Error}", filePath, ex.Message);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// リモートENDファイルから対応するデータファイル名を取得
+    /// </summary>
+    private string GetDataFileForEndFileRemote(string endFilePath)
+    {
+        if (string.IsNullOrEmpty(endFilePath) || _watch.EndFileExtensions == null)
+        {
+            return string.Empty;
+        }
+
+        try
+        {
+            var fileName = Path.GetFileName(endFilePath);
+            var extension = Path.GetExtension(endFilePath);
+
+            // ENDファイル拡張子を除去してデータファイル名を取得
+            foreach (var endExt in _watch.EndFileExtensions)
+            {
+                if (string.IsNullOrWhiteSpace(endExt))
+                {
+                    continue;
+                }
+
+                var normalizedEndExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
+                if (string.Equals(extension, normalizedEndExt, StringComparison.OrdinalIgnoreCase))
+                {
+                    // ENDファイル拡張子を除去してデータファイル名を返す
+                    return fileName.Substring(0, fileName.Length - normalizedEndExt.Length);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning("Error getting data file name for remote END file {EndFile}: {Error}", endFilePath, ex.Message);
+        }
+
+        return string.Empty;
+    }
+
+    /// <summary>
+    /// 指定されたリモートファイルに対応するENDファイルが存在するかどうかを確認
+    /// </summary>
+    private bool HasEndFileRemote(string filePath, List<string> remoteFiles)
+    {
+        // 入力値の検証
+        if (string.IsNullOrEmpty(filePath) || remoteFiles == null)
+        {
+            return false;
+        }
+
+        // ENDファイル拡張子が設定されていない場合
+        if (_watch.EndFileExtensions == null || _watch.EndFileExtensions.Length == 0)
+        {
+            return false;
+        }
+
+        try
+        {
+            var fileNameWithoutExtension = Path.GetFileNameWithoutExtension(filePath);
+            var directory = Path.GetDirectoryName(filePath) ?? string.Empty;
+
+            // ファイル名が取得できない場合
+            if (string.IsNullOrEmpty(fileNameWithoutExtension))
+            {
+                return false;
+            }
+
+            foreach (var endExt in _watch.EndFileExtensions)
+            {
+                // null または空の拡張子をスキップ
+                if (string.IsNullOrWhiteSpace(endExt))
+                {
+                    continue;
+                }
+
+                var endFileExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
+                var endFileName = fileNameWithoutExtension + endFileExt;
+                
+                // リモートパスはUnix形式（/）を使用
+                var endFilePath = string.IsNullOrEmpty(directory) ? endFileName : $"{directory.Replace('\\', '/')}/{endFileName}";
+
+                // リモートファイル一覧から対応するENDファイルを検索
+                if (remoteFiles.Any(f => string.Equals(f, endFilePath, StringComparison.OrdinalIgnoreCase)))
+                {
+                    return true;
+                }
+            }
+        }
+        catch (ArgumentException ex)
+        {
+            // 不正なパス文字が含まれる場合
+            _logger.LogWarning("Invalid remote file path for END file check: {FilePath}. Error: {Error}", filePath, ex.Message);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            // その他の予期しないエラー
+            _logger.LogWarning("Error checking remote END file for {FilePath}: {Error}", filePath, ex.Message);
         }
 
         return false;

@@ -32,7 +32,7 @@ public class WorkerDownloadTests
             Concurrency = 1
         });
         var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
-        var hashOpt = Options.Create(new HashOptions { Algorithm = "MD5" });
+        var hashOpt = Options.Create(new HashOptions { Algorithm = "SHA256" });
         var cleanup = Options.Create(new CleanupOptions { DeleteRemoteAfterDownload = true });
 
         var remoteFile = "/remote/sample.txt";
@@ -42,7 +42,7 @@ public class WorkerDownloadTests
         string remoteHash;
         {
             await using var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(remoteContent));
-            remoteHash = await HashUtil.ComputeHashAsync(ms, "MD5", CancellationToken.None);
+            remoteHash = await HashUtil.ComputeHashAsync(ms, "SHA256", CancellationToken.None);
         }
 
         var mock = new Mock<IFileTransferClient>();
@@ -54,7 +54,7 @@ public class WorkerDownloadTests
                 File.WriteAllText(lp, remoteContent);
             })
             .Returns(Task.CompletedTask).Verifiable();
-        mock.Setup(c => c.GetRemoteHashAsync(remoteFile, "MD5", It.IsAny<CancellationToken>(), false))
+        mock.Setup(c => c.GetRemoteHashAsync(remoteFile, "SHA256", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(remoteHash);
         mock.Setup(c => c.DeleteAsync(remoteFile, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask).Verifiable();
@@ -68,7 +68,7 @@ public class WorkerDownloadTests
         var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
         // タイムアウトを設定して無限待機を防止
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
         await worker.RunAsync(cts.Token);
 
         mock.Verify();
@@ -109,7 +109,7 @@ public class WorkerDownloadTests
             PreserveFolderStructure = true
         });
         var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
-        var hashOpt = Options.Create(new HashOptions { Algorithm = "MD5" });
+        var hashOpt = Options.Create(new HashOptions { Algorithm = "SHA256" });
         var cleanup = Options.Create(new CleanupOptions());
 
         var remoteFiles = new[]
@@ -123,7 +123,7 @@ public class WorkerDownloadTests
         string remoteHash;
         {
             await using var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(remoteContent));
-            remoteHash = await HashUtil.ComputeHashAsync(ms, "MD5", CancellationToken.None);
+            remoteHash = await HashUtil.ComputeHashAsync(ms, "SHA256", CancellationToken.None);
         }
 
         var mock = new Mock<IFileTransferClient>();
@@ -132,7 +132,7 @@ public class WorkerDownloadTests
 
         foreach (var remoteFile in remoteFiles)
         {
-            mock.Setup(c => c.GetRemoteHashAsync(remoteFile, "MD5", It.IsAny<CancellationToken>(), false))
+            mock.Setup(c => c.GetRemoteHashAsync(remoteFile, "SHA256", It.IsAny<CancellationToken>(), false))
                 .ReturnsAsync(remoteHash);
             mock.Setup(c => c.DownloadAsync(remoteFile, It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .Callback<string, string, CancellationToken>((remote, local, ct) =>
@@ -153,8 +153,9 @@ public class WorkerDownloadTests
             .AddSingleton<IHostApplicationLifetime>(new DummyLifetime())
             .BuildServiceProvider();
 
+        using var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, services,
-            new Mock<ILogger<Worker>>().Object, new DummyLifetime(), new NoDisposeClient(mock.Object));
+            new Mock<ILogger<Worker>>().Object, lifetime, new NoDisposeClient(mock.Object));
 
         await worker.RunAsync(CancellationToken.None);
 
@@ -198,7 +199,7 @@ public class WorkerDownloadTests
             PreserveFolderStructure = false
         });
         var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
-        var hashOpt = Options.Create(new HashOptions { Algorithm = "MD5" });
+        var hashOpt = Options.Create(new HashOptions { Algorithm = "SHA256" });
         var cleanup = Options.Create(new CleanupOptions());
 
         var remoteFiles = new[]
@@ -212,7 +213,7 @@ public class WorkerDownloadTests
         string remoteHash;
         {
             await using var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(remoteContent));
-            remoteHash = await HashUtil.ComputeHashAsync(ms, "MD5", CancellationToken.None);
+            remoteHash = await HashUtil.ComputeHashAsync(ms, "SHA256", CancellationToken.None);
         }
 
         var mock = new Mock<IFileTransferClient>();
@@ -221,7 +222,7 @@ public class WorkerDownloadTests
 
         foreach (var remoteFile in remoteFiles)
         {
-            mock.Setup(c => c.GetRemoteHashAsync(remoteFile, "MD5", It.IsAny<CancellationToken>(), false))
+            mock.Setup(c => c.GetRemoteHashAsync(remoteFile, "SHA256", It.IsAny<CancellationToken>(), false))
                 .ReturnsAsync(remoteHash);
             mock.Setup(c => c.DownloadAsync(remoteFile, It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .Callback<string, string, CancellationToken>((remote, local, ct) =>
@@ -241,8 +242,9 @@ public class WorkerDownloadTests
             .AddSingleton<IHostApplicationLifetime>(new DummyLifetime())
             .BuildServiceProvider();
 
+        using var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, services,
-            new Mock<ILogger<Worker>>().Object, new DummyLifetime(), new NoDisposeClient(mock.Object));
+            new Mock<ILogger<Worker>>().Object, lifetime, new NoDisposeClient(mock.Object));
 
         await worker.RunAsync(CancellationToken.None);
 
@@ -272,7 +274,12 @@ public class WorkerDownloadTests
             _client = client;
         }
         protected override IFileTransferClient CreateClient() => _client;
-        public Task RunAsync(CancellationToken token) => base.ExecuteAsync(token);
+        public async Task RunAsync(CancellationToken token)
+        {
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(token, timeoutCts.Token);
+            await base.ExecuteAsync(combinedCts.Token);
+        }
     }
 
     private class NoDisposeClient : IFileTransferClient
@@ -287,11 +294,25 @@ public class WorkerDownloadTests
         public Task DeleteAsync(string remotePath, CancellationToken ct) => _inner.DeleteAsync(remotePath, ct);
     }
 
-    private class DummyLifetime : IHostApplicationLifetime
+    private class DummyLifetime : IHostApplicationLifetime, IDisposable
     {
+        private readonly CancellationTokenSource _stoppingTokenSource = new();
+        private readonly CancellationTokenSource _stoppedTokenSource = new();
+        
         public CancellationToken ApplicationStarted => CancellationToken.None;
-        public CancellationToken ApplicationStopping => CancellationToken.None;
-        public CancellationToken ApplicationStopped => CancellationToken.None;
-        public void StopApplication() { }
+        public CancellationToken ApplicationStopping => _stoppingTokenSource.Token;
+        public CancellationToken ApplicationStopped => _stoppedTokenSource.Token;
+        
+        public void StopApplication() 
+        {
+            _stoppingTokenSource.Cancel();
+            _stoppedTokenSource.Cancel();
+        }
+
+        public void Dispose()
+        {
+            _stoppingTokenSource?.Dispose();
+            _stoppedTokenSource?.Dispose();
+        }
     }
 }

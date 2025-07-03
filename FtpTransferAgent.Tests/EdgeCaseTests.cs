@@ -293,7 +293,7 @@ public class EdgeCaseTests : IDisposable
         var lockObject = new object();
 
         // Act
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30)); // タイムアウト設定
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5)); // タイムアウト設定
 
         await queue.StartAsync(async (item, token) =>
         {

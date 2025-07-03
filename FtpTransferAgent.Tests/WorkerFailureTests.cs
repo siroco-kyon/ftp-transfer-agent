@@ -34,14 +34,14 @@ public class WorkerFailureTests
             Concurrency = 1
         });
         var retry = Options.Create(new RetryOptions { MaxAttempts = 2, DelaySeconds = 0 });
-        var hash = Options.Create(new HashOptions { Algorithm = "MD5" });
+        var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
         var cleanup = Options.Create(new CleanupOptions { DeleteAfterVerify = true });
 
         var remotePath = "/remote/sample.txt";
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.UploadAsync(file, remotePath, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        mock.Setup(c => c.GetRemoteHashAsync(remotePath, "MD5", It.IsAny<CancellationToken>(), false))
+        mock.Setup(c => c.GetRemoteHashAsync(remotePath, "SHA256", It.IsAny<CancellationToken>(), false))
             .ThrowsAsync(new TimeoutException("Network timeout during hash calculation")); // リトライ可能な例外に変更
         mock.Setup(c => c.Dispose());
 
@@ -50,7 +50,7 @@ public class WorkerFailureTests
         var provider = services.BuildServiceProvider();
         var logger = provider.GetRequiredService<ILogger<Worker>>();
 
-        var lifetime = new DummyLifetime();
+        using var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider,
             logger, lifetime, new NoDisposeClient(mock.Object));
 
@@ -76,7 +76,12 @@ public class WorkerFailureTests
 
         protected override IFileTransferClient CreateClient() => _client;
 
-        public Task RunAsync(CancellationToken token) => base.ExecuteAsync(token);
+        public async Task RunAsync(CancellationToken token)
+        {
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(token, timeoutCts.Token);
+            await base.ExecuteAsync(combinedCts.Token);
+        }
     }
 
     private class NoDisposeClient : IFileTransferClient
@@ -91,11 +96,25 @@ public class WorkerFailureTests
         public Task DeleteAsync(string remotePath, CancellationToken ct) => _inner.DeleteAsync(remotePath, ct);
     }
 
-    private class DummyLifetime : IHostApplicationLifetime
+    private class DummyLifetime : IHostApplicationLifetime, IDisposable
     {
+        private readonly CancellationTokenSource _stoppingTokenSource = new();
+        private readonly CancellationTokenSource _stoppedTokenSource = new();
+        
         public CancellationToken ApplicationStarted => CancellationToken.None;
-        public CancellationToken ApplicationStopping => CancellationToken.None;
-        public CancellationToken ApplicationStopped => CancellationToken.None;
-        public void StopApplication() { }
+        public CancellationToken ApplicationStopping => _stoppingTokenSource.Token;
+        public CancellationToken ApplicationStopped => _stoppedTokenSource.Token;
+        
+        public void StopApplication() 
+        {
+            _stoppingTokenSource.Cancel();
+            _stoppedTokenSource.Cancel();
+        }
+
+        public void Dispose()
+        {
+            _stoppingTokenSource?.Dispose();
+            _stoppedTokenSource?.Dispose();
+        }
     }
 }

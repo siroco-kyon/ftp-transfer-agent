@@ -39,7 +39,7 @@ public class EndFileFeatureTests
             Concurrency = 1
         });
         var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
-        var hash = Options.Create(new HashOptions { Algorithm = "MD5" });
+        var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
         var cleanup = Options.Create(new CleanupOptions());
 
         var mock = new Mock<IFileTransferClient>();
@@ -50,7 +50,7 @@ public class EndFileFeatureTests
         var provider = services.BuildServiceProvider();
         var logger = provider.GetRequiredService<ILogger<Worker>>();
 
-        var lifetime = new DummyLifetime();
+        using var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
         await worker.RunAsync(CancellationToken.None);
 
@@ -69,7 +69,7 @@ public class EndFileFeatureTests
         var endFile = Path.Combine(dir, "test.END");
         await File.WriteAllTextAsync(file, "data");
         await File.WriteAllTextAsync(endFile, "");
-        var localHash = await HashUtil.ComputeHashAsync(file, "MD5", CancellationToken.None);
+        var localHash = await HashUtil.ComputeHashAsync(file, "SHA256", CancellationToken.None);
 
         var watch = Options.Create(new WatchOptions
         {
@@ -88,14 +88,14 @@ public class EndFileFeatureTests
             Concurrency = 1
         });
         var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
-        var hash = Options.Create(new HashOptions { Algorithm = "MD5" });
+        var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
         var cleanup = Options.Create(new CleanupOptions());
 
         var remotePath = "/remote/test.txt";
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.UploadAsync(file, remotePath, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask).Verifiable();
-        mock.Setup(c => c.GetRemoteHashAsync(remotePath, "MD5", It.IsAny<CancellationToken>(), false))
+        mock.Setup(c => c.GetRemoteHashAsync(remotePath, "SHA256", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(localHash);
         mock.Setup(c => c.Dispose());
 
@@ -104,7 +104,7 @@ public class EndFileFeatureTests
         var provider = services.BuildServiceProvider();
         var logger = provider.GetRequiredService<ILogger<Worker>>();
 
-        var lifetime = new DummyLifetime();
+        using var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
         await worker.RunAsync(CancellationToken.None);
 
@@ -123,7 +123,7 @@ public class EndFileFeatureTests
         var endFile = Path.Combine(dir, "test.end");
         await File.WriteAllTextAsync(file, "data");
         await File.WriteAllTextAsync(endFile, "");
-        var localHash = await HashUtil.ComputeHashAsync(file, "MD5", CancellationToken.None);
+        var localHash = await HashUtil.ComputeHashAsync(file, "SHA256", CancellationToken.None);
 
         var watch = Options.Create(new WatchOptions
         {
@@ -142,14 +142,14 @@ public class EndFileFeatureTests
             Concurrency = 1
         });
         var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
-        var hash = Options.Create(new HashOptions { Algorithm = "MD5" });
+        var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
         var cleanup = Options.Create(new CleanupOptions());
 
         var remotePath = "/remote/test.txt";
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.UploadAsync(file, remotePath, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask).Verifiable();
-        mock.Setup(c => c.GetRemoteHashAsync(remotePath, "MD5", It.IsAny<CancellationToken>(), false))
+        mock.Setup(c => c.GetRemoteHashAsync(remotePath, "SHA256", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(localHash);
         mock.Setup(c => c.Dispose());
 
@@ -158,7 +158,7 @@ public class EndFileFeatureTests
         var provider = services.BuildServiceProvider();
         var logger = provider.GetRequiredService<ILogger<Worker>>();
 
-        var lifetime = new DummyLifetime();
+        using var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
         await worker.RunAsync(CancellationToken.None);
 
@@ -177,7 +177,7 @@ public class EndFileFeatureTests
         var endFile = Path.Combine(dir, "test.TRG");
         await File.WriteAllTextAsync(file, "data");
         await File.WriteAllTextAsync(endFile, "");
-        var localHash = await HashUtil.ComputeHashAsync(file, "MD5", CancellationToken.None);
+        var localHash = await HashUtil.ComputeHashAsync(file, "SHA256", CancellationToken.None);
 
         var watch = Options.Create(new WatchOptions
         {
@@ -196,14 +196,14 @@ public class EndFileFeatureTests
             Concurrency = 1
         });
         var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
-        var hash = Options.Create(new HashOptions { Algorithm = "MD5" });
+        var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
         var cleanup = Options.Create(new CleanupOptions());
 
         var remotePath = "/remote/test.txt";
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.UploadAsync(file, remotePath, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask).Verifiable();
-        mock.Setup(c => c.GetRemoteHashAsync(remotePath, "MD5", It.IsAny<CancellationToken>(), false))
+        mock.Setup(c => c.GetRemoteHashAsync(remotePath, "SHA256", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(localHash);
         mock.Setup(c => c.Dispose());
 
@@ -212,7 +212,7 @@ public class EndFileFeatureTests
         var provider = services.BuildServiceProvider();
         var logger = provider.GetRequiredService<ILogger<Worker>>();
 
-        var lifetime = new DummyLifetime();
+        using var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
         await worker.RunAsync(CancellationToken.None);
 
@@ -229,7 +229,7 @@ public class EndFileFeatureTests
         Directory.CreateDirectory(dir);
         var file = Path.Combine(dir, "test.txt");
         await File.WriteAllTextAsync(file, "data");
-        var localHash = await HashUtil.ComputeHashAsync(file, "MD5", CancellationToken.None);
+        var localHash = await HashUtil.ComputeHashAsync(file, "SHA256", CancellationToken.None);
 
         var watch = Options.Create(new WatchOptions
         {
@@ -247,14 +247,14 @@ public class EndFileFeatureTests
             Concurrency = 1
         });
         var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
-        var hash = Options.Create(new HashOptions { Algorithm = "MD5" });
+        var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
         var cleanup = Options.Create(new CleanupOptions());
 
         var remotePath = "/remote/test.txt";
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.UploadAsync(file, remotePath, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask).Verifiable();
-        mock.Setup(c => c.GetRemoteHashAsync(remotePath, "MD5", It.IsAny<CancellationToken>(), false))
+        mock.Setup(c => c.GetRemoteHashAsync(remotePath, "SHA256", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(localHash);
         mock.Setup(c => c.Dispose());
 
@@ -263,7 +263,7 @@ public class EndFileFeatureTests
         var provider = services.BuildServiceProvider();
         var logger = provider.GetRequiredService<ILogger<Worker>>();
 
-        var lifetime = new DummyLifetime();
+        using var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
         await worker.RunAsync(CancellationToken.None);
 
@@ -284,7 +284,7 @@ public class EndFileFeatureTests
         await File.WriteAllTextAsync(file, "data");
         await File.WriteAllTextAsync(endFile, "");
         await File.WriteAllTextAsync(anotherEndFile, "");
-        var localHash = await HashUtil.ComputeHashAsync(file, "MD5", CancellationToken.None);
+        var localHash = await HashUtil.ComputeHashAsync(file, "SHA256", CancellationToken.None);
 
         var watch = Options.Create(new WatchOptions
         {
@@ -304,14 +304,14 @@ public class EndFileFeatureTests
             Concurrency = 1
         });
         var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
-        var hash = Options.Create(new HashOptions { Algorithm = "MD5" });
+        var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
         var cleanup = Options.Create(new CleanupOptions());
 
         var remotePath = "/remote/test.txt";
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.UploadAsync(file, remotePath, It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask).Verifiable();
-        mock.Setup(c => c.GetRemoteHashAsync(remotePath, "MD5", It.IsAny<CancellationToken>(), false))
+        mock.Setup(c => c.GetRemoteHashAsync(remotePath, "SHA256", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(localHash);
         mock.Setup(c => c.Dispose());
 
@@ -320,7 +320,7 @@ public class EndFileFeatureTests
         var provider = services.BuildServiceProvider();
         var logger = provider.GetRequiredService<ILogger<Worker>>();
 
-        var lifetime = new DummyLifetime();
+        using var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
         await worker.RunAsync(CancellationToken.None);
 
@@ -371,13 +371,13 @@ public class EndFileFeatureTests
             Concurrency = 1
         });
         var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
-        var hash = Options.Create(new HashOptions { Algorithm = "MD5" });
+        var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
         var cleanup = Options.Create(new CleanupOptions());
 
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.UploadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
-        mock.Setup(c => c.GetRemoteHashAsync(It.IsAny<string>(), "MD5", It.IsAny<CancellationToken>(), false))
+        mock.Setup(c => c.GetRemoteHashAsync(It.IsAny<string>(), "SHA256", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync("d41d8cd98f00b204e9800998ecf8427e");
         mock.Setup(c => c.Dispose());
 
@@ -386,7 +386,7 @@ public class EndFileFeatureTests
         var provider = services.BuildServiceProvider();
         var logger = provider.GetRequiredService<ILogger<Worker>>();
 
-        var lifetime = new DummyLifetime();
+        using var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
         await worker.RunAsync(CancellationToken.None);
 
@@ -396,6 +396,239 @@ public class EndFileFeatureTests
         mock.Verify(c => c.UploadAsync(It.Is<string>(s => s.EndsWith("b_data.txt")), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         mock.Verify(c => c.UploadAsync(It.Is<string>(s => s.EndsWith("c_data.txt")), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never); // ENDファイルなし
         mock.Verify(c => c.UploadAsync(It.Is<string>(s => s.EndsWith(".END")), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never); // ENDファイル自体
+
+        Directory.Delete(dir, true);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Get_SkipsFileWithoutEndFile_WhenRequireEndFileEnabled()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+
+        var watch = Options.Create(new WatchOptions
+        {
+            Path = dir,
+            RequireEndFile = true,
+            EndFileExtensions = new[] { ".END", ".end" }
+        });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "get",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 1
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
+        var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
+        var cleanup = Options.Create(new CleanupOptions());
+
+        var localTestFile = Path.Combine(dir, "test.txt");
+
+        var mock = new Mock<IFileTransferClient>();
+        // リモートファイル一覧（ENDファイルなし）
+        mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(new[] { "/remote/test.txt" });
+        mock.Setup(c => c.Dispose());
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var provider = services.BuildServiceProvider();
+        var logger = provider.GetRequiredService<ILogger<Worker>>();
+
+        using var lifetime = new DummyLifetime();
+        var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
+        await worker.RunAsync(CancellationToken.None);
+
+        // DownloadAsyncが呼ばれないことを確認（ENDファイルがないため）
+        mock.Verify(c => c.DownloadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        Directory.Delete(dir, true);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Get_ProcessesFileWithEndFile_WhenRequireEndFileEnabled()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+
+        var watch = Options.Create(new WatchOptions
+        {
+            Path = dir,
+            RequireEndFile = true,
+            EndFileExtensions = new[] { ".END", ".end" }
+        });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "get",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 1
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
+        var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
+        var cleanup = Options.Create(new CleanupOptions());
+
+        var localTestFile = Path.Combine(dir, "test.txt");
+        var testData = "test data";
+        
+        // メモリストリームを使ってハッシュを事前計算
+        string expectedHash;
+        {
+            await using var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(testData));
+            expectedHash = await HashUtil.ComputeHashAsync(ms, "SHA256", CancellationToken.None);
+        }
+        
+        var mock = new Mock<IFileTransferClient>();
+        // リモートファイル一覧（対応するENDファイルあり）
+        mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(new[] { "/remote/test.txt", "/remote/test.END" });
+        mock.Setup(c => c.DownloadAsync("/remote/test.txt", localTestFile, It.IsAny<CancellationToken>()))
+            .Callback<string, string, CancellationToken>((_, lp, _) => File.WriteAllText(lp, testData))
+            .Returns(Task.CompletedTask).Verifiable();
+        mock.Setup(c => c.GetRemoteHashAsync("/remote/test.txt", "SHA256", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(expectedHash);
+        mock.Setup(c => c.Dispose());
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var provider = services.BuildServiceProvider();
+        var logger = provider.GetRequiredService<ILogger<Worker>>();
+
+        using var lifetime = new DummyLifetime();
+        var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
+        await worker.RunAsync(CancellationToken.None);
+
+        // ダウンロードが実行されることを確認
+        mock.Verify(c => c.DownloadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+
+        Directory.Delete(dir, true);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Get_TransfersEndFiles_WhenTransferEndFilesEnabled()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+
+        var watch = Options.Create(new WatchOptions
+        {
+            Path = dir,
+            RequireEndFile = true,
+            TransferEndFiles = true,
+            EndFileExtensions = new[] { ".END", ".end" }
+        });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "get",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 1
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
+        var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
+        var cleanup = Options.Create(new CleanupOptions());
+
+        var localTestFile = Path.Combine(dir, "test.txt");
+        var localEndFile = Path.Combine(dir, "test.END");
+        var testData = "test data";
+        var endData = "";
+
+        // メモリストリームを使ってハッシュを事前計算
+        string testDataHash, endDataHash;
+        {
+            await using var ms1 = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(testData));
+            testDataHash = await HashUtil.ComputeHashAsync(ms1, "SHA256", CancellationToken.None);
+        }
+        {
+            await using var ms2 = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(endData));
+            endDataHash = await HashUtil.ComputeHashAsync(ms2, "SHA256", CancellationToken.None);
+        }
+
+        var mock = new Mock<IFileTransferClient>();
+        // リモートファイル一覧（データファイルとENDファイル両方）
+        mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(new[] { "/remote/test.txt", "/remote/test.END" });
+        mock.Setup(c => c.DownloadAsync("/remote/test.txt", localTestFile, It.IsAny<CancellationToken>()))
+            .Callback<string, string, CancellationToken>((_, lp, _) => File.WriteAllText(lp, testData))
+            .Returns(Task.CompletedTask).Verifiable();
+        mock.Setup(c => c.DownloadAsync("/remote/test.END", localEndFile, It.IsAny<CancellationToken>()))
+            .Callback<string, string, CancellationToken>((_, lp, _) => File.WriteAllText(lp, endData))
+            .Returns(Task.CompletedTask).Verifiable();
+        mock.Setup(c => c.GetRemoteHashAsync("/remote/test.txt", "SHA256", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(testDataHash);
+        mock.Setup(c => c.GetRemoteHashAsync("/remote/test.END", "SHA256", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(endDataHash);
+        mock.Setup(c => c.Dispose());
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var provider = services.BuildServiceProvider();
+        var logger = provider.GetRequiredService<ILogger<Worker>>();
+
+        using var lifetime = new DummyLifetime();
+        var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
+        await worker.RunAsync(CancellationToken.None);
+
+        // 両方のファイルがダウンロードされることを確認
+        mock.Verify(c => c.DownloadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.AtLeast(2));
+
+        Directory.Delete(dir, true);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Get_SkipsOrphanEndFiles()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+
+        var watch = Options.Create(new WatchOptions
+        {
+            Path = dir,
+            RequireEndFile = false,
+            TransferEndFiles = true,
+            EndFileExtensions = new[] { ".END", ".end" }
+        });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "get",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 1
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
+        var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
+        var cleanup = Options.Create(new CleanupOptions());
+
+        var mock = new Mock<IFileTransferClient>();
+        // リモートファイル一覧（対応するデータファイルがないENDファイルのみ）
+        mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(new[] { "/remote/orphan.END" });
+        mock.Setup(c => c.Dispose());
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var provider = services.BuildServiceProvider();
+        var logger = provider.GetRequiredService<ILogger<Worker>>();
+
+        using var lifetime = new DummyLifetime();
+        var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
+        await worker.RunAsync(CancellationToken.None);
+
+        // 孤立したENDファイルはダウンロードされないことを確認
+        mock.Verify(c => c.DownloadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
 
         Directory.Delete(dir, true);
     }
@@ -411,7 +644,12 @@ public class EndFileFeatureTests
 
         protected override IFileTransferClient CreateClient() => _client;
 
-        public Task RunAsync(CancellationToken token) => base.ExecuteAsync(token);
+        public async Task RunAsync(CancellationToken token)
+        {
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(token, timeoutCts.Token);
+            await base.ExecuteAsync(combinedCts.Token);
+        }
     }
 
     private class NoDisposeClient : IFileTransferClient
@@ -426,11 +664,25 @@ public class EndFileFeatureTests
         public Task DeleteAsync(string remotePath, CancellationToken ct) => _inner.DeleteAsync(remotePath, ct);
     }
 
-    private class DummyLifetime : IHostApplicationLifetime
+    private class DummyLifetime : IHostApplicationLifetime, IDisposable
     {
+        private readonly CancellationTokenSource _stoppingTokenSource = new();
+        private readonly CancellationTokenSource _stoppedTokenSource = new();
+        
         public CancellationToken ApplicationStarted => CancellationToken.None;
-        public CancellationToken ApplicationStopping => CancellationToken.None;
-        public CancellationToken ApplicationStopped => CancellationToken.None;
-        public void StopApplication() { }
+        public CancellationToken ApplicationStopping => _stoppingTokenSource.Token;
+        public CancellationToken ApplicationStopped => _stoppedTokenSource.Token;
+        
+        public void StopApplication() 
+        {
+            _stoppingTokenSource.Cancel();
+            _stoppedTokenSource.Cancel();
+        }
+
+        public void Dispose()
+        {
+            _stoppingTokenSource?.Dispose();
+            _stoppedTokenSource?.Dispose();
+        }
     }
 }

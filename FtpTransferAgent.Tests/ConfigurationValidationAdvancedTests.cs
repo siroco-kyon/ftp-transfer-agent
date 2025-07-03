@@ -62,7 +62,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
             Password = "pass"
         };
         var retry = new RetryOptions();
-        var hash = new HashOptions();
+        var hash = new HashOptions { Algorithm = "SHA256" };
         var cleanup = new CleanupOptions();
 
         // Act
@@ -88,7 +88,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
             Concurrency = 10
         };
         var retry = new RetryOptions { MaxAttempts = 10 };
-        var hash = new HashOptions();
+        var hash = new HashOptions { Algorithm = "SHA256" };
         var cleanup = new CleanupOptions();
 
         // Act
@@ -115,7 +115,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
             Concurrency = 8
         };
         var retry = new RetryOptions();
-        var hash = new HashOptions();
+        var hash = new HashOptions { Algorithm = "SHA256" };
         var cleanup = new CleanupOptions();
 
         // Act
@@ -139,7 +139,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
             Password = "plaintext_password"
         };
         var retry = new RetryOptions();
-        var hash = new HashOptions();
+        var hash = new HashOptions { Algorithm = "SHA256" };
         var cleanup = new CleanupOptions();
 
         // Act
@@ -191,7 +191,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
             Password = "pass"
         };
         var retry = new RetryOptions();
-        var hash = new HashOptions();
+        var hash = new HashOptions { Algorithm = "SHA256" };
         var cleanup = new CleanupOptions();
 
         // Act
@@ -216,7 +216,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
             Port = 70000 // 無効なポート番号
         };
         var retry = new RetryOptions();
-        var hash = new HashOptions();
+        var hash = new HashOptions { Algorithm = "SHA256" };
         var cleanup = new CleanupOptions();
 
         // Act
@@ -245,7 +245,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
             Password = "pass" // FTPモードでパスワード設定により警告が発生
         };
         var retry = new RetryOptions { DelaySeconds = delaySeconds };
-        var hash = new HashOptions();
+        var hash = new HashOptions { Algorithm = "SHA256" };
         var cleanup = new CleanupOptions();
 
         // Act
@@ -335,7 +335,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
             PrivateKeyPath = "/non/existent/key.pem" // 存在しない鍵ファイル
         };
         var retry = new RetryOptions();
-        var hash = new HashOptions();
+        var hash = new HashOptions { Algorithm = "SHA256" };
         var cleanup = new CleanupOptions();
 
         // Act

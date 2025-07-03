@@ -125,7 +125,7 @@ public class ReliableIntegrationTests : IDisposable
             mockClient.Object);
 
         // Act
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60)); // 統合テストに十分な時間を設定
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)); // 統合テストに適切な時間を設定
         await worker.TestExecuteAsync(cts.Token);
 
         // Assert
@@ -196,7 +196,7 @@ public class ReliableIntegrationTests : IDisposable
             mockServiceProvider.Object, mockLogger.Object, mockLifetime.Object, mockClient.Object);
 
         // Act & Assert
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60)); // 統合テストに十分な時間を設定
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)); // 統合テストに適切な時間を設定
 
         // 並列処理改善後は例外が再スローされない
         await worker.TestExecuteAsync(cts.Token);

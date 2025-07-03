@@ -8,8 +8,8 @@ namespace FtpTransferAgent.Configuration;
 public class HashOptions
 {
     [Required]
-    [RegularExpression("^(MD5|SHA256|SHA512)$")]
-    public string Algorithm { get; set; } = "MD5";
+    [RegularExpression("^(SHA256|SHA512)$")]
+    public string Algorithm { get; set; } = "SHA256";
 
     // FTP サーバーのハッシュ計算コマンドを利用するか
     public bool UseServerCommand { get; set; } = false; // サーバーコマンドは使用せず確実なローカル計算を行う

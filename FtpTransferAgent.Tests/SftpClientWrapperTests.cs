@@ -130,16 +130,16 @@ public class SftpClientWrapperTests : IDisposable
         await File.WriteAllTextAsync(testFile, content);
 
         // Act
-        var md5Hash = await HashUtil.ComputeHashAsync(testFile, "MD5", CancellationToken.None);
         var sha256Hash = await HashUtil.ComputeHashAsync(testFile, "SHA256", CancellationToken.None);
+        var sha512Hash = await HashUtil.ComputeHashAsync(testFile, "SHA512", CancellationToken.None);
 
         // Assert
-        Assert.NotNull(md5Hash);
         Assert.NotNull(sha256Hash);
-        Assert.Equal(32, md5Hash.Length); // MD5は32文字
+        Assert.NotNull(sha512Hash);
         Assert.Equal(64, sha256Hash.Length); // SHA256は64文字
-        Assert.All(md5Hash, c => Assert.True(char.IsDigit(c) || (c >= 'a' && c <= 'f')));
+        Assert.Equal(128, sha512Hash.Length); // SHA512は128文字
         Assert.All(sha256Hash, c => Assert.True(char.IsDigit(c) || (c >= 'a' && c <= 'f')));
+        Assert.All(sha512Hash, c => Assert.True(char.IsDigit(c) || (c >= 'a' && c <= 'f')));
     }
 
     [Fact]
@@ -150,11 +150,11 @@ public class SftpClientWrapperTests : IDisposable
         var stream = new MemoryStream(Encoding.UTF8.GetBytes(content));
 
         // Act
-        var hash = await HashUtil.ComputeHashAsync(stream, "MD5", CancellationToken.None);
+        var hash = await HashUtil.ComputeHashAsync(stream, "SHA256", CancellationToken.None);
 
         // Assert
         Assert.NotNull(hash);
-        Assert.Equal(32, hash.Length);
+        Assert.Equal(64, hash.Length);
     }
 
     [Fact]

@@ -47,7 +47,7 @@ public class NetworkFailureSimulationTests
         channel.Writer.TryWrite(new TransferItem("test.txt", TransferAction.Upload));
         channel.Writer.Complete();
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         await queue.StartAsync(FailingHandler, cts.Token);
 
         // Assert - 並列処理改善後は例外が再スローされず統計情報で確認
@@ -110,7 +110,7 @@ public class NetworkFailureSimulationTests
         channel.Writer.TryWrite(new TransferItem("test.txt", TransferAction.Upload));
         channel.Writer.Complete();
 
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         await queue.StartAsync(NonRetryableHandler, cts.Token);
 
         // リトライしないことを確認（1回のみ実行）
@@ -170,7 +170,7 @@ public class NetworkFailureSimulationTests
         channel.Writer.Complete();
 
         // file3.txtで非リトライ可能例外が発生するが、他のファイルは処理される
-        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
         await queue.StartAsync(VariableFailureHandler, cts.Token);
 
         // Assert - 並列処理改善後は例外が再スローされず統計情報で確認
@@ -216,7 +216,7 @@ public class NetworkFailureSimulationTests
         // 長時間実行される処理
         async Task LongRunningHandler(TransferItem item, CancellationToken ct)
         {
-            await Task.Delay(TimeSpan.FromSeconds(2), ct);
+            await Task.Delay(TimeSpan.FromMilliseconds(2000), ct);
         }
 
         // Act
@@ -226,8 +226,8 @@ public class NetworkFailureSimulationTests
         var transferTask = queue.StartAsync(LongRunningHandler, CancellationToken.None);
 
         // 少し待ってから長時間実行中のアイテムをチェック
-        await Task.Delay(TimeSpan.FromSeconds(1));
-        var longRunningItems = queue.GetLongRunningItems(TimeSpan.FromMilliseconds(500));
+        await Task.Delay(TimeSpan.FromMilliseconds(500));
+        var longRunningItems = queue.GetLongRunningItems(TimeSpan.FromMilliseconds(100));
 
         // Assert
         Assert.Single(longRunningItems);

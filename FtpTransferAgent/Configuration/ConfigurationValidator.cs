@@ -35,7 +35,7 @@ public class ConfigurationValidator
         ValidatePerformanceConfiguration(transfer, retry, result);
 
         // セキュリティ関連の設定チェック
-        ValidateSecurityConfiguration(transfer, cleanup, result);
+        ValidateSecurityConfiguration(transfer, hash, cleanup, result);
 
         // 設定の組み合わせチェック
         ValidateConfigurationCombinations(watch, transfer, hash, cleanup, result);
@@ -55,6 +55,19 @@ public class ConfigurationValidator
             else if (!HasReadPermission(watch.Path))
             {
                 result.Warnings.Add($"May not have read permission for watch directory: {watch.Path}");
+            }
+        }
+        
+        // ダウンロード先ディレクトリの存在チェック
+        if (transfer.Direction is "get" or "both")
+        {
+            if (!Directory.Exists(watch.Path))
+            {
+                result.Errors.Add($"Download directory does not exist: {watch.Path}");
+            }
+            else if (!HasWritePermission(watch.Path))
+            {
+                result.Warnings.Add($"May not have write permission for download directory: {watch.Path}");
             }
         }
 
@@ -109,11 +122,6 @@ public class ConfigurationValidator
                 }
             }
 
-            // ダウンロード処理では ENDファイル機能は使用できない
-            if (transfer.Direction is "get" or "both")
-            {
-                result.Warnings.Add("END file verification is only supported for upload operations and will be ignored for downloads");
-            }
         }
 
         // TransferEndFiles の設定検証（RequireEndFileに関係なく独立してチェック）
@@ -159,7 +167,7 @@ public class ConfigurationValidator
         }
     }
 
-    private void ValidateSecurityConfiguration(TransferOptions transfer, CleanupOptions cleanup, ConfigurationValidationResult result)
+    private void ValidateSecurityConfiguration(TransferOptions transfer, HashOptions hash, CleanupOptions cleanup, ConfigurationValidationResult result)
     {
         // 認証情報の安全性チェック
         if (transfer.Mode == "ftp" && !string.IsNullOrEmpty(transfer.Password))
@@ -178,6 +186,12 @@ public class ConfigurationValidator
             {
                 result.Errors.Add($"Cannot read private key file: {transfer.PrivateKeyPath}");
             }
+        }
+
+        // ハッシュアルゴリズムのセキュリティチェック
+        if (hash.Algorithm.Equals("MD5", StringComparison.OrdinalIgnoreCase))
+        {
+            result.Errors.Add("MD5 hash algorithm is cryptographically insecure and has been disabled. Please use SHA256 or SHA512.");
         }
 
         // 危険な設定の組み合わせチェック
@@ -266,10 +280,10 @@ public class ConfigurationValidator
             result.Warnings.Add("No file extensions specified in AllowedExtensions. All files will be processed.");
         }
         
-        // ENDファイル機能とダウンロード方向の組み合わせ
-        if (watch.TransferEndFiles && transfer.Direction is "get" or "both")
+        // ENDファイル機能の使用状況
+        if (watch.TransferEndFiles && watch.EndFileExtensions?.Length == 0)
         {
-            result.Warnings.Add("TransferEndFiles is enabled but END file feature only works for upload (put) direction.");
+            result.Warnings.Add("TransferEndFiles is enabled but no END file extensions are configured.");
         }
         
         // 並列度とタイムアウトの組み合わせ警告
@@ -351,6 +365,48 @@ public class ConfigurationValidator
             return false;
         }
         catch (FileNotFoundException)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        catch (SecurityException)
+        {
+            return false;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 指定されたパスに書き込み権限があるかチェック
+    /// </summary>
+    private static bool HasWritePermission(string path)
+    {
+        try
+        {
+            if (Directory.Exists(path))
+            {
+                // 一時ファイルを作成して書き込み権限をテスト
+                var tempFile = Path.Combine(path, Path.GetRandomFileName());
+                using (File.Create(tempFile))
+                {
+                    // ファイル作成成功
+                }
+                File.Delete(tempFile);
+                return true;
+            }
+            return false;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return false;
+        }
+        catch (DirectoryNotFoundException)
         {
             return false;
         }
