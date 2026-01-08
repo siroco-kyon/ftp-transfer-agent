@@ -56,8 +56,7 @@ public class Worker : BackgroundService
     // バックグラウンド処理の本体
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        // 設定に応じて FTP または SFTP クライアントを生成
-        using IFileTransferClient client = CreateClient();
+        // クライアントは各転送タスク毎に作成するため、ここでは共通インスタンスを生成しない
 
         // 再試行付きの転送キューを開始
         var queueLogger = _services.GetRequiredService<ILogger<TransferQueue>>();
@@ -67,24 +66,30 @@ public class Worker : BackgroundService
         using var monitorCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
         var monitorTask = StartPerformanceMonitoringAsync(queue, monitorCts.Token);
 
+        // 各キュー処理では専用のクライアントを生成して処理する
         var queueTask = queue.StartAsync(async (item, token) =>
         {
+            // 新しいクライアントインスタンスを生成
+            using var perItemClient = CreateClient();
             // 各転送処理の識別子
             var id = Guid.NewGuid();
             if (item.Action == TransferAction.Upload)
             {
-                await ProcessUploadAsync(client, item, id, token).ConfigureAwait(false);
+                await ProcessUploadAsync(perItemClient, item, id, token).ConfigureAwait(false);
             }
             else
             {
-                await ProcessDownloadAsync(client, item, id, token).ConfigureAwait(false);
+                await ProcessDownloadAsync(perItemClient, item, id, token).ConfigureAwait(false);
             }
         }, stoppingToken);
 
         // アップロード処理が有効な場合は指定フォルダ内のファイルを列挙
         if (_transfer.Direction is "put" or "both")
         {
-            var exts = _watch.AllowedExtensions.Select(e => e.StartsWith(".") ? e : $".{e}").ToArray();
+            // AllowedExtensionsがnullの場合は空配列で扱う
+            var exts = (_watch.AllowedExtensions ?? System.Array.Empty<string>())
+                .Select(e => e.StartsWith(".") ? e : $".{e}")
+                .ToArray();
             var option = _watch.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
             try
             {
@@ -179,75 +184,112 @@ public class Worker : BackgroundService
         {
             try
             {
-                var files = await client.ListFilesAsync(_transfer.RemotePath, stoppingToken, _watch.IncludeSubfolders).ConfigureAwait(false);
-                
+                // リモート一覧取得用に専用のクライアントを生成する
+                using var listClient = CreateClient();
+                // リモートファイル一覧を取得
+                var files = await listClient.ListFilesAsync(_transfer.RemotePath, stoppingToken, _watch.IncludeSubfolders).ConfigureAwait(false);
+
+                // ファイルごとに正規化パス(先頭に "/" を付与)と元のパスを保持する辞書を作成する
+                var normalizedMap = new Dictionary<string, string>();
+                foreach (var f in files)
+                {
+                    if (string.IsNullOrEmpty(f)) continue;
+                    var norm = f.StartsWith("/") ? f : "/" + f;
+                    // 末尾の無駄なスラッシュは除去
+                    norm = norm.TrimEnd('/');
+                    normalizedMap[norm] = f;
+                }
+
                 // AllowedExtensionsが指定されている場合はフィルタを適用
-                var exts = _watch.AllowedExtensions.Select(e => e.StartsWith(".") ? e : $".{e}").ToArray();
-                
-                // ファイル順序を安定化し、ENDファイルが先に処理されないようにソート
-                var sortedFiles = files
-                    .OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
+                // AllowedExtensionsがnullの場合は空配列で扱う
+                var exts = (_watch.AllowedExtensions ?? System.Array.Empty<string>())
+                    .Select(e => e.StartsWith(".") ? e : $".{e}")
+                    .ToArray();
+
+                // 正規化パスでソートしてENDファイルとデータファイルを分ける
+                var sortedNormPaths = normalizedMap.Keys
+                    .OrderBy(p => Path.GetFileName(p), StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
-                // データファイルとENDファイルのペアを収集
-                var dataFiles = new List<string>();
-                var endFiles = new List<string>();
+                var dataFiles = new List<string>();    // キューに追加するオリジナルパス
+                var endFiles = new List<string>();     // キューに追加するオリジナルパス
 
-                foreach (var file in sortedFiles)
+                foreach (var normPath in sortedNormPaths)
                 {
-                    // ENDファイルかどうかを先にチェック
-                    if (IsEndFileRemote(file))
+                    var originalPath = normalizedMap[normPath];
+
+                    // ENDファイルかどうかを正規化パスで判定
+                    if (IsEndFileRemote(normPath))
                     {
-                        // ENDファイルは別リストに保存
                         if (_watch.TransferEndFiles)
                         {
-                            endFiles.Add(file);
+                            endFiles.Add(originalPath);
                         }
                         continue;
                     }
 
-                    // 通常ファイルに対して拡張子フィルタリングを適用
-                    if (exts.Length > 0 && !exts.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
+                    // 拡張子フィルタ適用（オリジナルパスに基づく）
+                    if (exts.Length > 0 && !exts.Contains(Path.GetExtension(originalPath), StringComparer.OrdinalIgnoreCase))
                     {
                         continue;
                     }
 
-                    // ENDファイル検証が有効な場合は、対応するENDファイルの存在を確認
+                    // ENDファイル必須の場合は対応ENDファイルの存在を確認
                     if (_watch.RequireEndFile)
                     {
-                        if (!HasEndFileRemote(file, sortedFiles))
+                        if (!HasEndFileRemote(normPath, sortedNormPaths))
                         {
-                            _logger.LogDebug("Skipping remote file {File} - no corresponding END file found", file);
+                            _logger.LogDebug("Skipping remote file {File} - no corresponding END file found", originalPath);
                             continue;
                         }
                     }
 
-                    dataFiles.Add(file);
+                    dataFiles.Add(originalPath);
                 }
 
                 // 1. まずデータファイルを転送キューに追加
-                //   チャンネルが満杯の場合にドロップしないよう、TryWrite() ではなく WriteAsync() を使用します。
                 foreach (var file in dataFiles)
                 {
                     await _channel.Writer.WriteAsync(new TransferItem(file, TransferAction.Download), stoppingToken);
                 }
 
-                // 2. その後でENDファイルを転送キューに追加（TransferEndFiles が true の場合）
+                // 2. その後でENDファイルを転送キューに追加
                 if (_watch.TransferEndFiles)
                 {
-                    foreach (var endFile in endFiles)
+                    foreach (var endOrigPath in endFiles)
                     {
+                        // ENDファイルの正規化パスを生成
+                        var endNorm = endOrigPath.StartsWith("/") ? endOrigPath : "/" + endOrigPath;
+                        endNorm = endNorm.TrimEnd('/');
                         // 対応するデータファイルが存在する場合のみENDファイルを転送
-                        var dataFileName = GetDataFileForEndFileRemote(endFile);
-                        if (dataFiles.Any(f => string.Equals(Path.GetFileName(f), dataFileName, StringComparison.OrdinalIgnoreCase)))
+                        var dataNormFull = GetDataFileForEndFileRemote(endNorm);
+                        if (!string.IsNullOrEmpty(dataNormFull))
                         {
-                            _logger.LogDebug("Queueing remote END file {File} for transfer after data file", endFile);
-                            // チャンネルが満杯の場合に待機し、ENDファイルを確実にキューに書き込む
-                            await _channel.Writer.WriteAsync(new TransferItem(endFile, TransferAction.Download), stoppingToken);
+                            // dataNormFull も正規化して先頭に '/' を付与し、末尾の不要なスラッシュを削除
+                            var dataFullNormalized = dataNormFull.StartsWith("/") ? dataNormFull : "/" + dataNormFull;
+                            dataFullNormalized = dataFullNormalized.TrimEnd('/', '\\');
+
+                            // 対応するデータファイルが存在する場合のみENDファイルを転送
+                            var exists = dataFiles.Any(f =>
+                            {
+                                var fNorm = f.StartsWith("/") ? f : "/" + f;
+                                fNorm = fNorm.TrimEnd('/', '\\');
+                                return string.Equals(fNorm, dataFullNormalized, StringComparison.OrdinalIgnoreCase);
+                            });
+
+                            if (exists)
+                            {
+                                _logger.LogDebug("Queueing remote END file {File} for transfer after data file", endOrigPath);
+                                await _channel.Writer.WriteAsync(new TransferItem(endOrigPath, TransferAction.Download), stoppingToken);
+                            }
+                            else
+                            {
+                                _logger.LogDebug("Skipping remote END file {File} - corresponding data file not being transferred", endOrigPath);
+                            }
                         }
                         else
                         {
-                            _logger.LogDebug("Skipping remote END file {File} - corresponding data file not being transferred", endFile);
+                            _logger.LogDebug("Skipping remote END file {File} - corresponding data file not found or invalid name", endOrigPath);
                         }
                     }
                 }
@@ -320,7 +362,37 @@ public class Worker : BackgroundService
         var name = _transfer.PreserveFolderStructure
             ? Path.GetRelativePath(_watch.Path, item.Path)
             : Path.GetFileName(item.Path);
-        var remotePath = Path.Combine(_transfer.RemotePath, name).Replace('\\', '/');
+        // リモートパスを組み立てる際、Path.Combineでは余計なセパレーターが入る場合があるため手動で結合する。
+        // Transfer.RemotePathの末尾のスラッシュを除去し、ファイル名または相対パスを '/' で連結する。
+        // 元のRemotePathがルート("/")の場合はそのまま保持する。末尾のスラッシュを除去するが、
+        // ルートは削除してはならない。
+        var rawBase = _transfer.RemotePath ?? string.Empty;
+        string remoteBase;
+        if (rawBase == "/")
+        {
+            remoteBase = "/";
+        }
+        else
+        {
+            // 末尾の区切り文字を削除（Windowsの '\' も対象）
+            remoteBase = rawBase.TrimEnd('/', '\\');
+        }
+        var remoteName = name.Replace('\\', '/');
+        string remotePath;
+        if (string.IsNullOrEmpty(remoteBase))
+        {
+            // ベースが空ならそのまま名前を返す
+            remotePath = remoteName;
+        }
+        else if (remoteBase == "/")
+        {
+            // ルートの場合はルートと名前を連結
+            remotePath = $"/{remoteName}";
+        }
+        else
+        {
+            remotePath = $"{remoteBase}/{remoteName}";
+        }
 
         _logger.LogInformation("[{Id}] Starting upload {File} to {Remote}", id, item.Path, remotePath);
 
@@ -394,7 +466,13 @@ public class Worker : BackgroundService
         if (_transfer.PreserveFolderStructure && _watch.IncludeSubfolders)
         {
             // サブディレクトリ構造を保持する場合
-            var relativePath = Path.GetRelativePath(_transfer.RemotePath, item.Path);
+            // ListFilesAsync で生成した item.Path は先頭に '/' を付加している場合があるが、
+            // Transfer.RemotePath は必ず '/' 始まりとは限らないため、RelativePath の計算時にベースパスも正規化する。
+            var remoteBase = _transfer.RemotePath ?? string.Empty;
+            var normalizedRemoteBase = remoteBase.StartsWith("/") ? remoteBase : "/" + remoteBase;
+            // item.Path が先頭に '/' を持たない場合は付与して正規化する
+            var normalizedItemPath = item.Path.StartsWith("/") ? item.Path : "/" + item.Path;
+            var relativePath = Path.GetRelativePath(normalizedRemoteBase, normalizedItemPath);
             
             // パストラバーサル攻撃対策（包括的検証）
             if (relativePath.Contains("..") || Path.IsPathRooted(relativePath) ||
@@ -697,6 +775,8 @@ public class Worker : BackgroundService
     /// </summary>
     private string GetDataFileForEndFileRemote(string endFilePath)
     {
+        // ENDファイルから対応するデータファイルの完全パスを取得します。
+        // ディレクトリとファイル名を分離し、拡張子を除去した上で再結合します。
         if (string.IsNullOrEmpty(endFilePath) || _watch.EndFileExtensions == null)
         {
             return string.Empty;
@@ -704,12 +784,14 @@ public class Worker : BackgroundService
 
         try
         {
+            // ディレクトリとファイル名を取得
+            var directory = Path.GetDirectoryName(endFilePath) ?? string.Empty;
             var fileName = Path.GetFileName(endFilePath);
             var extension = Path.GetExtension(endFilePath);
 
-            // ENDファイル拡張子を除去してデータファイル名を取得
             foreach (var endExt in _watch.EndFileExtensions)
             {
+                // 空白や空の拡張子はスキップ
                 if (string.IsNullOrWhiteSpace(endExt))
                 {
                     continue;
@@ -718,8 +800,30 @@ public class Worker : BackgroundService
                 var normalizedEndExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
                 if (string.Equals(extension, normalizedEndExt, StringComparison.OrdinalIgnoreCase))
                 {
-                    // ENDファイル拡張子を除去してデータファイル名を返す
-                    return fileName.Substring(0, fileName.Length - normalizedEndExt.Length);
+                    // ファイル名からEND拡張子を除去
+                    var baseName = fileName.Substring(0, fileName.Length - normalizedEndExt.Length);
+                    // ディレクトリと結合して完全パスを生成。セパレーターは '/' に統一
+                    string fullPath;
+                    if (string.IsNullOrEmpty(directory))
+                    {
+                        // ルートディレクトリにファイルがある場合、必ず先頭に'/'を付与
+                        fullPath = $"/{baseName}";
+                    }
+                    else
+                    {
+                        var trimmedDir = directory.TrimEnd(Path.DirectorySeparatorChar, '/', '\\');
+                        // ディレクトリがルート("/")の場合はそのまま、そうでなければスラッシュを付与
+                        if (trimmedDir.Length == 0 || trimmedDir == "/")
+                        {
+                            fullPath = $"/{baseName}";
+                        }
+                        else
+                        {
+                            fullPath = $"/{trimmedDir.TrimStart('/', '\\')}/{baseName}";
+                        }
+                    }
+                    // パス区切り文字を統一し返す
+                    return fullPath.Replace('\\', '/');
                 }
             }
         }
@@ -777,7 +881,11 @@ public class Worker : BackgroundService
                     normalizedDirectory.StartsWith("/") ? $"{normalizedDirectory}/{endFileName}" : $"/{normalizedDirectory}/{endFileName}";
 
                 // リモートファイル一覧から対応するENDファイルを検索
-                if (remoteFiles.Any(f => string.Equals(f, endFilePath, StringComparison.OrdinalIgnoreCase)))
+                // リストの表記はサーバ実装により '/' の有無が異なる場合があるため、先頭のセパレータを除去して比較する。
+                if (remoteFiles.Any(f => string.Equals(
+                        f?.TrimStart('/', '\\'),
+                        endFilePath.TrimStart('/', '\\'),
+                        StringComparison.OrdinalIgnoreCase)))
                 {
                     return true;
                 }

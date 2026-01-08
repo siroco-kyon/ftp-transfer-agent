@@ -16,6 +16,8 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
 {
     private readonly SftpClient _client;
     private readonly ILogger<SftpClientWrapper> _logger;
+    // 設定値全体を保持。ホスト鍵検証で利用するため。
+    private readonly TransferOptions _options;
 
     // テスト用に既存の SftpClient を渡せるようにする
     public SftpClientWrapper(TransferOptions options, ILogger<SftpClientWrapper> logger, SftpClient? client = null)
@@ -24,40 +26,59 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         ArgumentNullException.ThrowIfNull(logger);
 
         _logger = logger;
+        _options = options;
 
         if (client != null)
         {
+            // テストや特殊なケースで既存のSftpClientを受け取った場合でも
+            // 安全なホスト鍵検証が機能するように、ここでイベントを登録する。
             _client = client;
-            return;
-        }
-
-        if (!string.IsNullOrEmpty(options.PrivateKeyPath))
-        {
-            var methods = new List<AuthenticationMethod>();
-            if (!string.IsNullOrEmpty(options.Password))
+            AttachHostKeyValidation();
+            // 接続タイムアウトも設定しておく（呼び出し元で設定済みなら上書きにはならない）
+            try
             {
-                methods.Add(new PasswordAuthenticationMethod(options.Username, options.Password));
+                _client.OperationTimeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
             }
-            var keyFile = string.IsNullOrEmpty(options.PrivateKeyPassphrase)
-                ? new PrivateKeyFile(options.PrivateKeyPath)
-                : new PrivateKeyFile(options.PrivateKeyPath, options.PrivateKeyPassphrase);
-            methods.Add(new PrivateKeyAuthenticationMethod(options.Username, keyFile));
-
-            var conn = new ConnectionInfo(options.Host, options.Port, options.Username, methods.ToArray())
+            catch
             {
-                Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds)
-            };
-            _client = new SftpClient(conn);
-            _client.OperationTimeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
+                // OperationTimeoutが設定できない場合は無視する
+            }
         }
         else
         {
-            var password = options.Password ?? throw new ArgumentNullException(nameof(options.Password));
-            var conn = new ConnectionInfo(options.Host, options.Port, options.Username, new PasswordAuthenticationMethod(options.Username, password))
+            // 接続情報を構築し、弱いホスト鍵アルゴリズムや鍵交換アルゴリズムを除外する
+            ConnectionInfo conn;
+            if (!string.IsNullOrEmpty(options.PrivateKeyPath))
             {
-                Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds)
-            };
+                var methods = new List<AuthenticationMethod>();
+                if (!string.IsNullOrEmpty(options.Password))
+                {
+                    methods.Add(new PasswordAuthenticationMethod(options.Username, options.Password));
+                }
+                var keyFile = string.IsNullOrEmpty(options.PrivateKeyPassphrase)
+                    ? new PrivateKeyFile(options.PrivateKeyPath)
+                    : new PrivateKeyFile(options.PrivateKeyPath, options.PrivateKeyPassphrase);
+                methods.Add(new PrivateKeyAuthenticationMethod(options.Username, keyFile));
+
+                conn = new ConnectionInfo(options.Host, options.Port, options.Username, methods.ToArray())
+                {
+                    Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds)
+                };
+            }
+            else
+            {
+                var password = options.Password ?? throw new ArgumentNullException(nameof(options.Password));
+                conn = new ConnectionInfo(options.Host, options.Port, options.Username, new PasswordAuthenticationMethod(options.Username, password))
+                {
+                    Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds)
+                };
+            }
+
+            // 安全性を高めるため、弱い鍵交換方式やホスト鍵アルゴリズムを除外
+            ConfigureConnectionSecurity(conn);
             _client = new SftpClient(conn);
+            // サーバのホスト鍵指紋を検証・記録するハンドラを登録
+            AttachHostKeyValidation();
             _client.OperationTimeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         }
     }
@@ -199,5 +220,77 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     public void Dispose()
     {
         _client.Dispose();
+    }
+
+    /// <summary>
+    /// 接続情報から弱いホスト鍵アルゴリズムおよび SHA-1 ベースの鍵交換方式を除去する。
+    /// </summary>
+    /// <param name="conn">接続情報オブジェクト</param>
+    private static void ConfigureConnectionSecurity(ConnectionInfo conn)
+    {
+        if (conn == null)
+        {
+            return;
+        }
+        // HostKeyAlgorithms は IOrderedDictionary であるため、Remove(object key) を使用する。
+        try { conn.HostKeyAlgorithms.Remove("ssh-rsa"); } catch { }
+        try { conn.HostKeyAlgorithms.Remove("ssh-dss"); } catch { }
+
+        // SHA-1 ベースの鍵交換方式を削除
+        var weakKex = new[]
+        {
+            "diffie-hellman-group-exchange-sha1",
+            "diffie-hellman-group14-sha1",
+            "diffie-hellman-group1-sha1"
+        };
+        foreach (var algo in weakKex)
+        {
+            try { conn.KeyExchangeAlgorithms.Remove(algo); } catch { }
+        }
+    }
+
+    /// <summary>
+    /// SftpClient にホスト鍵検証ハンドラを登録する。
+    /// 期待される指紋が設定されている場合は照合し、一致しない場合は接続を拒否する。
+    /// 未設定の場合は受信した指紋をログに出力して信頼する。
+    /// </summary>
+    private void AttachHostKeyValidation()
+    {
+        // SftpClient のホスト鍵受信イベントにハンドラを追加
+        _client.HostKeyReceived += (sender, e) =>
+        {
+            // 受信した指紋 (MD5) を16進数表記に変換
+            var received = BitConverter.ToString(e.FingerPrint).Replace("-", "").ToLowerInvariant();
+            string? expected = null;
+            try
+            {
+                dynamic dynOpts = _options;
+                expected = dynOpts?.HostKeyFingerprint as string;
+            }
+            catch
+            {
+                expected = null;
+            }
+            if (!string.IsNullOrEmpty(expected))
+            {
+                // コロンやハイフンを除去して比較用に整形
+                expected = expected.Replace(":", "").Replace("-", "").ToLowerInvariant();
+                if (!string.Equals(expected, received, StringComparison.OrdinalIgnoreCase))
+                {
+                    // 指紋が一致しない場合は信頼せず接続を拒否
+                    e.CanTrust = false;
+                    _logger.LogError("Host key fingerprint mismatch. Expected {Expected}, but got {Received}", expected, received);
+                    return;
+                }
+                e.CanTrust = true;
+                _logger.LogInformation("Host key fingerprint verified: {Fingerprint}", received);
+            }
+            else
+            {
+                // 期待値が無い場合は受信した指紋をログ出力し、そのまま信頼
+                _logger.LogInformation("Host key fingerprint: {Fingerprint}", received);
+                e.CanTrust = true;
+            }
+        };
     }
 }
