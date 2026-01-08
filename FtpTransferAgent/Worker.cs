@@ -130,9 +130,11 @@ public class Worker : BackgroundService
                 }
 
                 // 1. まずデータファイルを転送キューに追加
+                //   チャンネルが満杯の場合にデータを失わないよう、TryWrite() ではなく WriteAsync() を使用します。
+                //   WriteAsync() は容量が空くまで待機し、確実にキューに書き込めるため安全です。
                 foreach (var file in dataFiles)
                 {
-                    _channel.Writer.TryWrite(new TransferItem(file, TransferAction.Upload));
+                    await _channel.Writer.WriteAsync(new TransferItem(file, TransferAction.Upload), stoppingToken);
                 }
 
                 // 2. その後でENDファイルを転送キューに追加（TransferEndFiles が true の場合）
@@ -145,7 +147,8 @@ public class Worker : BackgroundService
                         if (dataFiles.Any(f => string.Equals(Path.GetFileName(f), dataFileName, StringComparison.OrdinalIgnoreCase)))
                         {
                             _logger.LogDebug("Queueing END file {File} for transfer after data file", endFile);
-                            _channel.Writer.TryWrite(new TransferItem(endFile, TransferAction.Upload));
+                            // チャンネルが満杯の場合に待機し、ENDファイルを確実にキューに書き込む
+                            await _channel.Writer.WriteAsync(new TransferItem(endFile, TransferAction.Upload), stoppingToken);
                         }
                         else
                         {
@@ -223,9 +226,10 @@ public class Worker : BackgroundService
                 }
 
                 // 1. まずデータファイルを転送キューに追加
+                //   チャンネルが満杯の場合にドロップしないよう、TryWrite() ではなく WriteAsync() を使用します。
                 foreach (var file in dataFiles)
                 {
-                    _channel.Writer.TryWrite(new TransferItem(file, TransferAction.Download));
+                    await _channel.Writer.WriteAsync(new TransferItem(file, TransferAction.Download), stoppingToken);
                 }
 
                 // 2. その後でENDファイルを転送キューに追加（TransferEndFiles が true の場合）
@@ -238,7 +242,8 @@ public class Worker : BackgroundService
                         if (dataFiles.Any(f => string.Equals(Path.GetFileName(f), dataFileName, StringComparison.OrdinalIgnoreCase)))
                         {
                             _logger.LogDebug("Queueing remote END file {File} for transfer after data file", endFile);
-                            _channel.Writer.TryWrite(new TransferItem(endFile, TransferAction.Download));
+                            // チャンネルが満杯の場合に待機し、ENDファイルを確実にキューに書き込む
+                            await _channel.Writer.WriteAsync(new TransferItem(endFile, TransferAction.Download), stoppingToken);
                         }
                         else
                         {
@@ -495,9 +500,18 @@ public class Worker : BackgroundService
             
             if (shouldDeleteRemote)
             {
-                await client.DeleteAsync(item.Path, token).ConfigureAwait(false);
-                var fileType = isEndFileRemote ? "remote END file" : "remote file";
-                _logger.LogInformation("[{Id}] Deleted {FileType} {Remote}", id, fileType, item.Path);
+                // ダウンロード後のリモートファイル削除は失敗しても転送全体を失敗させないようにtry/catchで処理します。
+                try
+                {
+                    await client.DeleteAsync(item.Path, token).ConfigureAwait(false);
+                    var fileType = isEndFileRemote ? "remote END file" : "remote file";
+                    _logger.LogInformation("[{Id}] Deleted {FileType} {Remote}", id, fileType, item.Path);
+                }
+                catch (Exception ex)
+                {
+                    // 削除に失敗した場合は警告ログのみ出力し、以後の処理を継続します。
+                    _logger.LogWarning("[{Id}] Failed to delete remote file {Remote}: {Error}", id, item.Path, ex.Message);
+                }
             }
         }
         else
