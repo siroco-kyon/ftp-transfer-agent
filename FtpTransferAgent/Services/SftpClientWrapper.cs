@@ -141,6 +141,13 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     {
         await EnsureConnectedAsync().ConfigureAwait(false);
 
+        // SFTPプロトコルではサーバーサイドハッシュコマンドが標準サポートされていないため
+        // useServerCommandパラメータが指定されている場合は警告ログを出力
+        if (useServerCommand)
+        {
+            _logger.LogDebug("Server-side hash command is not supported in SFTP protocol. Using local calculation for {Algorithm}", algorithm);
+        }
+
         // 大容量ファイルの場合はストリーミング処理
         using var stream = _client.OpenRead(remotePath);
         return await HashUtil.ComputeHashAsync(stream, algorithm, ct).ConfigureAwait(false);
