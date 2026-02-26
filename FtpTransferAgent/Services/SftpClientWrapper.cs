@@ -54,6 +54,13 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
                 if (!string.IsNullOrEmpty(options.Password))
                 {
                     methods.Add(new PasswordAuthenticationMethod(options.Username, options.Password));
+                    logger.LogInformation("SFTP auth configured: PrivateKey + Password (host={Host}, port={Port}, user={User}, key={Key})",
+                        options.Host, options.Port, options.Username, options.PrivateKeyPath);
+                }
+                else
+                {
+                    logger.LogInformation("SFTP auth configured: PrivateKey only (host={Host}, port={Port}, user={User}, key={Key})",
+                        options.Host, options.Port, options.Username, options.PrivateKeyPath);
                 }
                 var keyFile = string.IsNullOrEmpty(options.PrivateKeyPassphrase)
                     ? new PrivateKeyFile(options.PrivateKeyPath)
@@ -68,6 +75,8 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
             else
             {
                 var password = options.Password ?? throw new ArgumentNullException(nameof(options.Password));
+                logger.LogInformation("SFTP auth configured: Password only (host={Host}, port={Port}, user={User})",
+                    options.Host, options.Port, options.Username);
                 conn = new ConnectionInfo(options.Host, options.Port, options.Username, new PasswordAuthenticationMethod(options.Username, password))
                 {
                     Timeout = TimeSpan.FromSeconds(options.TimeoutSeconds)
@@ -89,6 +98,7 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         if (!_client.IsConnected)
         {
             await Task.Run(() => _client.Connect()).ConfigureAwait(false);
+            LogConnectionEstablished();
         }
     }
 
@@ -98,7 +108,24 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         if (!_client.IsConnected)
         {
             _client.Connect();
+            LogConnectionEstablished();
         }
+    }
+
+    // SFTP接続確立時の詳細情報をログに出力する
+    private void LogConnectionEstablished()
+    {
+        var info = _client.ConnectionInfo;
+        _logger.LogInformation(
+            "SFTP session established: Host={Host}, Port={Port}, User={User}, " +
+            "ServerVersion={ServerVersion}, KeyExchange={Kex}, Encryption={Enc}, Hmac={Hmac}",
+            info.Host,
+            info.Port,
+            info.Username,
+            info.ServerVersion,
+            info.CurrentKeyExchangeAlgorithm,
+            info.CurrentClientEncryption,
+            info.CurrentClientHmacAlgorithm);
     }
 
     // リモートディレクトリが存在しなければ作成
@@ -133,14 +160,26 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
 
         // 一意な一時ファイル名で衝突防止
         var temp = $"{remotePath}.tmp.{Guid.NewGuid():N}";
+        _logger.LogDebug("SFTP upload: {LocalPath} -> temp={TempPath}", localPath, temp);
 
         await using var fs = File.OpenRead(localPath);
         _client.UploadFile(fs, temp, true);
+        _logger.LogDebug("SFTP UploadFile completed. Temp exists: {Exists}", _client.Exists(temp));
+
         if (_client.Exists(remotePath))
         {
+            _logger.LogDebug("SFTP: Remote file exists, deleting before rename: {RemotePath}", remotePath);
             _client.DeleteFile(remotePath);
         }
         _client.RenameFile(temp, remotePath);
+
+        // RenameFile 後の存在確認：失敗した場合は一時ファイルが残ったままになるため明示的にエラーとする
+        if (!_client.Exists(remotePath))
+        {
+            throw new InvalidOperationException(
+                $"SFTP RenameFile completed without error but destination file not found: {remotePath}. Temp file may remain at: {temp}");
+        }
+        _logger.LogDebug("SFTP upload confirmed at: {RemotePath}", remotePath);
     }
 
     // ダウンロードも一時ファイル経由で行う
@@ -157,7 +196,7 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         File.Move(temp, localPath, true);
     }
 
-    // リモートファイルのハッシュ値を取得（ストリーミング処理でメモリ効率化）
+    // リモートファイルのハッシュ値を取得（一時ファイル経由でダウンロードして計算）
     public async Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = false)
     {
         await EnsureConnectedAsync().ConfigureAwait(false);
@@ -169,9 +208,22 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
             _logger.LogDebug("Server-side hash command is not supported in SFTP protocol. Using local calculation for {Algorithm}", algorithm);
         }
 
-        // 大容量ファイルの場合はストリーミング処理
-        using var stream = _client.OpenRead(remotePath);
-        return await HashUtil.ComputeHashAsync(stream, algorithm, ct).ConfigureAwait(false);
+        // SSH.NET の SftpFileStream は ReadAsync(Memory<byte>, CancellationToken) との互換性が
+        // 保証されないため、一時ローカルファイルにダウンロードしてからハッシュを計算する。
+        // これにより確実にリモートの実データを検証できる。
+        var tempFile = Path.GetTempFileName();
+        try
+        {
+            await using (var fs = File.OpenWrite(tempFile))
+            {
+                _client.DownloadFile(remotePath, fs);
+            }
+            return await HashUtil.ComputeHashAsync(tempFile, algorithm, ct).ConfigureAwait(false);
+        }
+        finally
+        {
+            try { File.Delete(tempFile); } catch { }
+        }
     }
 
     // 指定ディレクトリのファイル一覧を取得
@@ -261,16 +313,10 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         {
             // 受信した指紋 (MD5) を16進数表記に変換
             var received = BitConverter.ToString(e.FingerPrint).Replace("-", "").ToLowerInvariant();
-            string? expected = null;
-            try
-            {
-                dynamic dynOpts = _options;
-                expected = dynOpts?.HostKeyFingerprint as string;
-            }
-            catch
-            {
-                expected = null;
-            }
+
+            // TransferOptions.HostKeyFingerprint から期待値を直接取得
+            var expected = _options.HostKeyFingerprint;
+
             if (!string.IsNullOrEmpty(expected))
             {
                 // コロンやハイフンを除去して比較用に整形
@@ -288,7 +334,8 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
             else
             {
                 // 期待値が無い場合は受信した指紋をログ出力し、そのまま信頼
-                _logger.LogInformation("Host key fingerprint: {Fingerprint}", received);
+                // HostKeyFingerprint を設定することで MITM 攻撃を防止できます
+                _logger.LogWarning("HostKeyFingerprint is not configured. Trusting server key without verification: {Fingerprint}", received);
                 e.CanTrust = true;
             }
         };

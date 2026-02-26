@@ -84,7 +84,7 @@ This is a .NET 8 console application that performs batch FTP/SFTP file transfers
 3. **File Enumeration**: Based on `Direction` setting:
    - "put": Enumerate local files from `Watch.Path` with extension filtering
    - "get": List remote files from `RemotePath`
-   - "both": Do get first, then put
+   - "both": Do put first (enqueue uploads), then get (enqueue downloads)
 4. **Queue Processing**: Files are processed in parallel (1-16 concurrent workers) with duplicate prevention
 5. **Transfer**: Each file is uploaded/downloaded with temp name, then atomically renamed
 6. **Hash Verification**: Always uses local calculation for reliability, with fail-fast on mismatch

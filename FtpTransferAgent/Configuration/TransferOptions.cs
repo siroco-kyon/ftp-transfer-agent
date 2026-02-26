@@ -37,6 +37,13 @@ public class TransferOptions
     /// </summary>
     public string? PrivateKeyPassphrase { get; set; }
 
+    /// <summary>
+    /// SFTP 接続時に検証するサーバーホスト鍵の MD5 指紋。
+    /// 例: "a1:b2:c3:d4:..." または "a1b2c3d4..." のどちらの形式でも指定可能。
+    /// 未設定の場合は検証をスキップして接続を信頼します（非推奨）。
+    /// </summary>
+    public string? HostKeyFingerprint { get; set; }
+
     [Required]
     public string RemotePath { get; set; } = string.Empty;
 

@@ -3,6 +3,7 @@ using System.Net.Sockets;
 using System.Security;
 using FluentFTP.Exceptions;
 using Renci.SshNet.Common;
+using Renci.SshNet;
 
 namespace FtpTransferAgent.Services;
 
@@ -25,6 +26,8 @@ public static class RetryableExceptionClassifier
             TimeoutException => true,
             HttpRequestException => true,
             SshConnectionException => true,
+            // SshOperationTimeoutException は SshException を継承しており TimeoutException ではないため個別に指定
+            SshOperationTimeoutException => true,
             FtpException ftpEx when IsRetryableFtpException(ftpEx) => true,
 
             // ファイルシステム関連の一時的な例外（リトライ可能）

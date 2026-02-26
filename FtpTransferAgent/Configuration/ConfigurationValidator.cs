@@ -140,6 +140,18 @@ public class ConfigurationValidator
         {
             result.Errors.Add($"Invalid port number: {transfer.Port}. Must be between 1 and 65535.");
         }
+
+        // SFTP なのに FTP 標準ポート(21)を使っている場合に警告
+        if (transfer.Mode == "sftp" && transfer.Port == 21)
+        {
+            result.Warnings.Add("Mode is 'sftp' but Port is 21 (FTP default). SFTP typically uses port 22. Verify this is intentional.");
+        }
+
+        // FTP なのに SSH 標準ポート(22)を使っている場合に警告
+        if (transfer.Mode == "ftp" && transfer.Port == 22)
+        {
+            result.Warnings.Add("Mode is 'ftp' but Port is 22 (SSH/SFTP default). FTP typically uses port 21. Verify this is intentional.");
+        }
     }
 
     private void ValidatePerformanceConfiguration(TransferOptions transfer, RetryOptions retry, ConfigurationValidationResult result)
