@@ -196,7 +196,7 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         File.Move(temp, localPath, true);
     }
 
-    // リモートファイルのハッシュ値を取得（一時ファイル経由でダウンロードして計算）
+    // リモートファイルのハッシュ値を取得（Task.Run 内で同期 Read を使ってストリーム計算）
     public async Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = false)
     {
         await EnsureConnectedAsync().ConfigureAwait(false);
@@ -208,22 +208,14 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
             _logger.LogDebug("Server-side hash command is not supported in SFTP protocol. Using local calculation for {Algorithm}", algorithm);
         }
 
-        // SSH.NET の SftpFileStream は ReadAsync(Memory<byte>, CancellationToken) との互換性が
-        // 保証されないため、一時ローカルファイルにダウンロードしてからハッシュを計算する。
-        // これにより確実にリモートの実データを検証できる。
-        var tempFile = Path.GetTempFileName();
-        try
+        // SftpFileStream は ReadAsync(Memory<byte>, CancellationToken) との互換性が保証されないため、
+        // Task.Run 内で SSH.NET の同期 Read を使ってストリームを流しながらハッシュを計算する。
+        // これにより一時ファイルへのダウンロード不要でFTPと同等の帯域消費で検証できる。
+        return await Task.Run(() =>
         {
-            await using (var fs = File.OpenWrite(tempFile))
-            {
-                _client.DownloadFile(remotePath, fs);
-            }
-            return await HashUtil.ComputeHashAsync(tempFile, algorithm, ct).ConfigureAwait(false);
-        }
-        finally
-        {
-            try { File.Delete(tempFile); } catch { }
-        }
+            using var stream = _client.OpenRead(remotePath);
+            return HashUtil.ComputeHashSync(stream, algorithm);
+        }, ct).ConfigureAwait(false);
     }
 
     // 指定ディレクトリのファイル一覧を取得

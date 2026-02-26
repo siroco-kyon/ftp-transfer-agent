@@ -30,6 +30,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         var transfer = new TransferOptions
         {
             Mode = "sftp",
+            Port = 22,
             Direction = "put",
             Host = "example.com",
             Username = "user",
