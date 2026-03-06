@@ -1,4 +1,5 @@
 using System.IO;
+using System.Collections.Concurrent;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -107,6 +108,154 @@ public class WorkerTests
         Directory.Delete(dir, true);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_ParallelUploads_VerifiesHashPerFile()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+
+        try
+        {
+            const int fileCount = 24;
+            for (int i = 0; i < fileCount; i++)
+            {
+                var filePath = Path.Combine(dir, $"file{i:D2}.txt");
+                await File.WriteAllTextAsync(filePath, $"payload-{i}-{Guid.NewGuid():N}");
+            }
+
+            var watch = Options.Create(new WatchOptions
+            {
+                Path = dir,
+                AllowedExtensions = new[] { ".txt" }
+            });
+
+            var transfer = Options.Create(new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "put",
+                Host = "host",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/remote",
+                Concurrency = 4,
+                PreserveFolderStructure = false
+            });
+
+            var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
+            var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
+            var cleanup = Options.Create(new CleanupOptions());
+
+            var inMemoryClient = new InMemoryFileTransferClient(async (_, _, _, token) =>
+            {
+                await Task.Delay(5, token);
+            });
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            var provider = services.BuildServiceProvider();
+            var logger = provider.GetRequiredService<ILogger<Worker>>();
+
+            using var lifetime = new DummyLifetime();
+            var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, inMemoryClient);
+            await worker.RunAsync(CancellationToken.None);
+
+            Assert.Equal(fileCount, inMemoryClient.UploadCount);
+            Assert.Equal(fileCount, inMemoryClient.StoredFileCount);
+
+            foreach (var localFile in Directory.EnumerateFiles(dir, "*.txt"))
+            {
+                var fileName = Path.GetFileName(localFile);
+                var remotePath = $"/remote/{fileName}";
+                var localHash = await HashUtil.ComputeHashAsync(localFile, "SHA256", CancellationToken.None);
+                var remoteHash = await inMemoryClient.GetRemoteHashAsync(remotePath, "SHA256", CancellationToken.None);
+                Assert.Equal(localHash, remoteHash);
+            }
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_ParallelUploads_WithFlattenedDuplicateNames_CanCauseHashMismatch()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var firstSub = Path.Combine(dir, "a");
+        var secondSub = Path.Combine(dir, "b");
+        Directory.CreateDirectory(firstSub);
+        Directory.CreateDirectory(secondSub);
+
+        try
+        {
+            var firstFile = Path.Combine(firstSub, "duplicate.txt");
+            var secondFile = Path.Combine(secondSub, "duplicate.txt");
+            await File.WriteAllTextAsync(firstFile, "first-content");
+            await File.WriteAllTextAsync(secondFile, "second-content");
+
+            var watch = Options.Create(new WatchOptions
+            {
+                Path = dir,
+                IncludeSubfolders = true,
+                AllowedExtensions = new[] { ".txt" }
+            });
+
+            var transfer = Options.Create(new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "put",
+                Host = "host",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/remote",
+                Concurrency = 2,
+                PreserveFolderStructure = false
+            });
+
+            var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
+            var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
+            var cleanup = Options.Create(new CleanupOptions());
+
+            var secondUploadDone = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+            var inMemoryClient = new InMemoryFileTransferClient(async (sequence, _, _, token) =>
+            {
+                if (sequence == 1)
+                {
+                    await secondUploadDone.Task.WaitAsync(TimeSpan.FromSeconds(5), token);
+                }
+                else if (sequence == 2)
+                {
+                    secondUploadDone.TrySetResult();
+                }
+            });
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            var provider = services.BuildServiceProvider();
+            var logger = new Mock<ILogger<Worker>>();
+
+            using var lifetime = new DummyLifetime();
+            var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger.Object, lifetime, inMemoryClient);
+            await worker.RunAsync(CancellationToken.None);
+
+            logger.Verify(
+                x => x.Log(
+                    LogLevel.Error,
+                    It.IsAny<EventId>(),
+                    It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Hash mismatch", StringComparison.OrdinalIgnoreCase)),
+                    It.IsAny<Exception>(),
+                    It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+                Times.AtLeastOnce);
+
+            Assert.Equal(2, inMemoryClient.UploadCount);
+            Assert.Equal(1, inMemoryClient.StoredFileCount);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
     private class TestWorker : Worker
     {
         private readonly IFileTransferClient _client;
@@ -136,6 +285,104 @@ public class WorkerTests
         public Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = false) => _inner.GetRemoteHashAsync(remotePath, algorithm, ct, useServerCommand);
         public Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct, bool includeSubdirectories = false) => _inner.ListFilesAsync(remotePath, ct, includeSubdirectories);
         public Task DeleteAsync(string remotePath, CancellationToken ct) => _inner.DeleteAsync(remotePath, ct);
+    }
+
+    private sealed class InMemoryFileTransferClient : IFileTransferClient
+    {
+        private readonly ConcurrentDictionary<string, byte[]> _files = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Func<int, string, string, CancellationToken, Task>? _onUpload;
+        private int _uploadSequence;
+
+        public InMemoryFileTransferClient(Func<int, string, string, CancellationToken, Task>? onUpload = null)
+        {
+            _onUpload = onUpload;
+        }
+
+        public int UploadCount => _uploadSequence;
+        public int StoredFileCount => _files.Count;
+
+        public async Task UploadAsync(string localPath, string remotePath, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            var sequence = Interlocked.Increment(ref _uploadSequence);
+            var normalized = Normalize(remotePath);
+            var data = await File.ReadAllBytesAsync(localPath, ct).ConfigureAwait(false);
+            _files[normalized] = data;
+
+            if (_onUpload != null)
+            {
+                await _onUpload(sequence, localPath, normalized, ct).ConfigureAwait(false);
+            }
+        }
+
+        public async Task DownloadAsync(string remotePath, string localPath, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            var normalized = Normalize(remotePath);
+            if (!_files.TryGetValue(normalized, out var data))
+            {
+                throw new FileNotFoundException($"Remote file not found: {normalized}");
+            }
+
+            var directory = Path.GetDirectoryName(localPath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            await File.WriteAllBytesAsync(localPath, data, ct).ConfigureAwait(false);
+        }
+
+        public async Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = false)
+        {
+            ct.ThrowIfCancellationRequested();
+            var normalized = Normalize(remotePath);
+            if (!_files.TryGetValue(normalized, out var data))
+            {
+                throw new FileNotFoundException($"Remote file not found: {normalized}");
+            }
+
+            using var stream = new MemoryStream(data, writable: false);
+            return await HashUtil.ComputeHashAsync(stream, algorithm, ct).ConfigureAwait(false);
+        }
+
+        public Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct, bool includeSubdirectories = false)
+        {
+            ct.ThrowIfCancellationRequested();
+            var normalized = Normalize(remotePath).TrimEnd('/');
+            if (string.IsNullOrEmpty(normalized))
+            {
+                normalized = "/";
+            }
+
+            var files = _files.Keys
+                .Where(path => path.StartsWith(normalized, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            return Task.FromResult<IEnumerable<string>>(files);
+        }
+
+        public Task DeleteAsync(string remotePath, CancellationToken ct)
+        {
+            ct.ThrowIfCancellationRequested();
+            _files.TryRemove(Normalize(remotePath), out _);
+            return Task.CompletedTask;
+        }
+
+        public void Dispose()
+        {
+        }
+
+        private static string Normalize(string remotePath)
+        {
+            if (string.IsNullOrWhiteSpace(remotePath))
+            {
+                return "/";
+            }
+
+            var normalized = remotePath.Replace('\\', '/');
+            return normalized.StartsWith("/") ? normalized : "/" + normalized;
+        }
     }
 
     private class DummyLifetime : IHostApplicationLifetime, IDisposable

@@ -3,19 +3,19 @@ using System.IO;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Services;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Moq;
 
 namespace FtpTransferAgent.Tests;
 
 /// <summary>
-/// ENDファイル機能のパフォーマンステスト
+/// Performance tests for END file behavior.
 /// </summary>
 public class EndFilePerformanceTests
 {
-    [Fact(Skip = "Performance test may be too slow in CI environment")]
+    [Fact]
     public async Task EndFileCheck_WithManyFiles_ShouldCompleteReasonablyFast()
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
@@ -23,32 +23,39 @@ public class EndFilePerformanceTests
 
         try
         {
-            // 100ファイル作成（半分にENDファイルを作成）
+            // Create 100 data files and END files for half of them.
             const int fileCount = 100;
             var tasks = new List<Task>();
-            
+
             for (int i = 0; i < fileCount; i++)
             {
                 var fileName = $"test{i:D4}.txt";
                 var filePath = Path.Combine(dir, fileName);
                 tasks.Add(File.WriteAllTextAsync(filePath, $"data{i}"));
 
-                // 半分のファイルにENDファイルを作成
                 if (i % 2 == 0)
                 {
-                    var endFilePath = Path.Combine(dir, $"test{i:D4}.END");
-                    tasks.Add(File.WriteAllTextAsync(endFilePath, ""));
+                    var endFilePath = Path.Combine(dir, $"test{i:D4}.txt.END");
+                    tasks.Add(File.WriteAllTextAsync(endFilePath, string.Empty));
                 }
             }
-            
+
             await Task.WhenAll(tasks);
 
-            var watch = Options.Create(new WatchOptions 
-            { 
+            // Build expected hashes by remote filename for mock GetRemoteHashAsync.
+            var expectedHashes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var localFile in Directory.EnumerateFiles(dir, "*.txt"))
+            {
+                var hashValue = await HashUtil.ComputeHashAsync(localFile, "SHA256", CancellationToken.None);
+                expectedHashes[Path.GetFileName(localFile)] = hashValue;
+            }
+
+            var watch = Options.Create(new WatchOptions
+            {
                 Path = dir,
                 RequireEndFile = true,
                 EndFileExtensions = new[] { ".END", ".end" },
-                AllowedExtensions = new[] { ".txt" } // .txtファイルのみを転送対象にする
+                AllowedExtensions = new[] { ".txt" }
             });
             var transfer = Options.Create(new TransferOptions
             {
@@ -65,11 +72,14 @@ public class EndFilePerformanceTests
             var cleanup = Options.Create(new CleanupOptions());
 
             var mock = new Mock<IFileTransferClient>();
-            // ENDファイルがあるファイル（500個）のみアップロードされることを期待
             mock.Setup(c => c.UploadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
             mock.Setup(c => c.GetRemoteHashAsync(It.IsAny<string>(), "SHA256", It.IsAny<CancellationToken>(), false))
-                .ReturnsAsync("d41d8cd98f00b204e9800998ecf8427e"); // 空文字のSHA256
+                .ReturnsAsync((string remotePath, string _, CancellationToken __, bool ___) =>
+                {
+                    var remoteName = Path.GetFileName(remotePath);
+                    return expectedHashes.TryGetValue(remoteName, out var hashValue) ? hashValue : string.Empty;
+                });
             mock.Setup(c => c.Dispose());
 
             var services = new ServiceCollection();
@@ -80,17 +90,13 @@ public class EndFilePerformanceTests
             using var lifetime = new DummyLifetime();
             var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
 
-            // パフォーマンス測定
             var stopwatch = Stopwatch.StartNew();
             await worker.RunAsync(CancellationToken.None);
             stopwatch.Stop();
 
-            // 100ファイルの処理が30秒以内に完了することを確認
-            Assert.True(stopwatch.ElapsedMilliseconds < 30000, 
+            Assert.True(stopwatch.ElapsedMilliseconds < 30000,
                 $"Processing took too long: {stopwatch.ElapsedMilliseconds}ms");
-
-            // ENDファイルがあるファイル（50個）のみアップロードされたことを確認
-            mock.Verify(c => c.UploadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), 
+            mock.Verify(c => c.UploadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
                 Times.Exactly(50));
         }
         finally
@@ -102,7 +108,7 @@ public class EndFilePerformanceTests
         }
     }
 
-    [Fact(Skip = "Performance test may be too slow in CI environment")]
+    [Fact]
     public async Task EndFileCheck_WithManyExtensions_ShouldNotDegrade()
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
@@ -111,11 +117,13 @@ public class EndFilePerformanceTests
         try
         {
             var file = Path.Combine(dir, "test.txt");
-            var endFile = Path.Combine(dir, "test.END");
+            var endFile = Path.Combine(dir, "test.txt.END");
             await File.WriteAllTextAsync(file, "data");
-            await File.WriteAllTextAsync(endFile, "");
+            await File.WriteAllTextAsync(endFile, string.Empty);
 
-            // 20個の拡張子を設定（最後にマッチする.ENDを配置）
+            var expectedHash = await HashUtil.ComputeHashAsync(file, "SHA256", CancellationToken.None);
+
+            // Configure many END extensions and keep .END as the matching one.
             var extensions = new List<string>();
             for (int i = 0; i < 19; i++)
             {
@@ -123,12 +131,12 @@ public class EndFilePerformanceTests
             }
             extensions.Add(".END");
 
-            var watch = Options.Create(new WatchOptions 
-            { 
+            var watch = Options.Create(new WatchOptions
+            {
                 Path = dir,
                 RequireEndFile = true,
                 EndFileExtensions = extensions.ToArray(),
-                AllowedExtensions = new[] { ".txt" } // .txtファイルのみを転送対象にする
+                AllowedExtensions = new[] { ".txt" }
             });
             var transfer = Options.Create(new TransferOptions
             {
@@ -148,7 +156,7 @@ public class EndFilePerformanceTests
             mock.Setup(c => c.UploadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
                 .Returns(Task.CompletedTask);
             mock.Setup(c => c.GetRemoteHashAsync(It.IsAny<string>(), "SHA256", It.IsAny<CancellationToken>(), false))
-                .ReturnsAsync("d41d8cd98f00b204e9800998ecf8427e");
+                .ReturnsAsync(expectedHash);
             mock.Setup(c => c.Dispose());
 
             var services = new ServiceCollection();
@@ -159,17 +167,13 @@ public class EndFilePerformanceTests
             using var lifetime = new DummyLifetime();
             var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
 
-            // パフォーマンス測定
             var stopwatch = Stopwatch.StartNew();
             await worker.RunAsync(CancellationToken.None);
             stopwatch.Stop();
 
-            // 20個の拡張子があっても処理が30秒以内に完了することを確認
-            Assert.True(stopwatch.ElapsedMilliseconds < 30000, 
+            Assert.True(stopwatch.ElapsedMilliseconds < 30000,
                 $"Processing with many extensions took too long: {stopwatch.ElapsedMilliseconds}ms");
-
-            // ファイルが正しく検出されアップロードされたことを確認
-            mock.Verify(c => c.UploadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), 
+            mock.Verify(c => c.UploadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()),
                 Times.Once);
         }
         finally
@@ -184,6 +188,7 @@ public class EndFilePerformanceTests
     private class TestWorker : Worker
     {
         private readonly IFileTransferClient _client;
+
         public TestWorker(IOptions<WatchOptions> w, IOptions<TransferOptions> t, IOptions<RetryOptions> r, IOptions<HashOptions> h, IOptions<CleanupOptions> c, IServiceProvider sp, ILogger<Worker> l, IHostApplicationLifetime lifetime, IFileTransferClient client)
             : base(w, t, r, h, c, sp, l, lifetime)
         {
@@ -203,7 +208,9 @@ public class EndFilePerformanceTests
     private class NoDisposeClient : IFileTransferClient
     {
         private readonly IFileTransferClient _inner;
+
         public NoDisposeClient(IFileTransferClient inner) => _inner = inner;
+
         public void Dispose() { }
         public Task UploadAsync(string localPath, string remotePath, CancellationToken ct) => _inner.UploadAsync(localPath, remotePath, ct);
         public Task DownloadAsync(string remotePath, string localPath, CancellationToken ct) => _inner.DownloadAsync(remotePath, localPath, ct);
@@ -216,12 +223,12 @@ public class EndFilePerformanceTests
     {
         private readonly CancellationTokenSource _stoppingTokenSource = new();
         private readonly CancellationTokenSource _stoppedTokenSource = new();
-        
+
         public CancellationToken ApplicationStarted => CancellationToken.None;
         public CancellationToken ApplicationStopping => _stoppingTokenSource.Token;
         public CancellationToken ApplicationStopped => _stoppedTokenSource.Token;
-        
-        public void StopApplication() 
+
+        public void StopApplication()
         {
             _stoppingTokenSource.Cancel();
             _stoppedTokenSource.Cancel();
@@ -229,8 +236,8 @@ public class EndFilePerformanceTests
 
         public void Dispose()
         {
-            _stoppingTokenSource?.Dispose();
-            _stoppedTokenSource?.Dispose();
+            _stoppingTokenSource.Dispose();
+            _stoppedTokenSource.Dispose();
         }
     }
 }
