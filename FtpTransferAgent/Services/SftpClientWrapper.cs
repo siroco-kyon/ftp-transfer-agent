@@ -162,22 +162,31 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         var temp = $"{remotePath}.tmp.{Guid.NewGuid():N}";
         _logger.LogDebug("SFTP upload: {LocalPath} -> temp={TempPath}", localPath, temp);
 
-        await using var fs = File.OpenRead(localPath);
-        _client.UploadFile(fs, temp, true);
-        _logger.LogDebug("SFTP UploadFile completed. Temp exists: {Exists}", _client.Exists(temp));
-
-        if (_client.Exists(remotePath))
+        try
         {
-            _logger.LogDebug("SFTP: Remote file exists, deleting before rename: {RemotePath}", remotePath);
-            _client.DeleteFile(remotePath);
-        }
-        _client.RenameFile(temp, remotePath);
+            await using var fs = File.OpenRead(localPath);
+            _client.UploadFile(fs, temp, true);
+            _logger.LogDebug("SFTP UploadFile completed. Temp exists: {Exists}", _client.Exists(temp));
 
-        // RenameFile 後の存在確認：失敗した場合は一時ファイルが残ったままになるため明示的にエラーとする
+            if (_client.Exists(remotePath))
+            {
+                _logger.LogDebug("SFTP: Remote file exists, deleting before rename: {RemotePath}", remotePath);
+                _client.DeleteFile(remotePath);
+            }
+            _client.RenameFile(temp, remotePath);
+        }
+        catch
+        {
+            // RenameFile 失敗時にリモートの一時ファイルが蓄積しないよう削除を試みる
+            try { if (_client.Exists(temp)) _client.DeleteFile(temp); } catch { }
+            throw;
+        }
+
+        // RenameFile 後の存在確認
         if (!_client.Exists(remotePath))
         {
             throw new InvalidOperationException(
-                $"SFTP RenameFile completed without error but destination file not found: {remotePath}. Temp file may remain at: {temp}");
+                $"SFTP RenameFile completed without error but destination file not found: {remotePath}.");
         }
         _logger.LogDebug("SFTP upload confirmed at: {RemotePath}", remotePath);
     }
@@ -188,12 +197,21 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         await EnsureConnectedAsync().ConfigureAwait(false);
         var temp = $"{localPath}.tmp.{Guid.NewGuid():N}";
 
-        await using (var fs = File.Create(temp))
+        try
         {
-            _client.DownloadFile(remotePath, fs);
-        }
+            await using (var fs = File.Create(temp))
+            {
+                _client.DownloadFile(remotePath, fs);
+            }
 
-        File.Move(temp, localPath, true);
+            File.Move(temp, localPath, true);
+        }
+        catch
+        {
+            // File.Move 失敗時に一時ファイルが残らないよう削除する
+            try { File.Delete(temp); } catch { }
+            throw;
+        }
     }
 
     // リモートファイルのハッシュ値を取得（Task.Run 内で同期 Read を使ってストリーム計算）

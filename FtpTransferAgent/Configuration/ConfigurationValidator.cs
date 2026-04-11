@@ -200,8 +200,14 @@ public class ConfigurationValidator
             }
         }
 
-        // ハッシュアルゴリズムのセキュリティチェック
-        if (hash.Algorithm.Equals("MD5", StringComparison.OrdinalIgnoreCase))
+        // ハッシュ検証が無効の場合は警告を出す
+        if (!hash.Enabled)
+        {
+            result.Warnings.Add("Hash verification is disabled. File integrity will not be verified after transfer.");
+        }
+
+        // ハッシュアルゴリズムのセキュリティチェック（有効時のみ）
+        if (hash.Enabled && hash.Algorithm.Equals("MD5", StringComparison.OrdinalIgnoreCase))
         {
             result.Errors.Add("MD5 hash algorithm is cryptographically insecure and has been disabled. Please use SHA256 or SHA512.");
         }
@@ -221,7 +227,7 @@ public class ConfigurationValidator
         ConfigurationValidationResult result)
     {
         // ハッシュ検証なしでファイル削除を有効にしている場合
-        if (cleanup.DeleteAfterVerify && string.IsNullOrEmpty(hash.Algorithm))
+        if (cleanup.DeleteAfterVerify && !hash.Enabled)
         {
             result.Errors.Add("Cannot delete files after verification when hash verification is disabled");
         }
@@ -270,8 +276,8 @@ public class ConfigurationValidator
             }
         }
         
-        // UseServerCommand設定の適用範囲チェック
-        if (hash.UseServerCommand && transfer.Mode == "sftp")
+        // UseServerCommand設定の適用範囲チェック（ハッシュ検証有効時のみ）
+        if (hash.Enabled && hash.UseServerCommand && transfer.Mode == "sftp")
         {
             result.Warnings.Add("UseServerCommand is enabled but SFTP does not support server-side hash commands. Local hash calculation will be used.");
         }

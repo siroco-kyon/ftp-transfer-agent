@@ -64,8 +64,17 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
         // 一意な一時ファイル名で衝突防止
         var tempPath = $"{remotePath}.tmp.{Guid.NewGuid():N}";
 
-        await _client.UploadFile(localPath, tempPath, FtpRemoteExists.Overwrite, true, FtpVerify.None, null, ct).ConfigureAwait(false);
-        await _client.MoveFile(tempPath, remotePath, FtpRemoteExists.Overwrite, ct).ConfigureAwait(false);
+        try
+        {
+            await _client.UploadFile(localPath, tempPath, FtpRemoteExists.Overwrite, true, FtpVerify.None, null, ct).ConfigureAwait(false);
+            await _client.MoveFile(tempPath, remotePath, FtpRemoteExists.Overwrite, ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            // MoveFile 失敗時にリモートの一時ファイルが蓄積しないよう削除を試みる
+            try { await _client.DeleteFile(tempPath, ct).ConfigureAwait(false); } catch { }
+            throw;
+        }
     }
 
     // ダウンロードも一時ファイル経由で行う
@@ -73,8 +82,17 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
     {
         await EnsureConnectedAsync(ct).ConfigureAwait(false);
         var temp = $"{localPath}.tmp.{Guid.NewGuid():N}";
-        await _client.DownloadFile(temp, remotePath, FtpLocalExists.Overwrite, FtpVerify.None, null, ct).ConfigureAwait(false);
-        File.Move(temp, localPath, true);
+        try
+        {
+            await _client.DownloadFile(temp, remotePath, FtpLocalExists.Overwrite, FtpVerify.None, null, ct).ConfigureAwait(false);
+            File.Move(temp, localPath, true);
+        }
+        catch
+        {
+            // File.Move 失敗時に一時ファイルが残らないよう削除する
+            try { File.Delete(temp); } catch { }
+            throw;
+        }
     }
 
     // リモートファイルのハッシュ値を取得

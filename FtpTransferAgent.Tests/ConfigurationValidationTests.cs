@@ -163,6 +163,99 @@ public class ConfigurationValidationTests
     }
 
     [Fact]
+    public void HashOptions_Enabled_DefaultsToTrue()
+    {
+        var options = new HashOptions();
+        Assert.True(options.Enabled);
+    }
+
+    [Fact]
+    public void HashOptions_Enabled_False_IsValid()
+    {
+        var options = new HashOptions { Enabled = false, Algorithm = "SHA256" };
+        var validation = ValidateObject(options);
+        Assert.Empty(validation);
+    }
+
+    [Fact]
+    public void ConfigurationValidator_HashDisabled_ShouldWarn()
+    {
+        var logger = new Mock<ILogger<ConfigurationValidator>>();
+        var validator = new ConfigurationValidator(logger.Object);
+
+        var watch = new WatchOptions { Path = Path.GetTempPath() };
+        var transfer = new TransferOptions
+        {
+            Mode = "sftp",
+            Direction = "put",
+            Host = "test.com",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote"
+        };
+        var retry = new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 };
+        var hash = new HashOptions { Enabled = false, Algorithm = "SHA256" };
+        var cleanup = new CleanupOptions();
+
+        var result = validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+
+        Assert.True(result.IsValid);
+        Assert.Contains(result.Warnings, w => w.Contains("Hash verification is disabled"));
+    }
+
+    [Fact]
+    public void ConfigurationValidator_HashDisabled_WithDeleteAfterVerify_ShouldError()
+    {
+        var logger = new Mock<ILogger<ConfigurationValidator>>();
+        var validator = new ConfigurationValidator(logger.Object);
+
+        var watch = new WatchOptions { Path = Path.GetTempPath() };
+        var transfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "test.com",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote"
+        };
+        var retry = new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 };
+        var hash = new HashOptions { Enabled = false, Algorithm = "SHA256" };
+        var cleanup = new CleanupOptions { DeleteAfterVerify = true };
+
+        var result = validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("Cannot delete files after verification when hash verification is disabled"));
+    }
+
+    [Fact]
+    public void ConfigurationValidator_HashDisabled_UseServerCommand_ShouldNotWarn()
+    {
+        // ハッシュ検証無効時は UseServerCommand の警告を出さない
+        var logger = new Mock<ILogger<ConfigurationValidator>>();
+        var validator = new ConfigurationValidator(logger.Object);
+
+        var watch = new WatchOptions { Path = Path.GetTempPath() };
+        var transfer = new TransferOptions
+        {
+            Mode = "sftp",
+            Direction = "put",
+            Host = "test.com",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote"
+        };
+        var retry = new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 };
+        var hash = new HashOptions { Enabled = false, Algorithm = "SHA256", UseServerCommand = true };
+        var cleanup = new CleanupOptions();
+
+        var result = validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+
+        Assert.DoesNotContain(result.Warnings, w => w.Contains("UseServerCommand"));
+    }
+
+    [Fact]
     public void RetryOptions_ShouldValidateRanges()
     {
         // Valid retry options

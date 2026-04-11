@@ -164,7 +164,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
             Password = "pass"
         };
         var retry = new RetryOptions();
-        var hash = new HashOptions { Algorithm = "" }; // ハッシュ無効
+        var hash = new HashOptions { Enabled = false, Algorithm = "SHA256" }; // ハッシュ無効
         var cleanup = new CleanupOptions { DeleteAfterVerify = true }; // ファイル削除有効
 
         // Act

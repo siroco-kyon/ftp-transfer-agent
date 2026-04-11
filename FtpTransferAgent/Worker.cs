@@ -83,6 +83,10 @@ public class Worker : BackgroundService
             }
         }, stoppingToken);
 
+        // ファイル列挙フェーズ：例外発生時も必ず Channel を完了してワーカーを解放する
+        try
+        {
+
         // アップロード処理が有効な場合は指定フォルダ内のファイルを列挙
         if (_transfer.Direction is "put" or "both")
         {
@@ -311,8 +315,14 @@ public class Worker : BackgroundService
             }
         }
 
-        // 書き込みを完了してキュー処理の完了を待機
-        _channel.Writer.Complete();
+        } // try（ファイル列挙フェーズ）
+        finally
+        {
+            // 例外発生時もワーカーが WaitToReadAsync でブロックし続けないよう Channel を必ず完了する
+            _channel.Writer.TryComplete();
+        }
+
+        // 書き込みを完了してキュー処理の完了を待機（正常パスでは TryComplete が Complete の役割を担う）
         
         try
         {
@@ -334,7 +344,7 @@ public class Worker : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError("Error during transfer: {Error}", ex.Message);
+            _logger.LogError(ex, "Error during transfer: {Error}", ex.Message);
             throw;
         }
 
@@ -396,63 +406,70 @@ public class Worker : BackgroundService
 
         _logger.LogInformation("[{Id}] Starting upload {File} to {Remote}", id, item.Path, remotePath);
 
-        // 事前にローカルファイルのハッシュを計算
-        var localHash = await HashUtil.ComputeHashAsync(item.Path, _hash.Algorithm, token).ConfigureAwait(false);
-        _logger.LogDebug("[{Id}] Local hash calculated: {Hash}", id, localHash);
-
-        // アップロード実行
-        await client.UploadAsync(item.Path, remotePath, token).ConfigureAwait(false);
-        _logger.LogInformation("[{Id}] Upload completed for {File}", id, item.Path);
-
-        // リモートファイルのハッシュを取得して検証
-        var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token, _hash.UseServerCommand).ConfigureAwait(false);
-        _logger.LogDebug("[{Id}] Remote hash calculated: {Hash}", id, remoteHash);
-
-        if (string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
+        if (_hash.Enabled)
         {
+            // 事前にローカルファイルのハッシュを計算
+            var localHash = await HashUtil.ComputeHashAsync(item.Path, _hash.Algorithm, token).ConfigureAwait(false);
+            _logger.LogDebug("[{Id}] Local hash calculated: {Hash}", id, localHash);
+
+            // アップロード実行
+            await client.UploadAsync(item.Path, remotePath, token).ConfigureAwait(false);
+            _logger.LogInformation("[{Id}] Upload completed for {File}", id, item.Path);
+
+            // リモートファイルのハッシュを取得して検証
+            var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token, _hash.UseServerCommand).ConfigureAwait(false);
+            _logger.LogDebug("[{Id}] Remote hash calculated: {Hash}", id, remoteHash);
+
+            if (!string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
+            {
+                var error = $"Hash mismatch for {item.Path}: Local={localHash}, Remote={remoteHash}";
+                _logger.LogError("[{Id}] {Error}", id, error);
+                throw new InvalidOperationException(error);
+            }
+
             _logger.LogInformation("[{Id}] Hash verification successful for {File}", id, item.Path);
-            
-            // ローカルファイルの削除判定
-            var isEndFile = IsEndFile(item.Path);
-            var shouldDeleteLocal = isEndFile || _cleanup.DeleteAfterVerify;
-            
-            if (shouldDeleteLocal)
-            {
-                try
-                {
-                    File.Delete(item.Path);
-                    var fileType = isEndFile ? "END file" : "local file";
-                    _logger.LogInformation("[{Id}] Deleted {FileType} {File}", id, fileType, item.Path);
-                }
-                catch (IOException ex)
-                {
-                    _logger.LogWarning("[{Id}] Failed to delete local file {File}: {Error}", id, item.Path, ex.Message);
-                }
-                catch (UnauthorizedAccessException ex)
-                {
-                    _logger.LogWarning("[{Id}] Access denied deleting local file {File}: {Error}", id, item.Path, ex.Message);
-                }
-            }
-            
-            // 転送先のENDファイル削除判定（アップロード後）
-            if (isEndFile && _cleanup.DeleteRemoteEndFiles)
-            {
-                try
-                {
-                    await client.DeleteAsync(remotePath, token).ConfigureAwait(false);
-                    _logger.LogInformation("[{Id}] Deleted remote END file {Remote}", id, remotePath);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning("[{Id}] Failed to delete remote END file {Remote}: {Error}", id, remotePath, ex.Message);
-                }
-            }
         }
         else
         {
-            var error = $"Hash mismatch for {item.Path}: Local={localHash}, Remote={remoteHash}";
-            _logger.LogError("[{Id}] {Error}", id, error);
-            throw new InvalidOperationException(error);
+            // ハッシュ検証なしでアップロード
+            await client.UploadAsync(item.Path, remotePath, token).ConfigureAwait(false);
+            _logger.LogInformation("[{Id}] Upload completed for {File} (hash verification disabled)", id, item.Path);
+        }
+
+        // ローカルファイルの削除判定
+        var isEndFile = IsEndFile(item.Path);
+        var shouldDeleteLocal = isEndFile || _cleanup.DeleteAfterVerify;
+
+        if (shouldDeleteLocal)
+        {
+            try
+            {
+                File.Delete(item.Path);
+                var fileType = isEndFile ? "END file" : "local file";
+                _logger.LogInformation("[{Id}] Deleted {FileType} {File}", id, fileType, item.Path);
+            }
+            catch (IOException ex)
+            {
+                _logger.LogWarning("[{Id}] Failed to delete local file {File}: {Error}", id, item.Path, ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning("[{Id}] Access denied deleting local file {File}: {Error}", id, item.Path, ex.Message);
+            }
+        }
+
+        // 転送先のENDファイル削除判定（アップロード後）
+        if (isEndFile && _cleanup.DeleteRemoteEndFiles)
+        {
+            try
+            {
+                await client.DeleteAsync(remotePath, token).ConfigureAwait(false);
+                _logger.LogInformation("[{Id}] Deleted remote END file {Remote}", id, remotePath);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("[{Id}] Failed to delete remote END file {Remote}: {Error}", id, remotePath, ex.Message);
+            }
         }
     }
 
@@ -487,7 +504,7 @@ public class Worker : BackgroundService
             var fullPath = Path.GetFullPath(safePath);
             var watchFullPath = Path.GetFullPath(_watch.Path);
             
-            if (!fullPath.StartsWith(watchFullPath + Path.DirectorySeparatorChar) &&
+            if (!fullPath.StartsWith(watchFullPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(fullPath, watchFullPath, StringComparison.OrdinalIgnoreCase))
             {
                 throw new ArgumentException($"Unsafe file path detected: {relativePath}");
@@ -545,58 +562,54 @@ public class Worker : BackgroundService
 
         _logger.LogInformation("[{Id}] Starting download {Remote} to {Local}", id, item.Path, localPath);
 
-        // 事前にリモートファイルのハッシュを計算
-        var remoteHash = await client.GetRemoteHashAsync(item.Path, _hash.Algorithm, token, _hash.UseServerCommand).ConfigureAwait(false);
-        _logger.LogDebug("[{Id}] Remote hash calculated: {Hash}", id, remoteHash);
-
-        // ダウンロード実行
-        await client.DownloadAsync(item.Path, localPath, token).ConfigureAwait(false);
-        _logger.LogInformation("[{Id}] Download completed for {Remote}", id, item.Path);
-
-        // ローカルファイルのハッシュを計算して検証
-        var localHash = await HashUtil.ComputeHashAsync(localPath, _hash.Algorithm, token).ConfigureAwait(false);
-        _logger.LogDebug("[{Id}] Local hash calculated: {Hash}", id, localHash);
-
-        if (string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
+        if (_hash.Enabled)
         {
+            // 事前にリモートファイルのハッシュを計算
+            var remoteHash = await client.GetRemoteHashAsync(item.Path, _hash.Algorithm, token, _hash.UseServerCommand).ConfigureAwait(false);
+            _logger.LogDebug("[{Id}] Remote hash calculated: {Hash}", id, remoteHash);
+
+            // ダウンロード実行
+            await client.DownloadAsync(item.Path, localPath, token).ConfigureAwait(false);
+            _logger.LogInformation("[{Id}] Download completed for {Remote}", id, item.Path);
+
+            // ローカルファイルのハッシュを計算して検証
+            var localHash = await HashUtil.ComputeHashAsync(localPath, _hash.Algorithm, token).ConfigureAwait(false);
+            _logger.LogDebug("[{Id}] Local hash calculated: {Hash}", id, localHash);
+
+            if (!string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
+            {
+                var error = $"Hash mismatch for {item.Path}: Remote={remoteHash}, Local={localHash}";
+                _logger.LogError("[{Id}] {Error}", id, error);
+                throw new InvalidOperationException(error);
+            }
+
             _logger.LogInformation("[{Id}] Hash verification successful for {Remote}", id, item.Path);
-            
-            // ENDファイルまたは通常ファイルの削除判定
-            var isEndFileRemote = IsEndFileRemote(item.Path);
-            var shouldDeleteRemote = false;
-            
-            if (isEndFileRemote)
-            {
-                // ENDファイルの場合：DeleteRemoteEndFiles設定に従う
-                shouldDeleteRemote = _cleanup.DeleteRemoteEndFiles;
-            }
-            else
-            {
-                // 通常ファイルの場合：DeleteRemoteAfterDownload設定に従う
-                shouldDeleteRemote = _cleanup.DeleteRemoteAfterDownload;
-            }
-            
-            if (shouldDeleteRemote)
-            {
-                // ダウンロード後のリモートファイル削除は失敗しても転送全体を失敗させないようにtry/catchで処理します。
-                try
-                {
-                    await client.DeleteAsync(item.Path, token).ConfigureAwait(false);
-                    var fileType = isEndFileRemote ? "remote END file" : "remote file";
-                    _logger.LogInformation("[{Id}] Deleted {FileType} {Remote}", id, fileType, item.Path);
-                }
-                catch (Exception ex)
-                {
-                    // 削除に失敗した場合は警告ログのみ出力し、以後の処理を継続します。
-                    _logger.LogWarning("[{Id}] Failed to delete remote file {Remote}: {Error}", id, item.Path, ex.Message);
-                }
-            }
         }
         else
         {
-            var error = $"Hash mismatch for {item.Path}: Remote={remoteHash}, Local={localHash}";
-            _logger.LogError("[{Id}] {Error}", id, error);
-            throw new InvalidOperationException(error);
+            // ハッシュ検証なしでダウンロード
+            await client.DownloadAsync(item.Path, localPath, token).ConfigureAwait(false);
+            _logger.LogInformation("[{Id}] Download completed for {Remote} (hash verification disabled)", id, item.Path);
+        }
+
+        // ENDファイルまたは通常ファイルの削除判定
+        var isEndFileRemote = IsEndFileRemote(item.Path);
+        var shouldDeleteRemote = isEndFileRemote ? _cleanup.DeleteRemoteEndFiles : _cleanup.DeleteRemoteAfterDownload;
+
+        if (shouldDeleteRemote)
+        {
+            // ダウンロード後のリモートファイル削除は失敗しても転送全体を失敗させないようにtry/catchで処理します。
+            try
+            {
+                await client.DeleteAsync(item.Path, token).ConfigureAwait(false);
+                var fileType = isEndFileRemote ? "remote END file" : "remote file";
+                _logger.LogInformation("[{Id}] Deleted {FileType} {Remote}", id, fileType, item.Path);
+            }
+            catch (Exception ex)
+            {
+                // 削除に失敗した場合は警告ログのみ出力し、以後の処理を継続します。
+                _logger.LogWarning("[{Id}] Failed to delete remote file {Remote}: {Error}", id, item.Path, ex.Message);
+            }
         }
     }
 
