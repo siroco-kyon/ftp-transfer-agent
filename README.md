@@ -65,6 +65,7 @@
     "DelaySeconds": 5
   },
   "Hash": {
+    "Enabled": true,
     "Algorithm": "SHA256",
     "UseServerCommand": false
   },
@@ -157,12 +158,15 @@ schtasks /create /tn "FtpTransferAgent" /tr "C:\path\to\FtpTransferAgent.exe" /s
 
 | 項目 | 型 | 必須 | 既定値 | 説明 |
 |---|---|---|---|---|
+| `Enabled` | bool | 任意 | `true` | ハッシュ検証を有効にする。`false` にするとリモートへのハッシュ取得通信が省略されネットワーク負荷が約半分になる |
 | `Algorithm` | string | 必須 | `"SHA256"` | `SHA256` / `SHA512` |
 | `UseServerCommand` | bool | 任意 | `false` | FTP: サーバー側ハッシュコマンドを試行。SFTP: 無効扱いでローカル計算 |
 
 注意:
 
-- 実行時設定として `MD5` は無効です（起動時バリデーションでエラー終了）。
+- `Enabled: false` のときは `DeleteAfterVerify: true` と組み合わせられません（起動時バリデーションでエラー終了）。
+- `MD5` は無効です（起動時バリデーションでエラー終了）。
+- SFTP は転送レイヤーで HMAC による整合性保証があるため、`Enabled: false` にしても実用上の問題は少ないです。
 
 ### 推奨設定テンプレート
 
