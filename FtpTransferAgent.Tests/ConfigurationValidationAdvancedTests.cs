@@ -152,7 +152,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     }
 
     [Fact]
-    public void ValidateConfiguration_WithDeleteWithoutHash_ShouldFail()
+    public void ValidateConfiguration_WithDeleteWithoutHash_ShouldBeValid()
     {
         // Arrange
         var watch = new WatchOptions { Path = _testDirectory };
@@ -170,9 +170,9 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         // Act
         ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
 
-        // Assert
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.Contains("Cannot delete files after verification when hash verification is disabled"));
+        // Assert - ハッシュ無効でも削除は許可される
+        Assert.True(result.IsValid);
+        Assert.Contains(result.Infos, i => i.Contains("Hash verification is disabled"));
     }
 
     [Fact]

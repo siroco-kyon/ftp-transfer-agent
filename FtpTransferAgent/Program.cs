@@ -84,6 +84,14 @@ try
         }
     }
 
+    if (validationResult.HasInfos)
+    {
+        foreach (var info in validationResult.Infos)
+        {
+            Console.WriteLine($"INFO: {info}");
+        }
+    }
+
     host.Run();
 }
 catch (Exception ex)

@@ -200,11 +200,11 @@ public class ConfigurationValidationTests
         var result = validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
 
         Assert.True(result.IsValid);
-        Assert.Contains(result.Warnings, w => w.Contains("Hash verification is disabled"));
+        Assert.Contains(result.Infos, i => i.Contains("Hash verification is disabled"));
     }
 
     [Fact]
-    public void ConfigurationValidator_HashDisabled_WithDeleteAfterVerify_ShouldError()
+    public void ConfigurationValidator_HashDisabled_WithDeleteAfterVerify_ShouldBeValid()
     {
         var logger = new Mock<ILogger<ConfigurationValidator>>();
         var validator = new ConfigurationValidator(logger.Object);
@@ -225,8 +225,8 @@ public class ConfigurationValidationTests
 
         var result = validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
 
-        Assert.False(result.IsValid);
-        Assert.Contains(result.Errors, e => e.Contains("Cannot delete files after verification when hash verification is disabled"));
+        Assert.True(result.IsValid);
+        Assert.Contains(result.Infos, i => i.Contains("Hash verification is disabled"));
     }
 
     [Fact]

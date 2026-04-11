@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build:*)",
+      "Read(//d/Github/ftp-transfer-agent/**)",
+      "Bash(dotnet test:*)"
+    ]
+  }
+}

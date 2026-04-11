@@ -200,10 +200,10 @@ public class ConfigurationValidator
             }
         }
 
-        // ハッシュ検証が無効の場合は警告を出す
+        // ハッシュ検証が無効の場合はInfoとして通知
         if (!hash.Enabled)
         {
-            result.Warnings.Add("Hash verification is disabled. File integrity will not be verified after transfer.");
+            result.Infos.Add("Hash verification is disabled. File integrity will not be verified after transfer.");
         }
 
         // ハッシュアルゴリズムのセキュリティチェック（有効時のみ）
@@ -226,12 +226,6 @@ public class ConfigurationValidator
         CleanupOptions cleanup,
         ConfigurationValidationResult result)
     {
-        // ハッシュ検証なしでファイル削除を有効にしている場合
-        if (cleanup.DeleteAfterVerify && !hash.Enabled)
-        {
-            result.Errors.Add("Cannot delete files after verification when hash verification is disabled");
-        }
-
         // サブフォルダー処理とフォルダー構造維持の組み合わせ
         if (!watch.IncludeSubfolders && transfer.PreserveFolderStructure)
         {
@@ -456,9 +450,11 @@ public class ConfigurationValidationResult
 {
     public List<string> Errors { get; } = new();
     public List<string> Warnings { get; } = new();
+    public List<string> Infos { get; } = new();
 
     public bool IsValid => !Errors.Any();
     public bool HasWarnings => Warnings.Any();
+    public bool HasInfos => Infos.Any();
 }
 
 /// <summary>
