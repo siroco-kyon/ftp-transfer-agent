@@ -20,6 +20,46 @@
 - ENDファイル制御（Put/Get 両対応、データファイル先行転送）
 - ローリングファイルログ + エラーメール通知
 
+## 動作環境
+
+### 自己完結・単一ファイル発行時（`--self-contained`）
+
+自己完結で発行した場合、サーバへの **.NET ランタイムのインストールは不要**です。  
+ただし OS レベルの依存ライブラリは必要です。
+
+#### Linux (x64 / arm64)
+
+| 依存ライブラリ | 用途 | 備考 |
+|---|---|---|
+| **glibc 2.17 以上** | .NET 8 の動作基盤 | Ubuntu 18.04以降、CentOS 7以降は満たす |
+| **libssl (OpenSSL 1.1 または 3.x)** | FTP over TLS / SFTP (SSH.NET) | このアプリでは必須 |
+| **libicu** | グローバリゼーション処理 | `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` で無効化可能 |
+| **libz (zlib)** | 圧縮処理 | ほぼ全ディストロに標準搭載 |
+
+> Alpine Linux など **musl-libc** ベースのディストロは glibc と互換性がありません。使用する場合は `-r linux-musl-x64` でビルドが必要です。
+
+#### Windows
+
+- **Windows 10 / Windows Server 2016 以降**
+- Windows 7/8.1 は .NET 8 の対象外のため非対応
+
+#### macOS
+
+- **macOS 12 (Monterey) 以降**
+
+### 発行コマンド例
+
+```bash
+# Linux (x64)
+dotnet publish -c Release -r linux-x64 --self-contained /p:PublishSingleFile=true
+
+# Windows (x64)
+dotnet publish -c Release -r win-x64 --self-contained /p:PublishSingleFile=true
+
+# macOS (x64)
+dotnet publish -c Release -r osx-x64 --self-contained /p:PublishSingleFile=true
+```
+
 ## 実行モデル
 
 1. 設定を読み込み、起動時バリデーションを実施
@@ -34,7 +74,8 @@
 
 ### 1. 前提
 
-- .NET 8 SDK または Runtime
+- **開発・ビルド時**: .NET 8 SDK
+- **本番サーバ**: 自己完結発行（`--self-contained`）であれば .NET ランタイム不要（OS 依存ライブラリのみ必要、[動作環境](#動作環境) 参照）
 - 転送先/転送元の FTP または SFTP サーバー
 
 ### 2. 設定例（最小）
@@ -115,6 +156,31 @@ Windows（タスクスケジューラ）例:
 ```powershell
 schtasks /create /tn "FtpTransferAgent" /tr "C:\path\to\FtpTransferAgent.exe" /sc minute /mo 5
 ```
+
+## 設定ファイル構成
+
+プロジェクトには複数の appsettings ファイルが存在しますが、役割はそれぞれ異なります。
+
+| ファイル | 自動読み込み | 役割 |
+|---|---|---|
+| `appsettings.json` | 常時 | ベース設定。全環境共通の設定値を定義する **必須ファイル** |
+| `appsettings.Development.json` | 開発時のみ | `DOTNET_ENVIRONMENT=Development` のときだけ `appsettings.json` に上書きされる。開発用の接続先など |
+| `appsettings.backup.json` | されない | `appsettings.json` のバックアップコピー。アプリは参照しない |
+| `appsettings.invalid.json` | されない | 意図的に不正な JSON を含む設定バリデーションのテスト用サンプル |
+
+### 環境による読み込み挙動
+
+```
+appsettings.json            ← 常に読み込まれる（ベース）
+    ↓ 上書き
+appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するときのみ読み込まれる
+```
+
+`dotnet run` では `launchSettings.json` により自動的に `DOTNET_ENVIRONMENT=Development` が設定されるため、開発時は `appsettings.Development.json` も読み込まれます。
+
+### 本番デプロイ時
+
+**`appsettings.json` のみを配置**してください。接続先ホスト名・パスワードなどの実環境の値に書き換えてから配置します。`appsettings.Development.json`・`appsettings.backup.json`・`appsettings.invalid.json` は不要です。
 
 ## 設定リファレンス
 
