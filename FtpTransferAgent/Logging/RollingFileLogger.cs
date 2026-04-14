@@ -155,4 +155,87 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
             _disposed = true;
         }
     }
+
+    /// <summary>
+    /// 古いログファイルを削除する。ファイル名に含まれる YYYYMMDD をパースし、
+    /// 指定日数より古いものを削除する。パースできないファイルは無視する。
+    /// 空になった月・年フォルダも削除する。
+    /// </summary>
+    /// <returns>削除したファイル数</returns>
+    public static int CleanupOldLogs(string rollingFilePath, int retentionDays)
+    {
+        if (string.IsNullOrWhiteSpace(rollingFilePath) || retentionDays <= 0)
+        {
+            return 0;
+        }
+
+        var baseDir = Path.GetDirectoryName(rollingFilePath);
+        if (string.IsNullOrEmpty(baseDir) || !Directory.Exists(baseDir))
+        {
+            return 0;
+        }
+
+        var prefix = Path.GetFileNameWithoutExtension(rollingFilePath);
+        var ext = Path.GetExtension(rollingFilePath);
+        var cutoff = DateTime.UtcNow.Date.AddDays(-retentionDays);
+
+        int deleted = 0;
+        foreach (var file in Directory.EnumerateFiles(baseDir, "*" + ext, SearchOption.AllDirectories))
+        {
+            var name = Path.GetFileNameWithoutExtension(file);
+            if (!name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            var remainder = name.Substring(prefix.Length);
+            // 期待形式: YYYYMMDD または YYYYMMDD_n
+            if (remainder.Length < 8)
+            {
+                continue;
+            }
+            var datePart = remainder.Substring(0, 8);
+            if (!DateTime.TryParseExact(datePart, "yyyyMMdd",
+                System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None,
+                out var fileDate))
+            {
+                continue;
+            }
+            if (fileDate.Date >= cutoff)
+            {
+                continue;
+            }
+            try
+            {
+                File.Delete(file);
+                deleted++;
+            }
+            catch (IOException) { /* ファイルがロックされている場合は次回 */ }
+            catch (UnauthorizedAccessException) { /* 権限がない場合はスキップ */ }
+        }
+
+        // 空になった月・年フォルダを削除
+        foreach (var yearDir in Directory.EnumerateDirectories(baseDir))
+        {
+            foreach (var monthDir in Directory.EnumerateDirectories(yearDir))
+            {
+                TryRemoveIfEmpty(monthDir);
+            }
+            TryRemoveIfEmpty(yearDir);
+        }
+
+        return deleted;
+    }
+
+    private static void TryRemoveIfEmpty(string dir)
+    {
+        try
+        {
+            if (!Directory.EnumerateFileSystemEntries(dir).Any())
+            {
+                Directory.Delete(dir);
+            }
+        }
+        catch { /* ignore */ }
+    }
 }

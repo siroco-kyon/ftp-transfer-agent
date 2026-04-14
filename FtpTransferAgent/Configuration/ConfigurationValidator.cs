@@ -40,7 +40,69 @@ public class ConfigurationValidator
         // 設定の組み合わせチェック
         ValidateConfigurationCombinations(watch, transfer, hash, cleanup, result);
 
+        // 追加宛先のバリデーション
+        ValidateAdditionalDestinations(transfer, result);
+
         return result;
+    }
+
+    private void ValidateAdditionalDestinations(TransferOptions transfer, ConfigurationValidationResult result)
+    {
+        if (transfer.AdditionalDestinations is null || transfer.AdditionalDestinations.Count == 0)
+        {
+            return;
+        }
+
+        if (transfer.Direction is "get" or "both")
+        {
+            result.Warnings.Add($"AdditionalDestinations is set ({transfer.AdditionalDestinations.Count} entries) but Direction is '{transfer.Direction}'. Additional destinations are used only for uploads.");
+        }
+
+        for (int i = 0; i < transfer.AdditionalDestinations.Count; i++)
+        {
+            var d = transfer.AdditionalDestinations[i];
+            var label = $"[Destination#{i + 1} host={d.Host}]";
+
+            if (d is null)
+            {
+                result.Errors.Add($"{label} is null");
+                continue;
+            }
+            if (string.IsNullOrWhiteSpace(d.Host))
+            {
+                result.Errors.Add($"{label} Host is required");
+            }
+            if (string.IsNullOrWhiteSpace(d.Username))
+            {
+                result.Errors.Add($"{label} Username is required");
+            }
+            if (string.IsNullOrWhiteSpace(d.RemotePath))
+            {
+                result.Errors.Add($"{label} RemotePath is required");
+            }
+            if (!(d.Mode == "ftp" || d.Mode == "sftp"))
+            {
+                result.Errors.Add($"{label} Mode must be 'ftp' or 'sftp' (got '{d.Mode}')");
+            }
+            if (d.Port < 1 || d.Port > 65535)
+            {
+                result.Errors.Add($"{label} Invalid port: {d.Port}");
+            }
+            if (d.Mode == "ftp" && string.IsNullOrEmpty(d.Password))
+            {
+                result.Errors.Add($"{label} Password is required for FTP mode");
+            }
+            if (d.Mode == "sftp"
+                && string.IsNullOrEmpty(d.Password)
+                && string.IsNullOrEmpty(d.PrivateKeyPath))
+            {
+                result.Errors.Add($"{label} Password or PrivateKeyPath must be specified for SFTP mode");
+            }
+            if (d.Mode == "sftp" && !string.IsNullOrEmpty(d.PrivateKeyPath) && !File.Exists(d.PrivateKeyPath))
+            {
+                result.Errors.Add($"{label} Private key file not found: {d.PrivateKeyPath}");
+            }
+        }
     }
 
     private void ValidateBasicConfiguration(WatchOptions watch, TransferOptions transfer, ConfigurationValidationResult result)

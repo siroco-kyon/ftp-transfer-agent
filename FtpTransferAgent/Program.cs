@@ -1,6 +1,7 @@
 using FtpTransferAgent;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Logging;
+using FtpTransferAgent.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -19,6 +20,7 @@ builder.Services.AddOptions<HashOptions>().BindConfiguration("Hash").ValidateDat
 builder.Services.AddOptions<CleanupOptions>().BindConfiguration("Cleanup").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddOptions<SmtpOptions>().BindConfiguration("Smtp").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddOptions<LoggingOptions>().BindConfiguration("Logging").ValidateDataAnnotations().ValidateOnStart();
+builder.Services.AddOptions<AppOptions>().BindConfiguration("App");
 
 // ログ出力の設定を読み込み
 var logging = builder.Configuration.GetSection("Logging").Get<LoggingOptions>() ?? new LoggingOptions();
@@ -37,6 +39,20 @@ if (!string.IsNullOrEmpty(logging.RollingFilePath))
 {
     // ログをファイルにも出力する
     builder.Logging.AddProvider(new RollingFileLoggerProvider(logging));
+
+    // 起動時に古いログを掃除（Retention.Enabled=true 時のみ）
+    if (logging.Retention?.Enabled == true)
+    {
+        try
+        {
+            var removed = RollingFileLogger.CleanupOldLogs(logging.RollingFilePath, logging.Retention.RetentionDays);
+            Console.WriteLine($"INFO: Log retention cleanup removed {removed} file(s) older than {logging.Retention.RetentionDays} day(s).");
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"WARNING: Log retention cleanup failed: {ex.Message}");
+        }
+    }
 }
 if (smtp.Enabled)
 {
@@ -92,7 +108,29 @@ try
         }
     }
 
-    host.Run();
+    // 二重起動を防止するロックを取得してから実行
+    var appOptions = host.Services.GetRequiredService<IOptions<AppOptions>>().Value;
+    ProcessLock? procLock;
+    try
+    {
+        procLock = ProcessLock.Acquire(appOptions.LockFilePath);
+        Console.WriteLine($"INFO: Acquired process lock at {procLock.LockFilePath}");
+    }
+    catch (InvalidOperationException ex)
+    {
+        Console.Error.WriteLine($"ERROR: {ex.Message}");
+        Environment.Exit(2);
+        return; // 到達しないが静的解析のため
+    }
+
+    try
+    {
+        host.Run();
+    }
+    finally
+    {
+        procLock.Dispose();
+    }
 }
 catch (Exception ex)
 {
