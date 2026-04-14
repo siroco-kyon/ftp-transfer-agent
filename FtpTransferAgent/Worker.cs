@@ -296,11 +296,8 @@ public class Worker : BackgroundService
                     // ENDファイルかどうかを先にチェック
                     if (IsEndFile(file))
                     {
-                        // ENDファイルは別リストに保存
-                        if (_watch.TransferEndFiles)
-                        {
-                            endFiles.Add(file);
-                        }
+                        // ENDファイルは常に別リストに保存（転送するかどうかは後で判断）
+                        endFiles.Add(file);
                         continue;
                     }
 
@@ -349,6 +346,26 @@ public class Worker : BackgroundService
                         else
                         {
                             _logger.LogDebug("Skipping END file {File} - corresponding data file not being transferred", endFile);
+                        }
+                    }
+                }
+                else if (_cleanup.DeleteLocalSkippedEndFiles && endFiles.Count > 0)
+                {
+                    // TransferEndFiles=false のとき、転送しなかった END ファイルをローカルから削除する
+                    foreach (var endFile in endFiles)
+                    {
+                        try
+                        {
+                            File.Delete(endFile);
+                            _logger.LogInformation("Deleted skipped END file {File} (TransferEndFiles=false, DeleteLocalSkippedEndFiles=true)", endFile);
+                        }
+                        catch (IOException ex)
+                        {
+                            _logger.LogWarning("Failed to delete skipped END file {File}: {Error}", endFile, ex.Message);
+                        }
+                        catch (UnauthorizedAccessException ex)
+                        {
+                            _logger.LogWarning("Access denied deleting skipped END file {File}: {Error}", endFile, ex.Message);
                         }
                     }
                 }
