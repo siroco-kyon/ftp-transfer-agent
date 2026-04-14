@@ -27,7 +27,7 @@ public class RollingFileLoggerTests
 
             logger.LogInformation("hello");
 
-            file = Path.Combine(dir, $"log{DateTime.UtcNow:yyyyMMdd}.txt");
+            file = Path.Combine(dir, $"{DateTime.UtcNow:yyyy}", $"{DateTime.UtcNow:MM}", $"log{DateTime.UtcNow:yyyyMMdd}.txt");
             Assert.True(File.Exists(file));
         }
 
@@ -52,7 +52,7 @@ public class RollingFileLoggerTests
             logger.LogInformation("first");
             logger.LogInformation("second");
 
-            baseName = Path.Combine(dir, $"log{DateTime.UtcNow:yyyyMMdd}");
+            baseName = Path.Combine(dir, $"{DateTime.UtcNow:yyyy}", $"{DateTime.UtcNow:MM}", $"log{DateTime.UtcNow:yyyyMMdd}");
         }
 
         Assert.True(File.Exists(baseName + ".txt"));
