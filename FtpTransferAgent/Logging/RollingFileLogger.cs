@@ -178,6 +178,7 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
         var prefix = Path.GetFileNameWithoutExtension(rollingFilePath);
         var ext = Path.GetExtension(rollingFilePath);
         var cutoff = DateTime.UtcNow.Date.AddDays(-retentionDays);
+        var cleanupDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         int deleted = 0;
         foreach (var file in Directory.EnumerateFiles(baseDir, "*" + ext, SearchOption.AllDirectories))
@@ -209,22 +210,42 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
             {
                 File.Delete(file);
                 deleted++;
+                AddCleanupCandidates(cleanupDirs, baseDir, file);
             }
             catch (IOException) { /* ファイルがロックされている場合は次回 */ }
             catch (UnauthorizedAccessException) { /* 権限がない場合はスキップ */ }
         }
 
-        // 空になった月・年フォルダを削除
-        foreach (var yearDir in Directory.EnumerateDirectories(baseDir))
+        // 削除したログが置かれていた月・年フォルダだけを後片付けする
+        foreach (var dir in cleanupDirs.OrderByDescending(GetPathDepth))
         {
-            foreach (var monthDir in Directory.EnumerateDirectories(yearDir))
-            {
-                TryRemoveIfEmpty(monthDir);
-            }
-            TryRemoveIfEmpty(yearDir);
+            TryRemoveIfEmpty(dir);
         }
 
         return deleted;
+    }
+
+    private static void AddCleanupCandidates(HashSet<string> cleanupDirs, string baseDir, string filePath)
+    {
+        var monthDir = Path.GetDirectoryName(filePath);
+        if (string.IsNullOrEmpty(monthDir))
+        {
+            return;
+        }
+
+        cleanupDirs.Add(monthDir);
+
+        var yearDir = Path.GetDirectoryName(monthDir);
+        if (!string.IsNullOrEmpty(yearDir)
+            && string.Equals(Path.GetDirectoryName(yearDir), baseDir, StringComparison.OrdinalIgnoreCase))
+        {
+            cleanupDirs.Add(yearDir);
+        }
+    }
+
+    private static int GetPathDepth(string path)
+    {
+        return path.Count(c => c == Path.DirectorySeparatorChar || c == Path.AltDirectorySeparatorChar);
     }
 
     private static void TryRemoveIfEmpty(string dir)

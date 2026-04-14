@@ -120,4 +120,16 @@ public class RollingFileLoggerRetentionTests : IDisposable
         CleanupOldLogs(_rollingPath, 30);
         Assert.False(File.Exists(old));
     }
+
+    [Fact]
+    public void DoesNotRemoveUnrelatedEmptyDirectories()
+    {
+        WriteLogAt(DateTime.UtcNow.Date.AddDays(-40));
+        var unrelated = Path.Combine(_dir, "scratch");
+        Directory.CreateDirectory(unrelated);
+
+        CleanupOldLogs(_rollingPath, 30);
+
+        Assert.True(Directory.Exists(unrelated));
+    }
 }

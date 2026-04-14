@@ -61,13 +61,14 @@ public class ConfigurationValidator
         for (int i = 0; i < transfer.AdditionalDestinations.Count; i++)
         {
             var d = transfer.AdditionalDestinations[i];
-            var label = $"[Destination#{i + 1} host={d.Host}]";
+            var label = $"[Destination#{i + 1}]";
 
             if (d is null)
             {
                 result.Errors.Add($"{label} is null");
                 continue;
             }
+            label = $"[Destination#{i + 1} host={d.Host}]";
             if (string.IsNullOrWhiteSpace(d.Host))
             {
                 result.Errors.Add($"{label} Host is required");
@@ -137,7 +138,7 @@ public class ConfigurationValidator
         if (watch.AllowedExtensions?.Any() == true)
         {
             var invalidExtensions = watch.AllowedExtensions
-                .Where(ext => string.IsNullOrWhiteSpace(ext) || ext.Contains(' '))
+                .Where(string.IsNullOrWhiteSpace)
                 .ToList();
 
             if (invalidExtensions.Any())

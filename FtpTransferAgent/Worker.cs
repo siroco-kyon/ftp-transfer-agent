@@ -12,6 +12,7 @@ namespace FtpTransferAgent;
 // ファイル転送を実行するバックグラウンドサービス
 public class Worker : BackgroundService
 {
+    private const int QueueCapacity = 1000;
     private readonly ILogger<Worker> _logger;
     private readonly WatchOptions _watch;
     private readonly TransferOptions _transfer;
@@ -23,12 +24,6 @@ public class Worker : BackgroundService
     private readonly FanoutCoordinator _fanout = new();
 
     // 転送処理用のチャンネル（容量制限でメモリリーク防止）
-    private readonly Channel<TransferItem> _channel = Channel.CreateBounded<TransferItem>(new BoundedChannelOptions(1000)
-    {
-        FullMode = BoundedChannelFullMode.Wait,
-        SingleReader = false,
-        SingleWriter = false
-    });
 
     // DI された各種オプションを受け取る
     public Worker(IOptions<WatchOptions> watch, IOptions<TransferOptions> transfer, IOptions<RetryOptions> retry, IOptions<HashOptions> hash, IOptions<CleanupOptions> cleanup, IServiceProvider services, ILogger<Worker> logger, IHostApplicationLifetime lifetime)
@@ -43,10 +38,37 @@ public class Worker : BackgroundService
         _lifetime = lifetime;
     }
 
+    private sealed class QueueContext
+    {
+        public QueueContext(DestinationOptions destination, string name, Channel<TransferItem> channel, TransferQueue queue)
+        {
+            Destination = destination;
+            Name = name;
+            Channel = channel;
+            Queue = queue;
+        }
+
+        public DestinationOptions Destination { get; }
+        public string Name { get; }
+        public Channel<TransferItem> Channel { get; }
+        public TransferQueue Queue { get; }
+    }
+
+    // 実クライアント生成の共通実装。virtual メソッドから分離して相互再帰を避ける。
+    private IFileTransferClient CreateClientCore(DestinationOptions dest)
+    {
+        return dest.Mode.ToLowerInvariant() switch
+        {
+            "sftp" => ActivatorUtilities.CreateInstance<SftpClientWrapper>(_services, dest),
+            "ftp" => ActivatorUtilities.CreateInstance<AsyncFtpClientWrapper>(_services, dest),
+            _ => throw new ArgumentException($"Unsupported transfer mode: {dest.Mode}")
+        };
+    }
+
     // DI を活用してクライアントファクトリパターンを実装（primary 用）
     protected virtual IFileTransferClient CreateClient()
     {
-        return CreateClientFor(_transfer);
+        return CreateClientCore(_transfer);
     }
 
     // ファンアウト対応: 宛先ごとにクライアントを生成する
@@ -57,12 +79,7 @@ public class Worker : BackgroundService
         {
             return CreateClient();
         }
-        return dest.Mode.ToLowerInvariant() switch
-        {
-            "sftp" => ActivatorUtilities.CreateInstance<SftpClientWrapper>(_services, dest),
-            "ftp" => ActivatorUtilities.CreateInstance<AsyncFtpClientWrapper>(_services, dest),
-            _ => throw new ArgumentException($"Unsupported transfer mode: {dest.Mode}")
-        };
+        return CreateClientCore(dest);
     }
 
     // put 方向で使用する全宛先リスト (primary + 追加宛先)
@@ -79,10 +96,77 @@ public class Worker : BackgroundService
     private static string DescribeDestination(DestinationOptions d) =>
         $"{d.Mode}://{d.Host}:{d.Port}{d.RemotePath}";
 
+    private static Channel<TransferItem> CreateTransferChannel()
+    {
+        return Channel.CreateBounded<TransferItem>(new BoundedChannelOptions(QueueCapacity)
+        {
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = false,
+            SingleWriter = false
+        });
+    }
+
+    private QueueContext CreateQueueContext(DestinationOptions destination, string name, int concurrency)
+    {
+        var queueLogger = _services.GetRequiredService<ILogger<TransferQueue>>();
+        var channel = CreateTransferChannel();
+        var queue = new TransferQueue(channel, _retry, queueLogger, concurrency);
+        return new QueueContext(destination, name, channel, queue);
+    }
+
+    private List<QueueContext> CreateQueueContexts()
+    {
+        var contexts = new List<QueueContext>
+        {
+            CreateQueueContext(_transfer, $"primary {DescribeDestination(_transfer)}", _transfer.Concurrency)
+        };
+
+        if (_transfer.Direction is not "put" and not "both")
+        {
+            return contexts;
+        }
+
+        if (_transfer.AdditionalDestinations is not { Count: > 0 })
+        {
+            return contexts;
+        }
+
+        for (int i = 0; i < _transfer.AdditionalDestinations.Count; i++)
+        {
+            var destination = _transfer.AdditionalDestinations[i];
+            contexts.Add(CreateQueueContext(destination, $"destination#{i + 1} {DescribeDestination(destination)}", destination.Concurrency));
+        }
+
+        return contexts;
+    }
+
+    private QueueContext GetPrimaryQueueContext(IReadOnlyList<QueueContext> queueContexts)
+    {
+        return queueContexts[0];
+    }
+
+    private QueueContext GetQueueContextForDestination(IReadOnlyList<QueueContext> queueContexts, DestinationOptions destination)
+    {
+        foreach (var context in queueContexts)
+        {
+            if (ReferenceEquals(context.Destination, destination))
+            {
+                return context;
+            }
+        }
+
+        throw new InvalidOperationException($"Queue context not found for destination {DescribeDestination(destination)}");
+    }
+
     // 1 ファイルを全宛先に対してファンアウトしてキューへ投入する。
     // 全宛先完了時に FanoutCoordinator からコールバックされ、
     // 全成功ならローカル削除・部分失敗ならローカル保持のログを出力する。
-    private async Task EnqueueFanoutAsync(string file, IReadOnlyList<DestinationOptions> destinations, bool isEndFile, CancellationToken token)
+    private async Task EnqueueFanoutAsync(
+        string file,
+        IReadOnlyList<DestinationOptions> destinations,
+        IReadOnlyList<QueueContext> queueContexts,
+        bool isEndFile,
+        CancellationToken token)
     {
         var groupId = Guid.NewGuid().ToString("N");
         _fanout.Register(groupId, file, destinations.Count, (source, results) =>
@@ -92,7 +176,8 @@ public class Worker : BackgroundService
 
         foreach (var dest in destinations)
         {
-            await _channel.Writer.WriteAsync(
+            var queueContext = GetQueueContextForDestination(queueContexts, dest);
+            await queueContext.Channel.Writer.WriteAsync(
                 new TransferItem(file, TransferAction.Upload, dest, groupId),
                 token).ConfigureAwait(false);
         }
@@ -107,7 +192,7 @@ public class Worker : BackgroundService
         if (!allSuccess)
         {
             var failed = results.Where(r => !r.Success).Select(r => r.DestinationLabel);
-            _logger.LogError("Partial failure for {File}: {Ok}/{Total} destinations succeeded. Failed: {Failed}. Local file retained for next run.",
+            _logger.LogError("Partial failure for {File}: {Ok}/{Total} destinations succeeded. Failed: {Failed}. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.",
                 sourcePath, succeeded, total, string.Join(", ", failed));
             return;
         }
@@ -141,15 +226,18 @@ public class Worker : BackgroundService
         // クライアントは各転送タスク毎に作成するため、ここでは共通インスタンスを生成しない
 
         // 再試行付きの転送キューを開始
-        var queueLogger = _services.GetRequiredService<ILogger<TransferQueue>>();
-        var queue = new TransferQueue(_channel, _retry, queueLogger, _transfer.Concurrency);
+        var queueContexts = CreateQueueContexts();
+        var primaryQueue = GetPrimaryQueueContext(queueContexts);
 
         // パフォーマンス監視用のCancellationTokenSourceを作成
         using var monitorCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
-        var monitorTask = StartPerformanceMonitoringAsync(queue, monitorCts.Token);
+        var monitorTasks = queueContexts
+            .Select(context => StartPerformanceMonitoringAsync(context.Name, context.Queue, monitorCts.Token))
+            .ToArray();
 
         // 各キュー処理では専用のクライアントを生成して処理する
-        var queueTask = queue.StartAsync(
+        var queueTasks = queueContexts
+            .Select(context => context.Queue.StartAsync(
             async (item, token) =>
             {
                 // 各転送処理の識別子
@@ -157,7 +245,7 @@ public class Worker : BackgroundService
                 if (item.Action == TransferAction.Upload)
                 {
                     // Upload は宛先ごとに専用クライアントを生成
-                    var dest = item.Destination ?? _transfer;
+                    var dest = item.Destination ?? context.Destination;
                     using var perItemClient = CreateClientFor(dest);
                     await ProcessUploadAsync(perItemClient, item, id, token).ConfigureAwait(false);
                 }
@@ -175,12 +263,13 @@ public class Worker : BackgroundService
                 {
                     return;
                 }
-                var dest = item.Destination ?? _transfer;
+                var dest = item.Destination ?? context.Destination;
                 var label = DescribeDestination(dest);
                 _fanout.ReportResult(item.GroupId,
                     new FanoutCoordinator.DestinationResult(label, ex == null, ex));
             },
-            stoppingToken);
+            stoppingToken))
+            .ToArray();
 
         // ファイル列挙フェーズ：例外発生時も必ず Channel を完了してワーカーを解放する
         try
@@ -243,7 +332,7 @@ public class Worker : BackgroundService
                 // 1. まずデータファイルを全宛先に対してファンアウトしてキューへ投入
                 foreach (var file in dataFiles)
                 {
-                    await EnqueueFanoutAsync(file, destinations, isEndFile: false, stoppingToken).ConfigureAwait(false);
+                    await EnqueueFanoutAsync(file, destinations, queueContexts, isEndFile: false, stoppingToken).ConfigureAwait(false);
                 }
 
                 // 2. ENDファイルを投入（TransferEndFiles が true の場合）
@@ -255,7 +344,7 @@ public class Worker : BackgroundService
                         if (dataFiles.Any(f => string.Equals(Path.GetFileName(f), dataFileName, StringComparison.OrdinalIgnoreCase)))
                         {
                             _logger.LogDebug("Queueing END file {File} for transfer after data file", endFile);
-                            await EnqueueFanoutAsync(endFile, destinations, isEndFile: true, stoppingToken).ConfigureAwait(false);
+                            await EnqueueFanoutAsync(endFile, destinations, queueContexts, isEndFile: true, stoppingToken).ConfigureAwait(false);
                         }
                         else
                         {
@@ -356,7 +445,7 @@ public class Worker : BackgroundService
                 // 1. まずデータファイルを転送キューに追加
                 foreach (var file in dataFiles)
                 {
-                    await _channel.Writer.WriteAsync(new TransferItem(file, TransferAction.Download), stoppingToken);
+                    await primaryQueue.Channel.Writer.WriteAsync(new TransferItem(file, TransferAction.Download), stoppingToken);
                 }
 
                 // 2. その後でENDファイルを転送キューに追加
@@ -386,7 +475,7 @@ public class Worker : BackgroundService
                             if (exists)
                             {
                                 _logger.LogDebug("Queueing remote END file {File} for transfer after data file", endOrigPath);
-                                await _channel.Writer.WriteAsync(new TransferItem(endOrigPath, TransferAction.Download), stoppingToken);
+                                await primaryQueue.Channel.Writer.WriteAsync(new TransferItem(endOrigPath, TransferAction.Download), stoppingToken);
                             }
                             else
                             {
@@ -421,7 +510,10 @@ public class Worker : BackgroundService
         finally
         {
             // 例外発生時もワーカーが WaitToReadAsync でブロックし続けないよう Channel を必ず完了する
-            _channel.Writer.TryComplete();
+            foreach (var context in queueContexts)
+            {
+                context.Channel.Writer.TryComplete();
+            }
         }
 
         // 書き込みを完了してキュー処理の完了を待機（正常パスでは TryComplete が Complete の役割を担う）
@@ -429,7 +521,7 @@ public class Worker : BackgroundService
         try
         {
             // まずキュー処理の完了を待機
-            await queueTask.ConfigureAwait(false);
+            await Task.WhenAll(queueTasks).ConfigureAwait(false);
             
             // キュー処理が完了したら監視タスクをキャンセル
             monitorCts.Cancel();
@@ -437,7 +529,7 @@ public class Worker : BackgroundService
             // 監視タスクの完了を少し待機（強制終了を避けるため）
             try
             {
-                await monitorTask.WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+                await Task.WhenAll(monitorTasks).WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
             }
             catch (TimeoutException)
             {
@@ -451,12 +543,12 @@ public class Worker : BackgroundService
         }
 
         // 最終統計情報をログ出力
-        var finalStats = queue.GetStatistics();
+        var finalStats = AggregateStatistics(queueContexts.Select(context => context.Queue.GetStatistics()));
         _logger.LogInformation("Transfer completed. Total: {Total}, Success: {Success}, Failed: {Failed}, Critical Errors: {Critical}, Success Rate: {Rate:F1}%",
             finalStats.TotalEnqueued, finalStats.TotalCompleted, finalStats.TotalFailed, finalStats.CriticalErrorCount, finalStats.SuccessRate);
 
         // クリティカルエラーがあれば詳細をログ出力
-        var criticalExceptions = queue.GetCriticalExceptions();
+        var criticalExceptions = queueContexts.SelectMany(context => context.Queue.GetCriticalExceptions());
         foreach (var ex in criticalExceptions)
         {
             _logger.LogError(ex, "Critical error occurred during transfer: {Message}", ex.Message);
@@ -464,6 +556,24 @@ public class Worker : BackgroundService
 
         // すべての処理が完了したらアプリケーションを停止
         _lifetime.StopApplication();
+    }
+
+    private static TransferStatistics AggregateStatistics(IEnumerable<TransferStatistics> allStats)
+    {
+        var aggregated = new TransferStatistics();
+        foreach (var stats in allStats)
+        {
+            aggregated.TotalEnqueued += stats.TotalEnqueued;
+            aggregated.TotalCompleted += stats.TotalCompleted;
+            aggregated.TotalFailed += stats.TotalFailed;
+            aggregated.ActiveItems += stats.ActiveItems;
+            aggregated.ProcessedItems += stats.ProcessedItems;
+            aggregated.MemoryUsageMB = Math.Max(aggregated.MemoryUsageMB, stats.MemoryUsageMB);
+            aggregated.ActiveWorkers += stats.ActiveWorkers;
+            aggregated.CriticalErrorCount += stats.CriticalErrorCount;
+        }
+
+        return aggregated;
     }
 
     /// <summary>
@@ -1004,7 +1114,7 @@ public class Worker : BackgroundService
     /// <summary>
     /// パフォーマンス監視タスクを開始
     /// </summary>
-    private async Task StartPerformanceMonitoringAsync(TransferQueue queue, CancellationToken cancellationToken)
+    private async Task StartPerformanceMonitoringAsync(string queueName, TransferQueue queue, CancellationToken cancellationToken)
     {
         try
         {
@@ -1015,21 +1125,21 @@ public class Worker : BackgroundService
                 var stats = queue.GetStatistics();
                 if (stats.TotalEnqueued > 0)
                 {
-                    _logger.LogInformation("Transfer Progress - Total: {Total}, Completed: {Completed}, Failed: {Failed}, Active: {Active}, Memory: {Memory}MB, Success Rate: {Rate:F1}%",
-                        stats.TotalEnqueued, stats.TotalCompleted, stats.TotalFailed, stats.ActiveItems, stats.MemoryUsageMB, stats.SuccessRate);
+                    _logger.LogInformation("Transfer Progress [{Queue}] - Total: {Total}, Completed: {Completed}, Failed: {Failed}, Active: {Active}, Memory: {Memory}MB, Success Rate: {Rate:F1}%",
+                        queueName, stats.TotalEnqueued, stats.TotalCompleted, stats.TotalFailed, stats.ActiveItems, stats.MemoryUsageMB, stats.SuccessRate);
                 }
 
                 // 長時間実行中のアイテムを警告
                 var longRunningItems = queue.GetLongRunningItems(TimeSpan.FromMinutes(5));
                 foreach (var (itemKey, duration) in longRunningItems)
                 {
-                    _logger.LogWarning("Long running transfer detected: {ItemKey} running for {Duration}", itemKey, duration);
+                    _logger.LogWarning("Long running transfer detected [{Queue}]: {ItemKey} running for {Duration}", queueName, itemKey, duration);
                 }
 
                 // メモリ使用量が高い場合は警告
                 if (stats.MemoryUsageMB > 500)
                 {
-                    _logger.LogWarning("High memory usage detected: {Memory}MB", stats.MemoryUsageMB);
+                    _logger.LogWarning("High memory usage detected [{Queue}]: {Memory}MB", queueName, stats.MemoryUsageMB);
                 }
             }
         }
@@ -1039,7 +1149,7 @@ public class Worker : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Performance monitoring task failed");
+            _logger.LogError(ex, "Performance monitoring task failed for queue {Queue}", queueName);
         }
     }
 

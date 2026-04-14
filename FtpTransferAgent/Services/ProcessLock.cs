@@ -90,7 +90,14 @@ public sealed class ProcessLock : IDisposable
         {
             return Path.GetFullPath(configured);
         }
-        return Path.Combine(AppContext.BaseDirectory, "ftp-transfer-agent.lock");
+
+        var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (string.IsNullOrWhiteSpace(baseDir))
+        {
+            baseDir = Path.GetTempPath();
+        }
+
+        return Path.Combine(baseDir, "FtpTransferAgent", "ftp-transfer-agent.lock");
     }
 
     private static bool TryReadPid(string path, out int pid)

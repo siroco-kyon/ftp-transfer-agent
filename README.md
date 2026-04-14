@@ -213,16 +213,16 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `PrivateKeyPassphrase` | string | 任意 | `null` | 鍵のパスフレーズ |
 | `HostKeyFingerprint` | string | 任意 | `null` | SFTP サーバー鍵指紋（未設定だと検証スキップ警告） |
 | `RemotePath` | string | 必須 | `""` | リモート基準パス |
-| `Concurrency` | int | 任意 | `1` | 並列転送数（1-16） |
+| `Concurrency` | int | 任意 | `1` | primary 宛先の並列転送数（1-16）。`get` と primary への `put` に適用。`AdditionalDestinations` は各要素の `Concurrency` を個別に使用 |
 | `PreserveFolderStructure` | bool | 任意 | `false` | サブフォルダ構造を維持して転送 |
 | `TimeoutSeconds` | int | 任意 | `120` | 接続・転送タイムアウト秒（1-3600） |
-| `AdditionalDestinations` | object[] | 任意 | `[]` | put 方向の追加送信先。各要素は Transfer と同じ接続系プロパティを持つ（`Direction` / `AdditionalDestinations` を除く）。1 ファイルをメイン + 追加宛先の全てへ同時に送信する |
+| `AdditionalDestinations` | object[] | 任意 | `[]` | put 方向の追加送信先。各要素は Transfer と同じ接続系プロパティを持つ（`Direction` / `AdditionalDestinations` を除く）。各宛先の `Concurrency` / `TimeoutSeconds` / 認証設定はその宛先に個別適用される。1 ファイルをメイン + 追加宛先の全てへ同時に送信する。部分失敗時はローカルファイルを保持し、次回実行では成功済み宛先を含めて全宛先へ再送する |
 
 ### App
 
 | 項目 | 型 | 必須 | 既定値 | 説明 |
 |---|---|---|---|---|
-| `LockFilePath` | string | 任意 | `""` | 二重起動防止用のロックファイルパス。空の場合は実行ファイルと同ディレクトリに `ftp-transfer-agent.lock` を作成する |
+| `LockFilePath` | string | 任意 | `""` | 二重起動防止用のロックファイルパス。空の場合は `LocalApplicationData/FtpTransferAgent/ftp-transfer-agent.lock`（取得できない環境ではテンポラリ配下）を使用する |
 
 ### Retry
 
@@ -321,6 +321,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
         "Username": "user",
         "Password": "pass",
         "RemotePath": "/inbox",
+        "Concurrency": 2,
         "TimeoutSeconds": 60
       }
     ]
@@ -331,6 +332,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 - メイン + 追加宛先の**全宛先**へ同時に送信
 - **全宛先成功時のみ**ローカルファイルを削除（`Cleanup.DeleteAfterVerify: true` 時）
 - 1 つでも失敗した場合はローカル保持 + ERROR ログ出力 → 次回起動で再送
+- 部分失敗時の再実行は all-or-nothing で、失敗宛先だけでなく成功済み宛先にも再送する
 - `Direction: get` / `both` では追加宛先は使用されず、警告が表示される
 
 ### Cleanup
@@ -418,7 +420,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 
 タスクスケジューラから短い間隔で実行する場合、前回実行分と重ならないよう PID ロックファイルで二重起動を防止します。
 
-- 起動時に `App.LockFilePath`（未指定なら実行ファイルと同ディレクトリの `ftp-transfer-agent.lock`）を確認
+- 起動時に `App.LockFilePath`（未指定なら `LocalApplicationData/FtpTransferAgent/ftp-transfer-agent.lock`、取得できない環境ではテンポラリ配下）を確認
 - 既存ロックがあり、書かれている PID のプロセスが**生存中**なら終了コード `2` で即終了
 - 死んだ PID のロックは自動的に上書きして起動を継続
 - 正常終了・異常終了のいずれでも `Dispose` でロックファイルは削除される

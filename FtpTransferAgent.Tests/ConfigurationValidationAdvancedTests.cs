@@ -204,6 +204,31 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     }
 
     [Fact]
+    public void ValidateConfiguration_WithWildcardPatternContainingSpaces_ShouldPass()
+    {
+        var watch = new WatchOptions
+        {
+            Path = _testDirectory,
+            AllowedExtensions = new[] { "sales report *.csv", "*.txt" }
+        };
+        var transfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Host = "example.com",
+            Username = "user",
+            Password = "pass"
+        };
+        var retry = new RetryOptions();
+        var hash = new HashOptions { Algorithm = "SHA256" };
+        var cleanup = new CleanupOptions();
+
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+
+        Assert.True(result.IsValid);
+        Assert.DoesNotContain(result.Errors, e => e.Contains("Invalid file extensions"));
+    }
+
+    [Fact]
     public void ValidateConfiguration_WithInvalidPort_ShouldFail()
     {
         // Arrange
@@ -345,6 +370,30 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         // Assert
         Assert.False(result.IsValid);
         Assert.Contains(result.Errors, e => e.Contains("Private key file not found"));
+    }
+
+    [Fact]
+    public void ValidateConfiguration_WithNullAdditionalDestination_ShouldReportValidationError()
+    {
+        var watch = new WatchOptions { Path = _testDirectory };
+        var transfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "example.com",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            AdditionalDestinations = new List<DestinationOptions> { null! }
+        };
+        var retry = new RetryOptions();
+        var hash = new HashOptions { Algorithm = "SHA256" };
+        var cleanup = new CleanupOptions();
+
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("[Destination#1] is null"));
     }
 
     public void Dispose()

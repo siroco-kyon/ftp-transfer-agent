@@ -92,5 +92,6 @@ public class ProcessLockTests : IDisposable
         using var l = ProcessLock.Acquire(null);
         Assert.True(File.Exists(l.LockFilePath));
         Assert.EndsWith("ftp-transfer-agent.lock", l.LockFilePath);
+        Assert.NotEqual(Path.Combine(AppContext.BaseDirectory, "ftp-transfer-agent.lock"), l.LockFilePath);
     }
 }
