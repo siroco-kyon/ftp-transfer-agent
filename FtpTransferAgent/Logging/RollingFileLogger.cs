@@ -56,15 +56,16 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
         _options = options;
     }
 
-    // 現在のログファイルパスを取得
+    // 現在のログファイルパスを取得（年月サブフォルダ付き）
     private string GetPath()
     {
         var basePath = _options.RollingFilePath;
-        var dir = Path.GetDirectoryName(basePath) ?? string.Empty;
+        var baseDir = Path.GetDirectoryName(basePath) ?? string.Empty;
         var name = Path.GetFileNameWithoutExtension(basePath);
         var ext = Path.GetExtension(basePath);
         var suffix = _index > 0 ? $"_{_index}" : string.Empty;
-        return Path.Combine(dir, $"{name}{_currentDate:yyyyMMdd}{suffix}{ext}");
+        var subDir = Path.Combine(baseDir, _currentDate.ToString("yyyy"), _currentDate.ToString("MM"));
+        return Path.Combine(subDir, $"{name}{_currentDate:yyyyMMdd}{suffix}{ext}");
     }
 
     // ログファイルのローテーションを管理
@@ -107,7 +108,11 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
     // StreamWriter 生成失敗時に FileStream がリークしないよう安全に生成する
     private StreamWriter OpenWriter(FileMode mode)
     {
-        var fs = new FileStream(GetPath(), mode, FileAccess.Write, FileShare.ReadWrite);
+        var path = GetPath();
+        var dir = Path.GetDirectoryName(path);
+        if (!string.IsNullOrEmpty(dir))
+            Directory.CreateDirectory(dir);
+        var fs = new FileStream(path, mode, FileAccess.Write, FileShare.ReadWrite);
         try
         {
             return new StreamWriter(fs) { AutoFlush = true };
