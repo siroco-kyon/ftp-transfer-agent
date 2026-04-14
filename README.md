@@ -19,6 +19,10 @@
 - 最大 16 並列転送
 - ENDファイル制御（Put/Get 両対応、データファイル先行転送）
 - ローリングファイルログ + エラーメール通知
+- **二重起動防止**（PID ロックファイル方式）
+- **ファイル名ワイルドカード指定**（`*.txt`、`data_*.csv` など）
+- **複数宛先への同時配信**（put 方向のファンアウト）
+- **ログ保持日数指定**（古いログの自動削除）
 
 ## 動作環境
 
@@ -190,7 +194,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 |---|---|---|---|---|
 | `Path` | string | 必須 | `""` | 監視/保存ディレクトリ |
 | `IncludeSubfolders` | bool | 任意 | `false` | サブフォルダも対象にする |
-| `AllowedExtensions` | string[] | 任意 | `[]` | 対象拡張子（例: `.txt`）。空配列は全拡張子対象（起動時警告あり） |
+| `AllowedExtensions` | string[] | 任意 | `[]` | 対象ファイルのフィルタ。拡張子 (`"txt"` / `".txt"`) またはワイルドカード (`"*.txt"` / `"data_*.csv"`) を指定可能。空配列は全ファイル対象（起動時警告あり） |
 | `RequireEndFile` | bool | 任意 | `false` | 対応する END ファイルがあるデータのみ転送 |
 | `EndFileExtensions` | string[] | 任意 | `[".END", ".end"]` | END 拡張子一覧 |
 | `TransferEndFiles` | bool | 任意 | `false` | END ファイル自体も転送キューに入れる |
@@ -212,6 +216,13 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `Concurrency` | int | 任意 | `1` | 並列転送数（1-16） |
 | `PreserveFolderStructure` | bool | 任意 | `false` | サブフォルダ構造を維持して転送 |
 | `TimeoutSeconds` | int | 任意 | `120` | 接続・転送タイムアウト秒（1-3600） |
+| `AdditionalDestinations` | object[] | 任意 | `[]` | put 方向の追加送信先。各要素は Transfer と同じ接続系プロパティを持つ（`Direction` / `AdditionalDestinations` を除く）。1 ファイルをメイン + 追加宛先の全てへ同時に送信する |
+
+### App
+
+| 項目 | 型 | 必須 | 既定値 | 説明 |
+|---|---|---|---|---|
+| `LockFilePath` | string | 任意 | `""` | 二重起動防止用のロックファイルパス。空の場合は実行ファイルと同ディレクトリに `ftp-transfer-agent.lock` を作成する |
 
 ### Retry
 
@@ -277,6 +288,51 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 }
 ```
 
+#### 4. ワイルドカードでファイル指定
+
+```json
+{
+  "Watch": {
+    "AllowedExtensions": ["*.txt", "data_*.csv", "log"]
+  }
+}
+```
+
+- `*.txt` / `data_*.csv` のようなグロブと、従来の拡張子指定 (`"log"` / `".log"`) を混在可能
+- 大文字小文字は区別しない
+
+#### 5. 複数宛先への同時配信（put のみ）
+
+```json
+{
+  "Transfer": {
+    "Mode": "sftp",
+    "Direction": "put",
+    "Host": "primary.example.com",
+    "Port": 22,
+    "Username": "user",
+    "PrivateKeyPath": "./id_ed25519",
+    "RemotePath": "/in",
+    "AdditionalDestinations": [
+      {
+        "Mode": "ftp",
+        "Host": "backup.example.com",
+        "Port": 21,
+        "Username": "user",
+        "Password": "pass",
+        "RemotePath": "/inbox",
+        "TimeoutSeconds": 60
+      }
+    ]
+  }
+}
+```
+
+- メイン + 追加宛先の**全宛先**へ同時に送信
+- **全宛先成功時のみ**ローカルファイルを削除（`Cleanup.DeleteAfterVerify: true` 時）
+- 1 つでも失敗した場合はローカル保持 + ERROR ログ出力 → 次回起動で再送
+- `Direction: get` / `both` では追加宛先は使用されず、警告が表示される
+
 ### Cleanup
 
 | 項目 | 型 | 必須 | 既定値 | 説明 |
@@ -305,6 +361,8 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `Level` | string | 必須 | `"Information"` | `Trace`〜`None` |
 | `RollingFilePath` | string | 必須 | `""` | ログファイル基準名（例: `logs/ftp-transfer-.log`） |
 | `MaxBytes` | long | 任意 | `10485760` | ローテーション上限バイト（1024以上） |
+| `Retention.Enabled` | bool | 任意 | `false` | 起動時に古いログを削除する。`false` なら削除しない |
+| `Retention.RetentionDays` | int | 任意 | `30` | 保持日数（1-3650）。この日数より古いログファイルと、空になった年/月フォルダを起動時に削除する |
 
 ## 重要な警告: 同名ファイル衝突
 
@@ -356,11 +414,50 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 - 順序は「データ -> END」を保証
 - 対応データがない END は転送しない
 
+## 二重起動防止（ロックファイル）
+
+タスクスケジューラから短い間隔で実行する場合、前回実行分と重ならないよう PID ロックファイルで二重起動を防止します。
+
+- 起動時に `App.LockFilePath`（未指定なら実行ファイルと同ディレクトリの `ftp-transfer-agent.lock`）を確認
+- 既存ロックがあり、書かれている PID のプロセスが**生存中**なら終了コード `2` で即終了
+- 死んだ PID のロックは自動的に上書きして起動を継続
+- 正常終了・異常終了のいずれでも `Dispose` でロックファイルは削除される
+
+```json
+{
+  "App": {
+    "LockFilePath": "C:/ProgramData/FtpTransferAgent/agent.lock"
+  }
+}
+```
+
+## ログ保持日数
+
+ローリングログは `logs/yyyy/MM/` 配下に日次蓄積されるため、長期運用ではディスク圧迫の要因になります。`Logging.Retention` で起動時の自動削除を有効化できます。
+
+```json
+{
+  "Logging": {
+    "RollingFilePath": "logs/ftp-transfer-.log",
+    "Retention": {
+      "Enabled": true,
+      "RetentionDays": 30
+    }
+  }
+}
+```
+
+- 起動時、ファイル名中の `YYYYMMDD` をパースして保持日数より古いファイルを削除
+- パース不能なファイル名や、プレフィックスが異なるファイルはスキップ
+- 削除により空になった月・年フォルダも併せて除去
+- `Enabled: false` （既定）なら従来どおり削除せず蓄積を継続
+
 ## 起動時バリデーションと終了コード
 
 - DataAnnotations + 独自 `ConfigurationValidator` を起動時に実施
 - エラーがある場合は内容を標準出力して終了コード `1` で終了
 - 警告のみの場合は処理継続（警告を表示）
+- 二重起動検出時は終了コード `2` で終了
 
 ## コマンドライン上書き
 
