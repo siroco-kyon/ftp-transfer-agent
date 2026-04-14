@@ -284,9 +284,15 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
     "RequireEndFile": true,
     "TransferEndFiles": false,
     "EndFileExtensions": [".END", ".TRG"]
+  },
+  "Cleanup": {
+    "DeleteLocalSkippedEndFiles": true
   }
 }
 ```
+
+- `TransferEndFiles: false` のとき、END ファイルは転送されずローカルに残る
+- `DeleteLocalSkippedEndFiles: true` を併用すると、データ転送完了後に END ファイルもローカルから削除される
 
 #### 4. ワイルドカードでファイル指定
 
@@ -342,6 +348,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `DeleteAfterVerify` | bool | 任意 | `false` | `put` 成功後、ローカルファイルを削除 |
 | `DeleteRemoteAfterDownload` | bool | 任意 | `false` | `get` 成功後、リモートファイルを削除 |
 | `DeleteRemoteEndFiles` | bool | 任意 | `false` | END ファイル成功時のリモート END ファイル削除 |
+| `DeleteLocalSkippedEndFiles` | bool | 任意 | `false` | `put` で `TransferEndFiles=false` のとき、転送しなかった END ファイルをローカルから削除する |
 
 ### Smtp
 
@@ -412,9 +419,10 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 挙動:
 
 - データファイルは END 存在時のみ転送
-- `TransferEndFiles: true` のとき END ファイルも転送
+- `TransferEndFiles: true` のとき END ファイルも転送（転送成功後にローカルの END ファイルを削除）
 - 順序は「データ -> END」を保証
 - 対応データがない END は転送しない
+- `TransferEndFiles: false` かつ `Cleanup.DeleteLocalSkippedEndFiles: true` のとき、転送しなかった END ファイルをローカルから削除する
 
 ## 二重起動防止（ロックファイル）
 
