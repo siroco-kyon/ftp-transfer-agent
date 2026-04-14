@@ -17,10 +17,10 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     private readonly SftpClient _client;
     private readonly ILogger<SftpClientWrapper> _logger;
     // 設定値全体を保持。ホスト鍵検証で利用するため。
-    private readonly TransferOptions _options;
+    private readonly DestinationOptions _options;
 
     // テスト用に既存の SftpClient を渡せるようにする
-    public SftpClientWrapper(TransferOptions options, ILogger<SftpClientWrapper> logger, SftpClient? client = null)
+    public SftpClientWrapper(DestinationOptions options, ILogger<SftpClientWrapper> logger, SftpClient? client = null)
     {
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(logger);

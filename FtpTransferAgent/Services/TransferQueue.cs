@@ -45,6 +45,17 @@ public class TransferQueue
 
     // キューの読み取りを開始する
     public Task StartAsync(Func<TransferItem, CancellationToken, Task> handler, CancellationToken ct)
+        => StartAsync(handler, onFinalOutcome: null, ct);
+
+    /// <summary>
+    /// キューの読み取りを開始する。<paramref name="onFinalOutcome"/> は Polly の再試行が
+    /// すべて完了した後に 1 アイテムにつき 1 回だけ呼び出される。成功時は null、失敗時は例外を渡す。
+    /// ファンアウト時に宛先ごとの最終結果を 1 回だけ集約するために使用する。
+    /// </summary>
+    public Task StartAsync(
+        Func<TransferItem, CancellationToken, Task> handler,
+        Action<TransferItem, Exception?>? onFinalOutcome,
+        CancellationToken ct)
     {
         // 指定された並列数だけワーカーを起動
         var tasks = new Task[_concurrency];
@@ -67,7 +78,7 @@ public class TransferQueue
                     if (_reader.TryRead(out var item))
                     {
                         // 重複処理を防ぐ（アトミックな処理保証）
-                        var itemKey = $"{item.Action}:{item.Path}";
+                        var itemKey = item.DedupKey;
                         if (!_processedItems.TryAdd(itemKey, true))
                         {
                             _logger.LogDebug("Item {ItemKey} already processed, skipping", itemKey);
@@ -91,6 +102,9 @@ public class TransferQueue
                             _logger.LogDebug("Worker {WorkerId} completed {ItemKey}", workerId, itemKey);
                             _activeItems.TryRemove(itemKey, out _);
                             Interlocked.Increment(ref _totalCompleted);
+
+                            try { onFinalOutcome?.Invoke(item, null); }
+                            catch (Exception cbEx) { _logger.LogWarning(cbEx, "onFinalOutcome callback threw for {ItemKey}", itemKey); }
                         }
                         catch (Exception ex)
                         {
@@ -107,6 +121,9 @@ public class TransferQueue
                                 // クリティカルエラーは記録するが他のワーカーの処理は継続
                                 _criticalExceptions.Add(ex);
                             }
+
+                            try { onFinalOutcome?.Invoke(item, ex); }
+                            catch (Exception cbEx) { _logger.LogWarning(cbEx, "onFinalOutcome callback threw for {ItemKey}", itemKey); }
 
                             // 例外を再スローせず、他のワーカーの処理を継続させる
                             // 失敗したアイテムは処理済みとして保持（無限リトライ防止）

@@ -20,6 +20,7 @@ public class Worker : BackgroundService
     private readonly CleanupOptions _cleanup;
     private readonly IServiceProvider _services;
     private readonly IHostApplicationLifetime _lifetime;
+    private readonly FanoutCoordinator _fanout = new();
 
     // 転送処理用のチャンネル（容量制限でメモリリーク防止）
     private readonly Channel<TransferItem> _channel = Channel.CreateBounded<TransferItem>(new BoundedChannelOptions(1000)
@@ -42,15 +43,96 @@ public class Worker : BackgroundService
         _lifetime = lifetime;
     }
 
-    // DI を活用してクライアントファクトリパターンを実装
+    // DI を活用してクライアントファクトリパターンを実装（primary 用）
     protected virtual IFileTransferClient CreateClient()
     {
-        return _transfer.Mode.ToLowerInvariant() switch
+        return CreateClientFor(_transfer);
+    }
+
+    // ファンアウト対応: 宛先ごとにクライアントを生成する
+    protected virtual IFileTransferClient CreateClientFor(DestinationOptions dest)
+    {
+        // dest が primary と同一参照なら CreateClient() を使う (テストのモックを尊重するため)
+        if (ReferenceEquals(dest, _transfer))
         {
-            "sftp" => ActivatorUtilities.CreateInstance<SftpClientWrapper>(_services, _transfer),
-            "ftp" => ActivatorUtilities.CreateInstance<AsyncFtpClientWrapper>(_services, _transfer),
-            _ => throw new ArgumentException($"Unsupported transfer mode: {_transfer.Mode}")
+            return CreateClient();
+        }
+        return dest.Mode.ToLowerInvariant() switch
+        {
+            "sftp" => ActivatorUtilities.CreateInstance<SftpClientWrapper>(_services, dest),
+            "ftp" => ActivatorUtilities.CreateInstance<AsyncFtpClientWrapper>(_services, dest),
+            _ => throw new ArgumentException($"Unsupported transfer mode: {dest.Mode}")
         };
+    }
+
+    // put 方向で使用する全宛先リスト (primary + 追加宛先)
+    private IReadOnlyList<DestinationOptions> GetUploadDestinations()
+    {
+        var list = new List<DestinationOptions> { _transfer };
+        if (_transfer.AdditionalDestinations is { Count: > 0 })
+        {
+            list.AddRange(_transfer.AdditionalDestinations);
+        }
+        return list;
+    }
+
+    private static string DescribeDestination(DestinationOptions d) =>
+        $"{d.Mode}://{d.Host}:{d.Port}{d.RemotePath}";
+
+    // 1 ファイルを全宛先に対してファンアウトしてキューへ投入する。
+    // 全宛先完了時に FanoutCoordinator からコールバックされ、
+    // 全成功ならローカル削除・部分失敗ならローカル保持のログを出力する。
+    private async Task EnqueueFanoutAsync(string file, IReadOnlyList<DestinationOptions> destinations, bool isEndFile, CancellationToken token)
+    {
+        var groupId = Guid.NewGuid().ToString("N");
+        _fanout.Register(groupId, file, destinations.Count, (source, results) =>
+        {
+            HandleFanoutCompletion(source, results, isEndFile);
+        });
+
+        foreach (var dest in destinations)
+        {
+            await _channel.Writer.WriteAsync(
+                new TransferItem(file, TransferAction.Upload, dest, groupId),
+                token).ConfigureAwait(false);
+        }
+    }
+
+    private void HandleFanoutCompletion(string sourcePath, IReadOnlyList<FanoutCoordinator.DestinationResult> results, bool isEndFile)
+    {
+        var total = results.Count;
+        var succeeded = results.Count(r => r.Success);
+        var allSuccess = succeeded == total;
+
+        if (!allSuccess)
+        {
+            var failed = results.Where(r => !r.Success).Select(r => r.DestinationLabel);
+            _logger.LogError("Partial failure for {File}: {Ok}/{Total} destinations succeeded. Failed: {Failed}. Local file retained for next run.",
+                sourcePath, succeeded, total, string.Join(", ", failed));
+            return;
+        }
+
+        _logger.LogInformation("All {Total} destinations succeeded for {File}", total, sourcePath);
+
+        // 全成功時のみローカル削除 (END ファイルは常に、通常ファイルは DeleteAfterVerify 有効時)
+        var shouldDeleteLocal = isEndFile || _cleanup.DeleteAfterVerify;
+        if (shouldDeleteLocal)
+        {
+            try
+            {
+                File.Delete(sourcePath);
+                var fileType = isEndFile ? "END file" : "local file";
+                _logger.LogInformation("Deleted {FileType} {File} after all destinations succeeded", fileType, sourcePath);
+            }
+            catch (IOException ex)
+            {
+                _logger.LogWarning("Failed to delete local file {File}: {Error}", sourcePath, ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning("Access denied deleting local file {File}: {Error}", sourcePath, ex.Message);
+            }
+        }
     }
 
     // バックグラウンド処理の本体
@@ -67,21 +149,38 @@ public class Worker : BackgroundService
         var monitorTask = StartPerformanceMonitoringAsync(queue, monitorCts.Token);
 
         // 各キュー処理では専用のクライアントを生成して処理する
-        var queueTask = queue.StartAsync(async (item, token) =>
-        {
-            // 新しいクライアントインスタンスを生成
-            using var perItemClient = CreateClient();
-            // 各転送処理の識別子
-            var id = Guid.NewGuid();
-            if (item.Action == TransferAction.Upload)
+        var queueTask = queue.StartAsync(
+            async (item, token) =>
             {
-                await ProcessUploadAsync(perItemClient, item, id, token).ConfigureAwait(false);
-            }
-            else
+                // 各転送処理の識別子
+                var id = Guid.NewGuid();
+                if (item.Action == TransferAction.Upload)
+                {
+                    // Upload は宛先ごとに専用クライアントを生成
+                    var dest = item.Destination ?? _transfer;
+                    using var perItemClient = CreateClientFor(dest);
+                    await ProcessUploadAsync(perItemClient, item, id, token).ConfigureAwait(false);
+                }
+                else
+                {
+                    // Download は primary のみ (Destination 未使用)
+                    using var perItemClient = CreateClient();
+                    await ProcessDownloadAsync(perItemClient, item, id, token).ConfigureAwait(false);
+                }
+            },
+            onFinalOutcome: (item, ex) =>
             {
-                await ProcessDownloadAsync(perItemClient, item, id, token).ConfigureAwait(false);
-            }
-        }, stoppingToken);
+                // ファンアウト集約: Upload かつ GroupId 付きのみ報告
+                if (item.Action != TransferAction.Upload || string.IsNullOrEmpty(item.GroupId))
+                {
+                    return;
+                }
+                var dest = item.Destination ?? _transfer;
+                var label = DescribeDestination(dest);
+                _fanout.ReportResult(item.GroupId,
+                    new FanoutCoordinator.DestinationResult(label, ex == null, ex));
+            },
+            stoppingToken);
 
         // ファイル列挙フェーズ：例外発生時も必ず Channel を完了してワーカーを解放する
         try
@@ -90,10 +189,7 @@ public class Worker : BackgroundService
         // アップロード処理が有効な場合は指定フォルダ内のファイルを列挙
         if (_transfer.Direction is "put" or "both")
         {
-            // AllowedExtensionsがnullの場合は空配列で扱う
-            var exts = (_watch.AllowedExtensions ?? System.Array.Empty<string>())
-                .Select(e => e.StartsWith(".") ? e : $".{e}")
-                .ToArray();
+            var patterns = _watch.AllowedExtensions ?? System.Array.Empty<string>();
             var option = _watch.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
             try
             {
@@ -119,8 +215,8 @@ public class Worker : BackgroundService
                         continue;
                     }
 
-                    // 通常ファイルに対して拡張子フィルタリングを適用
-                    if (exts.Length > 0 && !exts.Contains(Path.GetExtension(file), StringComparer.OrdinalIgnoreCase))
+                    // 通常ファイルに対してファイル名パターン (拡張子 or ワイルドカード) を適用
+                    if (!FileNameMatcher.IsMatch(Path.GetFileName(file), patterns))
                     {
                         continue;
                     }
@@ -138,26 +234,28 @@ public class Worker : BackgroundService
                     dataFiles.Add(file);
                 }
 
-                // 1. まずデータファイルを転送キューに追加
-                //   チャンネルが満杯の場合にデータを失わないよう、TryWrite() ではなく WriteAsync() を使用します。
-                //   WriteAsync() は容量が空くまで待機し、確実にキューに書き込めるため安全です。
+                var destinations = GetUploadDestinations();
+                _logger.LogInformation("Upload fanout: {FileCount} file(s) x {DestCount} destination(s) = {Total} transfer item(s)",
+                    dataFiles.Count + (_watch.TransferEndFiles ? endFiles.Count : 0),
+                    destinations.Count,
+                    (dataFiles.Count + (_watch.TransferEndFiles ? endFiles.Count : 0)) * destinations.Count);
+
+                // 1. まずデータファイルを全宛先に対してファンアウトしてキューへ投入
                 foreach (var file in dataFiles)
                 {
-                    await _channel.Writer.WriteAsync(new TransferItem(file, TransferAction.Upload), stoppingToken);
+                    await EnqueueFanoutAsync(file, destinations, isEndFile: false, stoppingToken).ConfigureAwait(false);
                 }
 
-                // 2. その後でENDファイルを転送キューに追加（TransferEndFiles が true の場合）
+                // 2. ENDファイルを投入（TransferEndFiles が true の場合）
                 if (_watch.TransferEndFiles)
                 {
                     foreach (var endFile in endFiles)
                     {
-                        // 対応するデータファイルが存在する場合のみENDファイルを転送
                         var dataFileName = GetDataFileForEndFile(endFile);
                         if (dataFiles.Any(f => string.Equals(Path.GetFileName(f), dataFileName, StringComparison.OrdinalIgnoreCase)))
                         {
                             _logger.LogDebug("Queueing END file {File} for transfer after data file", endFile);
-                            // チャンネルが満杯の場合に待機し、ENDファイルを確実にキューに書き込む
-                            await _channel.Writer.WriteAsync(new TransferItem(endFile, TransferAction.Upload), stoppingToken);
+                            await EnqueueFanoutAsync(endFile, destinations, isEndFile: true, stoppingToken).ConfigureAwait(false);
                         }
                         else
                         {
@@ -183,6 +281,13 @@ public class Worker : BackgroundService
             }
         }
 
+        // ダウンロード方向で追加宛先が設定されていれば警告（未使用になる）
+        if (_transfer.Direction is "get" or "both" && _transfer.AdditionalDestinations is { Count: > 0 })
+        {
+            _logger.LogWarning("AdditionalDestinations is set but Direction is '{Direction}'. Additional destinations are used only for uploads and will be ignored for downloads.",
+                _transfer.Direction);
+        }
+
         // ダウンロード処理が有効な場合はリモート一覧を取得
         if (_transfer.Direction is "get" or "both")
         {
@@ -204,11 +309,8 @@ public class Worker : BackgroundService
                     normalizedMap[norm] = f;
                 }
 
-                // AllowedExtensionsが指定されている場合はフィルタを適用
-                // AllowedExtensionsがnullの場合は空配列で扱う
-                var exts = (_watch.AllowedExtensions ?? System.Array.Empty<string>())
-                    .Select(e => e.StartsWith(".") ? e : $".{e}")
-                    .ToArray();
+                // AllowedExtensions (ファイル名パターン) フィルタ用
+                var patterns = _watch.AllowedExtensions ?? System.Array.Empty<string>();
 
                 // 正規化パスでソートしてENDファイルとデータファイルを分ける
                 var sortedNormPaths = normalizedMap.Keys
@@ -232,8 +334,8 @@ public class Worker : BackgroundService
                         continue;
                     }
 
-                    // 拡張子フィルタ適用（オリジナルパスに基づく）
-                    if (exts.Length > 0 && !exts.Contains(Path.GetExtension(originalPath), StringComparer.OrdinalIgnoreCase))
+                    // ファイル名パターン (拡張子 or ワイルドカード) フィルタをオリジナルパスに対して適用
+                    if (!FileNameMatcher.IsMatch(Path.GetFileName(originalPath), patterns))
                     {
                         continue;
                     }
@@ -365,18 +467,21 @@ public class Worker : BackgroundService
     }
 
     /// <summary>
-    /// アップロード処理（確実なハッシュ検証付き）
+    /// アップロード処理（確実なハッシュ検証付き）。
+    /// ファンアウト対応: item.Destination が示す 1 宛先へ送信し、
+    /// FanoutCoordinator に成功/失敗を報告する。ローカル削除は coordinator 側で集約実施。
     /// </summary>
     private async Task ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token)
     {
-        var name = _transfer.PreserveFolderStructure
+        var dest = item.Destination ?? _transfer;
+        var destLabel = DescribeDestination(dest);
+        var name = dest.PreserveFolderStructure
             ? Path.GetRelativePath(_watch.Path, item.Path)
             : Path.GetFileName(item.Path);
         // リモートパスを組み立てる際、Path.Combineでは余計なセパレーターが入る場合があるため手動で結合する。
-        // Transfer.RemotePathの末尾のスラッシュを除去し、ファイル名または相対パスを '/' で連結する。
-        // 元のRemotePathがルート("/")の場合はそのまま保持する。末尾のスラッシュを除去するが、
-        // ルートは削除してはならない。
-        var rawBase = _transfer.RemotePath ?? string.Empty;
+        // 宛先ごとの RemotePath の末尾のスラッシュを除去し、ファイル名または相対パスを '/' で連結する。
+        // 元のRemotePathがルート("/")の場合はそのまま保持する。
+        var rawBase = dest.RemotePath ?? string.Empty;
         string remoteBase;
         if (rawBase == "/")
         {
@@ -404,73 +509,50 @@ public class Worker : BackgroundService
             remotePath = $"{remoteBase}/{remoteName}";
         }
 
-        _logger.LogInformation("[{Id}] Starting upload {File} to {Remote}", id, item.Path, remotePath);
+        _logger.LogInformation("[{Id}] Starting upload {File} to {Dest} ({Remote})", id, item.Path, destLabel, remotePath);
 
+        var isEndFile = IsEndFile(item.Path);
         if (_hash.Enabled)
         {
-            // 事前にローカルファイルのハッシュを計算
             var localHash = await HashUtil.ComputeHashAsync(item.Path, _hash.Algorithm, token).ConfigureAwait(false);
             _logger.LogDebug("[{Id}] Local hash calculated: {Hash}", id, localHash);
 
-            // アップロード実行
             await client.UploadAsync(item.Path, remotePath, token).ConfigureAwait(false);
-            _logger.LogInformation("[{Id}] Upload completed for {File}", id, item.Path);
+            _logger.LogInformation("[{Id}] Upload completed for {File} -> {Dest}", id, item.Path, destLabel);
 
-            // リモートファイルのハッシュを取得して検証
             var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token, _hash.UseServerCommand).ConfigureAwait(false);
             _logger.LogDebug("[{Id}] Remote hash calculated: {Hash}", id, remoteHash);
 
             if (!string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
             {
-                var error = $"Hash mismatch for {item.Path}: Local={localHash}, Remote={remoteHash}";
+                var error = $"Hash mismatch for {item.Path} at {destLabel}: Local={localHash}, Remote={remoteHash}";
                 _logger.LogError("[{Id}] {Error}", id, error);
                 throw new InvalidOperationException(error);
             }
 
-            _logger.LogInformation("[{Id}] Hash verification successful for {File}", id, item.Path);
+            _logger.LogInformation("[{Id}] Hash verification successful for {File} at {Dest}", id, item.Path, destLabel);
         }
         else
         {
-            // ハッシュ検証なしでアップロード
             await client.UploadAsync(item.Path, remotePath, token).ConfigureAwait(false);
-            _logger.LogInformation("[{Id}] Upload completed for {File} (hash verification disabled)", id, item.Path);
+            _logger.LogInformation("[{Id}] Upload completed for {File} -> {Dest} (hash verification disabled)", id, item.Path, destLabel);
         }
 
-        // ローカルファイルの削除判定
-        var isEndFile = IsEndFile(item.Path);
-        var shouldDeleteLocal = isEndFile || _cleanup.DeleteAfterVerify;
-
-        if (shouldDeleteLocal)
-        {
-            try
-            {
-                File.Delete(item.Path);
-                var fileType = isEndFile ? "END file" : "local file";
-                _logger.LogInformation("[{Id}] Deleted {FileType} {File}", id, fileType, item.Path);
-            }
-            catch (IOException ex)
-            {
-                _logger.LogWarning("[{Id}] Failed to delete local file {File}: {Error}", id, item.Path, ex.Message);
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                _logger.LogWarning("[{Id}] Access denied deleting local file {File}: {Error}", id, item.Path, ex.Message);
-            }
-        }
-
-        // 転送先のENDファイル削除判定（アップロード後）
+        // 転送先のENDファイル削除判定（宛先ごとの操作）
         if (isEndFile && _cleanup.DeleteRemoteEndFiles)
         {
             try
             {
                 await client.DeleteAsync(remotePath, token).ConfigureAwait(false);
-                _logger.LogInformation("[{Id}] Deleted remote END file {Remote}", id, remotePath);
+                _logger.LogInformation("[{Id}] Deleted remote END file {Remote} at {Dest}", id, remotePath, destLabel);
             }
             catch (Exception ex)
             {
-                _logger.LogWarning("[{Id}] Failed to delete remote END file {Remote}: {Error}", id, remotePath, ex.Message);
+                _logger.LogWarning("[{Id}] Failed to delete remote END file {Remote} at {Dest}: {Error}", id, remotePath, destLabel, ex.Message);
             }
         }
+
+        // ローカルファイル削除はファンアウト集約で実施するためここでは行わない
     }
 
     /// <summary>

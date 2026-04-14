@@ -17,7 +17,7 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
     private readonly ILogger<AsyncFtpClientWrapper> _logger;
 
     // テスト用に既存の AsyncFtpClient を渡せるようオーバーロードを追加
-    public AsyncFtpClientWrapper(TransferOptions options, ILogger<AsyncFtpClientWrapper> logger, AsyncFtpClient? client = null)
+    public AsyncFtpClientWrapper(DestinationOptions options, ILogger<AsyncFtpClientWrapper> logger, AsyncFtpClient? client = null)
     {
         _logger = logger;
         _client = client ?? new AsyncFtpClient(options.Host, options.Username, options.Password, options.Port);

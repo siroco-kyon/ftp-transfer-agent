@@ -4,66 +4,19 @@ using System.Collections.Generic;
 namespace FtpTransferAgent.Configuration;
 
 /// <summary>
-/// 転送処理に関する設定
+/// 転送処理に関する設定。メインの転送先を保持しつつ、
+/// <see cref="AdditionalDestinations"/> により複数宛先ファンアウト (put 方向) に対応する。
 /// </summary>
 [TransferOptionsValidation]
-public class TransferOptions
+public class TransferOptions : DestinationOptions
 {
-    [Required]
-    [RegularExpression("^(ftp|sftp)$")]
-    public string Mode { get; set; } = "ftp";
-
     [Required]
     [RegularExpression("^(get|put|both)$")]
     public string Direction { get; set; } = "put";
 
-    [Required]
-    public string Host { get; set; } = string.Empty;
-
-    public int Port { get; set; } = 21;
-
-    [Required]
-    public string Username { get; set; } = string.Empty;
-
-    public string? Password { get; set; }
-
     /// <summary>
-    /// SFTP の鍵認証に使用する秘密鍵ファイルのパス
+    /// put (アップロード) 方向のみで利用する追加の送信先。
+    /// 1 ファイルをメイン + 各追加宛先に対して同時に送信する。
     /// </summary>
-    public string? PrivateKeyPath { get; set; }
-
-    /// <summary>
-    /// 鍵ファイルがパスフレーズで保護されている場合に指定します
-    /// </summary>
-    public string? PrivateKeyPassphrase { get; set; }
-
-    /// <summary>
-    /// SFTP 接続時に検証するサーバーホスト鍵の MD5 指紋。
-    /// 例: "a1:b2:c3:d4:..." または "a1b2c3d4..." のどちらの形式でも指定可能。
-    /// 未設定の場合は検証をスキップして接続を信頼します（非推奨）。
-    /// </summary>
-    public string? HostKeyFingerprint { get; set; }
-
-    [Required]
-    public string RemotePath { get; set; } = string.Empty;
-
-    /// <summary>
-    /// 並列転送数。1 以上を指定します。
-    /// 既定値は 1 (逐次転送)。
-    /// </summary>
-    [Range(1, 16)]
-    public int Concurrency { get; set; } = 1;
-
-    /// <summary>
-    /// サブフォルダを含めてアップロードする際に
-    /// ローカルのフォルダ構成を維持するかどうか
-    /// </summary>
-    public bool PreserveFolderStructure { get; set; }
-
-    /// <summary>
-    /// 接続およびデータ転送のタイムアウト時間（秒）
-    /// </summary>
-    [Range(1, 3600)]
-    public int TimeoutSeconds { get; set; } = 120;
-
+    public List<DestinationOptions> AdditionalDestinations { get; set; } = new();
 }

@@ -12,6 +12,12 @@ public class WatchOptions
 
     public bool IncludeSubfolders { get; set; }
 
+    /// <summary>
+    /// 転送対象のファイルパターン。以下を受け入れる:
+    ///   - 拡張子のみ: "txt" / ".txt" → 拡張子完全一致
+    ///   - ワイルドカード: "*.txt" / "data_*.csv" / "?.log" → ファイル名グロブ一致
+    /// 空配列の場合は全ファイルが対象。
+    /// </summary>
     public string[] AllowedExtensions { get; set; } = Array.Empty<string>();
 
     /// <summary>
