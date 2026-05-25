@@ -23,6 +23,7 @@ public class TransferQueue
     private int _totalEnqueued = 0;
     private int _totalCompleted = 0;
     private int _totalFailed = 0;
+    private long _totalBytesTransferred = 0;
 
     public TransferQueue(Channel<TransferItem> channel, RetryOptions options, ILogger<TransferQueue> logger, int concurrency = 1)
     {
@@ -139,6 +140,15 @@ public class TransferQueue
     }
 
     /// <summary>
+    /// 転送成功時に通信したバイト数を集計に加算する
+    /// </summary>
+    public void RecordBytesTransferred(long bytes)
+    {
+        if (bytes <= 0) return;
+        Interlocked.Add(ref _totalBytesTransferred, bytes);
+    }
+
+    /// <summary>
     /// 処理結果の統計情報を取得
     /// </summary>
     public TransferStatistics GetStatistics()
@@ -152,7 +162,8 @@ public class TransferQueue
             ProcessedItems = _processedItems.Count,
             MemoryUsageMB = GC.GetTotalMemory(false) / (1024 * 1024),
             ActiveWorkers = _concurrency,
-            CriticalErrorCount = _criticalExceptions.Count
+            CriticalErrorCount = _criticalExceptions.Count,
+            TotalBytesTransferred = Interlocked.Read(ref _totalBytesTransferred)
         };
     }
 
@@ -189,6 +200,7 @@ public class TransferStatistics
     public long MemoryUsageMB { get; set; }
     public int ActiveWorkers { get; set; }
     public int CriticalErrorCount { get; set; }
+    public long TotalBytesTransferred { get; set; }
 
     public double SuccessRate => TotalEnqueued > 0 ? (double)TotalCompleted / TotalEnqueued * 100 : 0;
     public int RemainingItems => TotalEnqueued - TotalCompleted - TotalFailed;

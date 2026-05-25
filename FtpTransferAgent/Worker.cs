@@ -328,19 +328,22 @@ public class Worker : BackgroundService
             {
                 // 各転送処理の識別子
                 var id = Guid.NewGuid();
+                long bytesTransferred;
                 if (item.Action == TransferAction.Upload)
                 {
                     // Upload は宛先ごとに専用クライアントを生成
                     var dest = item.Destination ?? context.Destination;
                     using var perItemClient = CreateClientFor(dest);
-                    await ProcessUploadAsync(perItemClient, item, id, token).ConfigureAwait(false);
+                    bytesTransferred = await ProcessUploadAsync(perItemClient, item, id, token).ConfigureAwait(false);
                 }
                 else
                 {
                     // Download は primary のみ (Destination 未使用)
                     using var perItemClient = CreateClient();
-                    await ProcessDownloadAsync(perItemClient, item, id, token).ConfigureAwait(false);
+                    bytesTransferred = await ProcessDownloadAsync(perItemClient, item, id, token).ConfigureAwait(false);
                 }
+                // 成功時のみバイト数を集計（例外時はここまで到達しない）
+                context.Queue.RecordBytesTransferred(bytesTransferred);
             },
             onFinalOutcome: (item, ex) =>
             {
@@ -720,8 +723,8 @@ public class Worker : BackgroundService
 
         // 最終統計情報をログ出力
         var finalStats = AggregateStatistics(queueContexts.Select(context => context.Queue.GetStatistics()));
-        _logger.LogInformation("Transfer completed. Total: {Total}, Success: {Success}, Failed: {Failed}, Critical Errors: {Critical}, Success Rate: {Rate:F1}%",
-            finalStats.TotalEnqueued, finalStats.TotalCompleted, finalStats.TotalFailed, finalStats.CriticalErrorCount, finalStats.SuccessRate);
+        _logger.LogInformation("Transfer completed. Total: {Total}, Success: {Success}, Failed: {Failed}, Critical Errors: {Critical}, Success Rate: {Rate:F1}%, Volume: {Volume}",
+            finalStats.TotalEnqueued, finalStats.TotalCompleted, finalStats.TotalFailed, finalStats.CriticalErrorCount, finalStats.SuccessRate, FormatBytes(finalStats.TotalBytesTransferred));
 
         if (finalStats.TotalFailed > 0 || finalStats.CriticalErrorCount > 0)
         {
@@ -753,6 +756,7 @@ public class Worker : BackgroundService
             aggregated.MemoryUsageMB = Math.Max(aggregated.MemoryUsageMB, stats.MemoryUsageMB);
             aggregated.ActiveWorkers += stats.ActiveWorkers;
             aggregated.CriticalErrorCount += stats.CriticalErrorCount;
+            aggregated.TotalBytesTransferred += stats.TotalBytesTransferred;
         }
 
         return aggregated;
@@ -773,11 +777,26 @@ public class Worker : BackgroundService
     }
 
     /// <summary>
+    /// バイト数を人が読みやすい単位にフォーマットする
+    /// </summary>
+    private static string FormatBytes(long bytes)
+    {
+        const double KB = 1024.0;
+        const double MB = KB * 1024;
+        const double GB = MB * 1024;
+        if (bytes >= GB) return $"{bytes / GB:F2} GB";
+        if (bytes >= MB) return $"{bytes / MB:F2} MB";
+        if (bytes >= KB) return $"{bytes / KB:F2} KB";
+        return $"{bytes:N0} B";
+    }
+
+    /// <summary>
     /// アップロード処理（確実なハッシュ検証付き）。
     /// ファンアウト対応: item.Destination が示す 1 宛先へ送信し、
     /// FanoutCoordinator に成功/失敗を報告する。ローカル削除は coordinator 側で集約実施。
+    /// 戻り値は成功時に転送したバイト数（統計集計用）。失敗時は例外をスロー。
     /// </summary>
-    private async Task ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token)
+    private async Task<long> ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token)
     {
         var dest = item.Destination ?? _transfer;
         var destLabel = DescribeDestination(dest);
@@ -789,14 +808,17 @@ public class Worker : BackgroundService
             await WaitForUploadDataDependencyAsync(item.Path, id, token).ConfigureAwait(false);
         }
 
-        _logger.LogInformation("[{Id}] Starting upload {File} to {Dest} ({Remote})", id, item.Path, destLabel, remotePath);
+        // 転送バイト数を取得（リトライ時も毎回読み直す: ファイルが途中で差し替わっている可能性に備えて）
+        var fileSize = new FileInfo(item.Path).Length;
+
+        _logger.LogInformation("[{Id}] Starting upload {File} ({Size}) to {Dest} ({Remote})", id, item.Path, FormatBytes(fileSize), destLabel, remotePath);
         if (_hash.Enabled)
         {
             var localHash = await HashUtil.ComputeHashAsync(item.Path, _hash.Algorithm, token).ConfigureAwait(false);
             _logger.LogDebug("[{Id}] Local hash calculated: {Hash}", id, localHash);
 
             await client.UploadAsync(item.Path, remotePath, token).ConfigureAwait(false);
-            _logger.LogInformation("[{Id}] Upload completed for {File} -> {Dest}", id, item.Path, destLabel);
+            _logger.LogInformation("[{Id}] Upload completed for {File} -> {Dest} ({Size})", id, item.Path, destLabel, FormatBytes(fileSize));
 
             var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token, _hash.UseServerCommand).ConfigureAwait(false);
             _logger.LogDebug("[{Id}] Remote hash calculated: {Hash}", id, remoteHash);
@@ -813,7 +835,7 @@ public class Worker : BackgroundService
         else
         {
             await client.UploadAsync(item.Path, remotePath, token).ConfigureAwait(false);
-            _logger.LogInformation("[{Id}] Upload completed for {File} -> {Dest} (hash verification disabled)", id, item.Path, destLabel);
+            _logger.LogInformation("[{Id}] Upload completed for {File} -> {Dest} ({Size}, hash verification disabled)", id, item.Path, destLabel, FormatBytes(fileSize));
         }
 
         // 転送先のENDファイル削除判定（宛先ごとの操作）
@@ -831,12 +853,14 @@ public class Worker : BackgroundService
         }
 
         // ローカルファイル削除はファンアウト集約で実施するためここでは行わない
+        return fileSize;
     }
 
     /// <summary>
-    /// ダウンロード処理（確実なハッシュ検証付き）
+    /// ダウンロード処理（確実なハッシュ検証付き）。
+    /// 戻り値は成功時に転送したバイト数（統計集計用）。失敗時は例外をスロー。
     /// </summary>
-    private async Task ProcessDownloadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token)
+    private async Task<long> ProcessDownloadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token)
     {
         string localPath;
         
@@ -928,6 +952,7 @@ public class Worker : BackgroundService
 
         _logger.LogInformation("[{Id}] Starting download {Remote} to {Local}", id, item.Path, localPath);
 
+        long fileSize;
         if (_hash.Enabled)
         {
             // 事前にリモートファイルのハッシュを計算
@@ -936,7 +961,8 @@ public class Worker : BackgroundService
 
             // ダウンロード実行
             await client.DownloadAsync(item.Path, localPath, token).ConfigureAwait(false);
-            _logger.LogInformation("[{Id}] Download completed for {Remote}", id, item.Path);
+            fileSize = new FileInfo(localPath).Length;
+            _logger.LogInformation("[{Id}] Download completed for {Remote} ({Size})", id, item.Path, FormatBytes(fileSize));
 
             // ローカルファイルのハッシュを計算して検証
             var localHash = await HashUtil.ComputeHashAsync(localPath, _hash.Algorithm, token).ConfigureAwait(false);
@@ -955,7 +981,8 @@ public class Worker : BackgroundService
         {
             // ハッシュ検証なしでダウンロード
             await client.DownloadAsync(item.Path, localPath, token).ConfigureAwait(false);
-            _logger.LogInformation("[{Id}] Download completed for {Remote} (hash verification disabled)", id, item.Path);
+            fileSize = new FileInfo(localPath).Length;
+            _logger.LogInformation("[{Id}] Download completed for {Remote} ({Size}, hash verification disabled)", id, item.Path, FormatBytes(fileSize));
         }
 
         // ENDファイルまたは通常ファイルの削除判定
@@ -976,6 +1003,8 @@ public class Worker : BackgroundService
                 _logger.LogWarning("[{Id}] Failed to delete remote file {Remote}: {Error}", id, item.Path, ex.Message);
             }
         }
+
+        return fileSize;
     }
 
     /// <summary>
@@ -1298,8 +1327,8 @@ public class Worker : BackgroundService
                 var stats = queue.GetStatistics();
                 if (stats.TotalEnqueued > 0)
                 {
-                    _logger.LogInformation("Transfer Progress [{Queue}] - Total: {Total}, Completed: {Completed}, Failed: {Failed}, Active: {Active}, Memory: {Memory}MB, Success Rate: {Rate:F1}%",
-                        queueName, stats.TotalEnqueued, stats.TotalCompleted, stats.TotalFailed, stats.ActiveItems, stats.MemoryUsageMB, stats.SuccessRate);
+                    _logger.LogInformation("Transfer Progress [{Queue}] - Total: {Total}, Completed: {Completed}, Failed: {Failed}, Active: {Active}, Memory: {Memory}MB, Success Rate: {Rate:F1}%, Volume: {Volume}",
+                        queueName, stats.TotalEnqueued, stats.TotalCompleted, stats.TotalFailed, stats.ActiveItems, stats.MemoryUsageMB, stats.SuccessRate, FormatBytes(stats.TotalBytesTransferred));
                 }
 
                 // 長時間実行中のアイテムを警告
