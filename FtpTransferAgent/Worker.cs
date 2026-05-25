@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.IO;
+using System.Runtime.ExceptionServices;
 using System.Threading.Channels;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Services;
@@ -21,12 +23,18 @@ public class Worker : BackgroundService
     private readonly CleanupOptions _cleanup;
     private readonly IServiceProvider _services;
     private readonly IHostApplicationLifetime _lifetime;
+    private readonly ApplicationExitCode? _exitCode;
     private readonly FanoutCoordinator _fanout = new();
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<bool>> _uploadDataCompletions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, string> _uploadEndDependencies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, TaskCompletionSource<bool>> _downloadDataCompletions = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, string> _downloadEndDependencies = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, bool> _currentRunUploadRemotePaths = new(StringComparer.OrdinalIgnoreCase);
 
     // 転送処理用のチャンネル（容量制限でメモリリーク防止）
 
     // DI された各種オプションを受け取る
-    public Worker(IOptions<WatchOptions> watch, IOptions<TransferOptions> transfer, IOptions<RetryOptions> retry, IOptions<HashOptions> hash, IOptions<CleanupOptions> cleanup, IServiceProvider services, ILogger<Worker> logger, IHostApplicationLifetime lifetime)
+    public Worker(IOptions<WatchOptions> watch, IOptions<TransferOptions> transfer, IOptions<RetryOptions> retry, IOptions<HashOptions> hash, IOptions<CleanupOptions> cleanup, IServiceProvider services, ILogger<Worker> logger, IHostApplicationLifetime lifetime, ApplicationExitCode? exitCode = null)
     {
         _watch = watch.Value;
         _transfer = transfer.Value;
@@ -36,6 +44,7 @@ public class Worker : BackgroundService
         _services = services;
         _logger = logger;
         _lifetime = lifetime;
+        _exitCode = exitCode;
     }
 
     private sealed class QueueContext
@@ -158,6 +167,31 @@ public class Worker : BackgroundService
         throw new InvalidOperationException($"Queue context not found for destination {DescribeDestination(destination)}");
     }
 
+    private string BuildUploadRemotePath(DestinationOptions dest, string localPath)
+    {
+        var name = dest.PreserveFolderStructure
+            ? Path.GetRelativePath(_watch.Path, localPath)
+            : Path.GetFileName(localPath);
+        var rawBase = dest.RemotePath ?? string.Empty;
+        var remoteBase = rawBase == "/" ? "/" : rawBase.TrimEnd('/', '\\');
+        var remoteName = name.Replace('\\', '/');
+
+        if (string.IsNullOrEmpty(remoteBase))
+        {
+            return remoteName;
+        }
+
+        return remoteBase == "/"
+            ? $"/{remoteName}"
+            : $"{remoteBase}/{remoteName}";
+    }
+
+    private static string NormalizeRemotePathForComparison(string path)
+    {
+        var normalized = path.Replace('\\', '/').TrimEnd('/');
+        return normalized.StartsWith("/", StringComparison.Ordinal) ? normalized : "/" + normalized;
+    }
+
     // 1 ファイルを全宛先に対してファンアウトしてキューへ投入する。
     // 全宛先完了時に FanoutCoordinator からコールバックされ、
     // 全成功ならローカル削除・部分失敗ならローカル保持のログを出力する。
@@ -183,11 +217,63 @@ public class Worker : BackgroundService
         }
     }
 
+    private static TaskCompletionSource<bool> CreateDependencyCompletion() =>
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    private void RegisterUploadEndDependency(string endFilePath, string dataFilePath)
+    {
+        _uploadEndDependencies[endFilePath] = dataFilePath;
+        _uploadDataCompletions.GetOrAdd(dataFilePath, _ => CreateDependencyCompletion());
+    }
+
+    private void RegisterDownloadEndDependency(string endFilePath, string dataFilePath)
+    {
+        _downloadEndDependencies[endFilePath] = dataFilePath;
+        _downloadDataCompletions.GetOrAdd(dataFilePath, _ => CreateDependencyCompletion());
+    }
+
+    private async Task WaitForUploadDataDependencyAsync(string endFilePath, Guid id, CancellationToken token)
+    {
+        if (!_uploadEndDependencies.TryGetValue(endFilePath, out var dataFilePath) ||
+            !_uploadDataCompletions.TryGetValue(dataFilePath, out var completion))
+        {
+            return;
+        }
+
+        _logger.LogDebug("[{Id}] Waiting for data file upload completion before END file {EndFile}", id, endFilePath);
+        var dataSucceeded = await completion.Task.WaitAsync(token).ConfigureAwait(false);
+        if (!dataSucceeded)
+        {
+            throw new InvalidOperationException($"Skipping END file upload because data file did not complete successfully: {dataFilePath}");
+        }
+    }
+
+    private async Task WaitForDownloadDataDependencyAsync(string endFilePath, Guid id, CancellationToken token)
+    {
+        if (!_downloadEndDependencies.TryGetValue(endFilePath, out var dataFilePath) ||
+            !_downloadDataCompletions.TryGetValue(dataFilePath, out var completion))
+        {
+            return;
+        }
+
+        _logger.LogDebug("[{Id}] Waiting for data file download completion before END file {EndFile}", id, endFilePath);
+        var dataSucceeded = await completion.Task.WaitAsync(token).ConfigureAwait(false);
+        if (!dataSucceeded)
+        {
+            throw new InvalidOperationException($"Skipping END file download because data file did not complete successfully: {dataFilePath}");
+        }
+    }
+
     private void HandleFanoutCompletion(string sourcePath, IReadOnlyList<FanoutCoordinator.DestinationResult> results, bool isEndFile)
     {
         var total = results.Count;
         var succeeded = results.Count(r => r.Success);
         var allSuccess = succeeded == total;
+
+        if (!isEndFile && _uploadDataCompletions.TryGetValue(sourcePath, out var uploadCompletion))
+        {
+            uploadCompletion.TrySetResult(allSuccess);
+        }
 
         if (!allSuccess)
         {
@@ -259,17 +345,24 @@ public class Worker : BackgroundService
             onFinalOutcome: (item, ex) =>
             {
                 // ファンアウト集約: Upload かつ GroupId 付きのみ報告
-                if (item.Action != TransferAction.Upload || string.IsNullOrEmpty(item.GroupId))
+                if (item.Action == TransferAction.Upload && !string.IsNullOrEmpty(item.GroupId))
                 {
-                    return;
+                    var dest = item.Destination ?? context.Destination;
+                    var label = DescribeDestination(dest);
+                    _fanout.ReportResult(item.GroupId,
+                        new FanoutCoordinator.DestinationResult(label, ex == null, ex));
                 }
-                var dest = item.Destination ?? context.Destination;
-                var label = DescribeDestination(dest);
-                _fanout.ReportResult(item.GroupId,
-                    new FanoutCoordinator.DestinationResult(label, ex == null, ex));
+
+                if (item.Action == TransferAction.Download
+                    && _downloadDataCompletions.TryGetValue(item.Path, out var downloadCompletion))
+                {
+                    downloadCompletion.TrySetResult(ex == null);
+                }
             },
             stoppingToken))
             .ToArray();
+
+        Exception? enumerationException = null;
 
         // ファイル列挙フェーズ：例外発生時も必ず Channel を完了してワーカーを解放する
         try
@@ -320,11 +413,46 @@ public class Worker : BackgroundService
                     dataFiles.Add(file);
                 }
 
+                var transferableEndFiles = new List<string>();
+                if (_watch.TransferEndFiles)
+                {
+                    var dataFilesByFullPath = dataFiles.ToDictionary(
+                        Path.GetFullPath,
+                        f => f,
+                        StringComparer.OrdinalIgnoreCase);
+
+                    foreach (var endFile in endFiles)
+                    {
+                        var dataPathForEnd = GetDataPathForEndFile(endFile);
+                        if (string.IsNullOrEmpty(dataPathForEnd))
+                        {
+                            continue;
+                        }
+
+                        var fullDataPathForEnd = Path.GetFullPath(dataPathForEnd);
+                        if (dataFilesByFullPath.TryGetValue(fullDataPathForEnd, out var dataFile))
+                        {
+                            RegisterUploadEndDependency(endFile, dataFile);
+                            transferableEndFiles.Add(endFile);
+                        }
+                    }
+                }
+
                 var destinations = GetUploadDestinations();
                 _logger.LogInformation("Upload fanout: {FileCount} file(s) x {DestCount} destination(s) = {Total} transfer item(s)",
-                    dataFiles.Count + (_watch.TransferEndFiles ? endFiles.Count : 0),
+                    dataFiles.Count + transferableEndFiles.Count,
                     destinations.Count,
-                    (dataFiles.Count + (_watch.TransferEndFiles ? endFiles.Count : 0)) * destinations.Count);
+                    (dataFiles.Count + transferableEndFiles.Count) * destinations.Count);
+
+                if (_transfer.Direction == "both")
+                {
+                    foreach (var uploadFile in dataFiles.Concat(transferableEndFiles))
+                    {
+                        _currentRunUploadRemotePaths.TryAdd(
+                            NormalizeRemotePathForComparison(BuildUploadRemotePath(_transfer, uploadFile)),
+                            true);
+                    }
+                }
 
                 // 1. まずデータファイルを全宛先に対してファンアウトしてキューへ投入
                 foreach (var file in dataFiles)
@@ -335,18 +463,15 @@ public class Worker : BackgroundService
                 // 2. ENDファイルを投入（TransferEndFiles が true の場合）
                 if (_watch.TransferEndFiles)
                 {
-                    foreach (var endFile in endFiles)
+                    foreach (var endFile in transferableEndFiles)
                     {
-                        var dataFileName = GetDataFileForEndFile(endFile);
-                        if (dataFiles.Any(f => string.Equals(Path.GetFileName(f), dataFileName, StringComparison.OrdinalIgnoreCase)))
-                        {
-                            _logger.LogDebug("Queueing END file {File} for transfer after data file", endFile);
-                            await EnqueueFanoutAsync(endFile, destinations, queueContexts, isEndFile: true, stoppingToken).ConfigureAwait(false);
-                        }
-                        else
-                        {
-                            _logger.LogDebug("Skipping END file {File} - corresponding data file not being transferred", endFile);
-                        }
+                        _logger.LogDebug("Queueing END file {File} for transfer after data file", endFile);
+                        await EnqueueFanoutAsync(endFile, destinations, queueContexts, isEndFile: true, stoppingToken).ConfigureAwait(false);
+                    }
+
+                    foreach (var endFile in endFiles.Except(transferableEndFiles, StringComparer.OrdinalIgnoreCase))
+                    {
+                        _logger.LogDebug("Skipping END file {File} - corresponding data file not being transferred", endFile);
                     }
                 }
                 else if (_cleanup.DeleteLocalSkippedEndFiles && endFiles.Count > 0)
@@ -430,6 +555,12 @@ public class Worker : BackgroundService
                 {
                     var originalPath = normalizedMap[normPath];
 
+                    if (_currentRunUploadRemotePaths.ContainsKey(NormalizeRemotePathForComparison(normPath)))
+                    {
+                        _logger.LogDebug("Skipping remote file {File} because it is scheduled for upload in this run", originalPath);
+                        continue;
+                    }
+
                     // ENDファイルかどうかを正規化パスで判定
                     if (IsEndFileRemote(normPath))
                     {
@@ -482,15 +613,21 @@ public class Worker : BackgroundService
                             dataFullNormalized = dataFullNormalized.TrimEnd('/', '\\');
 
                             // 対応するデータファイルが存在する場合のみENDファイルを転送
-                            var exists = dataFiles.Any(f =>
+                            string? matchedDataFile = null;
+                            foreach (var dataFile in dataFiles)
                             {
-                                var fNorm = f.StartsWith("/") ? f : "/" + f;
+                                var fNorm = dataFile.StartsWith("/") ? dataFile : "/" + dataFile;
                                 fNorm = fNorm.TrimEnd('/', '\\');
-                                return string.Equals(fNorm, dataFullNormalized, StringComparison.OrdinalIgnoreCase);
-                            });
+                                if (string.Equals(fNorm, dataFullNormalized, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    matchedDataFile = dataFile;
+                                    break;
+                                }
+                            }
 
-                            if (exists)
+                            if (matchedDataFile is not null)
                             {
+                                RegisterDownloadEndDependency(endOrigPath, matchedDataFile);
                                 _logger.LogDebug("Queueing remote END file {File} for transfer after data file", endOrigPath);
                                 await primaryQueue.Channel.Writer.WriteAsync(new TransferItem(endOrigPath, TransferAction.Download), stoppingToken);
                             }
@@ -524,6 +661,10 @@ public class Worker : BackgroundService
         }
 
         } // try（ファイル列挙フェーズ）
+        catch (Exception ex)
+        {
+            enumerationException = ex;
+        }
         finally
         {
             // 例外発生時もワーカーが WaitToReadAsync でブロックし続けないよう Channel を必ず完了する
@@ -539,10 +680,23 @@ public class Worker : BackgroundService
         {
             // まずキュー処理の完了を待機
             await Task.WhenAll(queueTasks).ConfigureAwait(false);
-            
-            // キュー処理が完了したら監視タスクをキャンセル
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            _logger.LogInformation("Transfer was cancelled.");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _exitCode?.MarkFailure();
+            _logger.LogError(ex, "Error during transfer: {Error}", ex.Message);
+            throw;
+        }
+        finally
+        {
+            // キュー処理がどの経路で終わっても監視タスクを停止する
             monitorCts.Cancel();
-            
+
             // 監視タスクの完了を少し待機（強制終了を避けるため）
             try
             {
@@ -553,16 +707,27 @@ public class Worker : BackgroundService
                 _logger.LogWarning("Performance monitoring task did not complete within timeout");
             }
         }
-        catch (Exception ex)
+
+        if (enumerationException is not null)
         {
-            _logger.LogError(ex, "Error during transfer: {Error}", ex.Message);
-            throw;
+            if (enumerationException is not OperationCanceledException || !stoppingToken.IsCancellationRequested)
+            {
+                _exitCode?.MarkFailure();
+            }
+
+            ExceptionDispatchInfo.Capture(enumerationException).Throw();
         }
 
         // 最終統計情報をログ出力
         var finalStats = AggregateStatistics(queueContexts.Select(context => context.Queue.GetStatistics()));
         _logger.LogInformation("Transfer completed. Total: {Total}, Success: {Success}, Failed: {Failed}, Critical Errors: {Critical}, Success Rate: {Rate:F1}%",
             finalStats.TotalEnqueued, finalStats.TotalCompleted, finalStats.TotalFailed, finalStats.CriticalErrorCount, finalStats.SuccessRate);
+
+        if (finalStats.TotalFailed > 0 || finalStats.CriticalErrorCount > 0)
+        {
+            _exitCode?.MarkFailure();
+            _logger.LogError("Transfer completed with failures. The process exit code will be set to 1.");
+        }
 
         // クリティカルエラーがあれば詳細をログ出力
         var criticalExceptions = queueContexts.SelectMany(context => context.Queue.GetCriticalExceptions());
@@ -593,6 +758,20 @@ public class Worker : BackgroundService
         return aggregated;
     }
 
+    private string GetDataPathForEndFile(string endFilePath)
+    {
+        var dataFileName = GetDataFileForEndFile(endFilePath);
+        if (string.IsNullOrEmpty(dataFileName))
+        {
+            return string.Empty;
+        }
+
+        var directory = Path.GetDirectoryName(endFilePath);
+        return string.IsNullOrEmpty(directory)
+            ? dataFileName
+            : Path.Combine(directory, dataFileName);
+    }
+
     /// <summary>
     /// アップロード処理（確実なハッシュ検証付き）。
     /// ファンアウト対応: item.Destination が示す 1 宛先へ送信し、
@@ -602,43 +781,15 @@ public class Worker : BackgroundService
     {
         var dest = item.Destination ?? _transfer;
         var destLabel = DescribeDestination(dest);
-        var name = dest.PreserveFolderStructure
-            ? Path.GetRelativePath(_watch.Path, item.Path)
-            : Path.GetFileName(item.Path);
-        // リモートパスを組み立てる際、Path.Combineでは余計なセパレーターが入る場合があるため手動で結合する。
-        // 宛先ごとの RemotePath の末尾のスラッシュを除去し、ファイル名または相対パスを '/' で連結する。
-        // 元のRemotePathがルート("/")の場合はそのまま保持する。
-        var rawBase = dest.RemotePath ?? string.Empty;
-        string remoteBase;
-        if (rawBase == "/")
+        var remotePath = BuildUploadRemotePath(dest, item.Path);
+
+        var isEndFile = IsEndFile(item.Path);
+        if (isEndFile)
         {
-            remoteBase = "/";
-        }
-        else
-        {
-            // 末尾の区切り文字を削除（Windowsの '\' も対象）
-            remoteBase = rawBase.TrimEnd('/', '\\');
-        }
-        var remoteName = name.Replace('\\', '/');
-        string remotePath;
-        if (string.IsNullOrEmpty(remoteBase))
-        {
-            // ベースが空ならそのまま名前を返す
-            remotePath = remoteName;
-        }
-        else if (remoteBase == "/")
-        {
-            // ルートの場合はルートと名前を連結
-            remotePath = $"/{remoteName}";
-        }
-        else
-        {
-            remotePath = $"{remoteBase}/{remoteName}";
+            await WaitForUploadDataDependencyAsync(item.Path, id, token).ConfigureAwait(false);
         }
 
         _logger.LogInformation("[{Id}] Starting upload {File} to {Dest} ({Remote})", id, item.Path, destLabel, remotePath);
-
-        var isEndFile = IsEndFile(item.Path);
         if (_hash.Enabled)
         {
             var localHash = await HashUtil.ComputeHashAsync(item.Path, _hash.Algorithm, token).ConfigureAwait(false);
@@ -769,6 +920,12 @@ public class Worker : BackgroundService
             localPath = safePath;
         }
 
+        var isEndFileRemote = IsEndFileRemote(item.Path);
+        if (isEndFileRemote)
+        {
+            await WaitForDownloadDataDependencyAsync(item.Path, id, token).ConfigureAwait(false);
+        }
+
         _logger.LogInformation("[{Id}] Starting download {Remote} to {Local}", id, item.Path, localPath);
 
         if (_hash.Enabled)
@@ -802,7 +959,6 @@ public class Worker : BackgroundService
         }
 
         // ENDファイルまたは通常ファイルの削除判定
-        var isEndFileRemote = IsEndFileRemote(item.Path);
         var shouldDeleteRemote = isEndFileRemote ? _cleanup.DeleteRemoteEndFiles : _cleanup.DeleteRemoteAfterDownload;
 
         if (shouldDeleteRemote)

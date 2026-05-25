@@ -5,72 +5,123 @@
     "Watch": {
       "type": "object",
       "properties": {
-        "Path": {"type": "string"},
-        "IncludeSubfolders": {"type": "boolean"},
-        "AllowedExtensions": {"type": "array", "items": {"type": "string"}}
+        "Path": { "type": "string", "minLength": 1 },
+        "IncludeSubfolders": { "type": "boolean" },
+        "AllowedExtensions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "RequireEndFile": { "type": "boolean" },
+        "EndFileExtensions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "TransferEndFiles": { "type": "boolean" }
       },
-      "required": ["Path"]
+      "required": [ "Path" ]
     },
     "Transfer": {
+      "allOf": [
+        { "$ref": "#/definitions/destination" },
+        {
+          "type": "object",
+          "properties": {
+            "Direction": { "enum": [ "get", "put", "both" ] },
+            "AdditionalDestinations": {
+              "type": "array",
+              "items": { "$ref": "#/definitions/destination" }
+            }
+          },
+          "required": [ "Direction" ]
+        }
+      ]
+    },
+    "App": {
       "type": "object",
       "properties": {
-        "Mode": {"enum": ["ftp", "sftp"]},
-        "Direction": {"enum": ["get", "put", "both"]},
-        "Host": {"type": "string"},
-        "Port": {"type": "integer"},
-        "Username": {"type": "string"},
-        "Password": {"type": "string"},
-        "PrivateKeyPath": {"type": "string"},
-        "PrivateKeyPassphrase": {"type": "string"},
-        "RemotePath": {"type": "string"},
-        "Concurrency": {"type": "integer", "minimum": 1},
-        "PreserveFolderStructure": {"type": "boolean"}
-      },
-      "required": ["Mode", "Direction", "Host", "Username", "RemotePath"]
+        "LockFilePath": { "type": "string" }
+      }
     },
     "Retry": {
       "type": "object",
       "properties": {
-        "MaxAttempts": {"type": "integer"},
-        "DelaySeconds": {"type": "integer"}
+        "MaxAttempts": { "type": "integer", "minimum": 0 },
+        "DelaySeconds": { "type": "integer", "minimum": 0 }
       }
     },
     "Hash": {
       "type": "object",
       "properties": {
-        "Algorithm": {"enum": ["MD5", "SHA256"]},
-        "UseServerCommand": {"type": "boolean"}
+        "Enabled": { "type": "boolean" },
+        "Algorithm": { "enum": [ "SHA256", "SHA512" ] },
+        "UseServerCommand": { "type": "boolean" }
       },
-      "required": ["Algorithm"]
+      "required": [ "Algorithm" ]
     },
     "Cleanup": {
       "type": "object",
       "properties": {
-        "DeleteAfterVerify": {"type": "boolean"},
-        "DeleteRemoteAfterDownload": {"type": "boolean"}
+        "DeleteAfterVerify": { "type": "boolean" },
+        "DeleteRemoteAfterDownload": { "type": "boolean" },
+        "DeleteRemoteEndFiles": { "type": "boolean" },
+        "DeleteLocalSkippedEndFiles": { "type": "boolean" }
       }
     },
     "Smtp": {
       "type": "object",
       "properties": {
-        "Enabled": {"type": "boolean"},
-        "RelayHost": {"type": "string"},
-        "RelayPort": {"type": "integer"},
-        "UseTls": {"type": "boolean"},
-        "Username": {"type": "string"},
-        "Password": {"type": "string"},
-        "From": {"type": "string"},
-        "To": {"type": "array", "items": {"type": "string"}}
+        "Enabled": { "type": "boolean" },
+        "RelayHost": { "type": "string" },
+        "RelayPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "UseTls": { "type": "boolean" },
+        "Username": { "type": "string" },
+        "Password": { "type": "string" },
+        "From": { "type": "string", "format": "email" },
+        "To": {
+          "type": "array",
+          "items": { "type": "string", "format": "email" },
+          "minItems": 1
+        }
       },
-      "required": ["To"]
+      "required": [ "To" ]
     },
     "Logging": {
       "type": "object",
       "properties": {
-        "Level": {"type": "string"},
-        "RollingFilePath": {"type": "string"},
-        "MaxBytes": {"type": "integer"}
-      }
+        "Level": {
+          "enum": [ "Trace", "Debug", "Information", "Warning", "Error", "Critical", "None" ]
+        },
+        "RollingFilePath": { "type": "string", "minLength": 1 },
+        "MaxBytes": { "type": "integer", "minimum": 1024 },
+        "Retention": {
+          "type": "object",
+          "properties": {
+            "Enabled": { "type": "boolean" },
+            "RetentionDays": { "type": "integer", "minimum": 1, "maximum": 3650 }
+          }
+        }
+      },
+      "required": [ "RollingFilePath" ]
+    }
+  },
+  "definitions": {
+    "destination": {
+      "type": "object",
+      "properties": {
+        "Mode": { "enum": [ "ftp", "sftp" ] },
+        "Host": { "type": "string", "minLength": 1 },
+        "Port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "Username": { "type": "string", "minLength": 1 },
+        "Password": { "type": "string" },
+        "PrivateKeyPath": { "type": "string" },
+        "PrivateKeyPassphrase": { "type": "string" },
+        "HostKeyFingerprint": { "type": "string" },
+        "RemotePath": { "type": "string", "minLength": 1 },
+        "Concurrency": { "type": "integer", "minimum": 1, "maximum": 16 },
+        "PreserveFolderStructure": { "type": "boolean" },
+        "TimeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 3600 }
+      },
+      "required": [ "Mode", "Host", "Username", "RemotePath" ]
     }
   }
 }

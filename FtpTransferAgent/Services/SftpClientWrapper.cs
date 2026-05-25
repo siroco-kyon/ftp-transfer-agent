@@ -140,16 +140,44 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         {
             return;
         }
-        var parts = dir.Split('/', StringSplitOptions.RemoveEmptyEntries);
-        var current = string.Empty;
-        foreach (var part in parts)
+
+        foreach (var current in GetDirectoryCreationPaths(dir))
         {
-            current += "/" + part;
             if (!_client.Exists(current))
             {
                 _client.CreateDirectory(current);
             }
         }
+    }
+
+    private static IReadOnlyList<string> GetDirectoryCreationPaths(string directory)
+    {
+        var normalized = directory.Replace('\\', '/');
+        if (string.IsNullOrWhiteSpace(normalized) || normalized == "/" || normalized == ".")
+        {
+            return Array.Empty<string>();
+        }
+
+        var isAbsolute = normalized.StartsWith("/", StringComparison.Ordinal);
+        var parts = normalized.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        var paths = new List<string>(parts.Length);
+        var current = string.Empty;
+
+        foreach (var part in parts)
+        {
+            if (string.IsNullOrEmpty(current))
+            {
+                current = isAbsolute ? "/" + part : part;
+            }
+            else
+            {
+                current += "/" + part;
+            }
+
+            paths.Add(current);
+        }
+
+        return paths;
     }
 
     // ファイルを一時名でアップロードしてからリネーム

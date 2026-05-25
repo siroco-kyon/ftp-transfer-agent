@@ -135,7 +135,11 @@ public class ConfigurationValidator
         }
 
         // ファイル拡張子の有効性チェック
-        if (watch.AllowedExtensions?.Any() == true)
+        if (watch.AllowedExtensions == null)
+        {
+            result.Errors.Add("AllowedExtensions must not be null. Use an empty array to process all files.");
+        }
+        else if (watch.AllowedExtensions.Any())
         {
             var invalidExtensions = watch.AllowedExtensions
                 .Where(string.IsNullOrWhiteSpace)
@@ -270,7 +274,11 @@ public class ConfigurationValidator
         }
 
         // ハッシュアルゴリズムのセキュリティチェック（有効時のみ）
-        if (hash.Enabled && hash.Algorithm.Equals("MD5", StringComparison.OrdinalIgnoreCase))
+        if (string.IsNullOrWhiteSpace(hash.Algorithm))
+        {
+            result.Errors.Add("Hash algorithm is required. Please use SHA256 or SHA512.");
+        }
+        else if (hash.Enabled && hash.Algorithm.Equals("MD5", StringComparison.OrdinalIgnoreCase))
         {
             result.Errors.Add("MD5 hash algorithm is cryptographically insecure and has been disabled. Please use SHA256 or SHA512.");
         }
@@ -350,7 +358,7 @@ public class ConfigurationValidator
         }
         
         // AllowedExtensions設定が空の場合の警告
-        if (watch.AllowedExtensions.Length == 0)
+        if (watch.AllowedExtensions?.Length == 0)
         {
             result.Warnings.Add("No file extensions specified in AllowedExtensions. All files will be processed.");
         }

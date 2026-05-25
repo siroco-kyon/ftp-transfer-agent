@@ -204,6 +204,52 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     }
 
     [Fact]
+    public void ValidateConfiguration_WithNullAllowedExtensions_ShouldFailWithoutThrowing()
+    {
+        var watch = new WatchOptions
+        {
+            Path = _testDirectory,
+            AllowedExtensions = null!
+        };
+        var transfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Host = "example.com",
+            Username = "user",
+            Password = "pass"
+        };
+        var retry = new RetryOptions();
+        var hash = new HashOptions { Algorithm = "SHA256" };
+        var cleanup = new CleanupOptions();
+
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("AllowedExtensions must not be null"));
+    }
+
+    [Fact]
+    public void ValidateConfiguration_WithNullHashAlgorithm_ShouldFailWithoutThrowing()
+    {
+        var watch = new WatchOptions { Path = _testDirectory };
+        var transfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Host = "example.com",
+            Username = "user",
+            Password = "pass"
+        };
+        var retry = new RetryOptions();
+        var hash = new HashOptions { Algorithm = null! };
+        var cleanup = new CleanupOptions();
+
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("Hash algorithm is required"));
+    }
+
+    [Fact]
     public void ValidateConfiguration_WithWildcardPatternContainingSpaces_ShouldPass()
     {
         var watch = new WatchOptions

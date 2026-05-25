@@ -49,16 +49,60 @@ public class WorkerFailureTests
         services.AddLogging();
         var provider = services.BuildServiceProvider();
         var logger = provider.GetRequiredService<ILogger<Worker>>();
+        var exitCode = new ApplicationExitCode();
 
         using var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider,
-            logger, lifetime, new NoDisposeClient(mock.Object));
+            logger, lifetime, new NoDisposeClient(mock.Object), exitCode);
 
         // 並列処理改善後は例外が再スローされない
         await worker.RunAsync(CancellationToken.None);
 
         mock.Verify(c => c.UploadAsync(file, remotePath, It.IsAny<CancellationToken>()), Times.Exactly(3));
         Assert.True(File.Exists(file));
+        Assert.Equal(1, exitCode.Code);
+
+        Directory.Delete(dir, true);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_WhenRemoteListingFails_MarksFailureExitCode()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+
+        var watch = Options.Create(new WatchOptions { Path = dir });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "get",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 1
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+        var hash = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+        var cleanup = Options.Create(new CleanupOptions());
+
+        var mock = new Mock<IFileTransferClient>();
+        mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
+            .ThrowsAsync(new IOException("remote listing failed"));
+        mock.Setup(c => c.Dispose());
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var provider = services.BuildServiceProvider();
+        var logger = provider.GetRequiredService<ILogger<Worker>>();
+        var exitCode = new ApplicationExitCode();
+
+        using var lifetime = new DummyLifetime();
+        var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider,
+            logger, lifetime, new NoDisposeClient(mock.Object), exitCode);
+
+        await Assert.ThrowsAsync<IOException>(() => worker.RunAsync(CancellationToken.None));
+        Assert.Equal(1, exitCode.Code);
 
         Directory.Delete(dir, true);
     }
@@ -68,8 +112,8 @@ public class WorkerFailureTests
         private readonly IFileTransferClient _client;
         public TestWorker(IOptions<WatchOptions> w, IOptions<TransferOptions> t, IOptions<RetryOptions> r,
             IOptions<HashOptions> h, IOptions<CleanupOptions> c, IServiceProvider sp,
-            ILogger<Worker> l, IHostApplicationLifetime lifetime, IFileTransferClient client)
-            : base(w, t, r, h, c, sp, l, lifetime)
+            ILogger<Worker> l, IHostApplicationLifetime lifetime, IFileTransferClient client, ApplicationExitCode? exitCode = null)
+            : base(w, t, r, h, c, sp, l, lifetime, exitCode)
         {
             _client = client;
         }
