@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
-using Microsoft.Extensions.Logging;
 using FtpTransferAgent.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace FtpTransferAgent.Logging;
 
@@ -9,40 +9,38 @@ namespace FtpTransferAgent.Logging;
 /// </summary>
 internal sealed class RollingFileLoggerProvider : ILoggerProvider
 {
-    private readonly LoggingOptions _options;
+    private readonly RollingFileLogSink _sink;
     private readonly ConcurrentDictionary<string, RollingFileLogger> _loggers = new();
 
     public RollingFileLoggerProvider(LoggingOptions options)
     {
-        _options = options;
-        var dir = Path.GetDirectoryName(_options.RollingFilePath);
+        var dir = Path.GetDirectoryName(options.RollingFilePath);
         if (!string.IsNullOrEmpty(dir))
         {
             Directory.CreateDirectory(dir);
         }
+
+        _sink = new RollingFileLogSink(options);
     }
 
     public ILogger CreateLogger(string categoryName)
     {
-        return _loggers.GetOrAdd(categoryName, name => new RollingFileLogger(name, _options));
+        return _loggers.GetOrAdd(categoryName, name => new RollingFileLogger(name, _sink));
     }
 
     public void Dispose()
     {
-        foreach (var logger in _loggers.Values)
-        {
-            logger.Dispose();
-        }
+        _sink.Dispose();
         _loggers.Clear();
     }
 }
 
 /// <summary>
-/// 1 日ごと、かつ指定サイズでファイルをローテーションするロガー
+/// 1 日ごと、かつ指定サイズでファイルをローテーションする共有シンク。
+/// すべてのカテゴリが同じファイルハンドルとローテーション状態を共有する。
 /// </summary>
-internal sealed class RollingFileLogger : ILogger, IDisposable
+internal sealed class RollingFileLogSink : IDisposable
 {
-    private readonly string _category;
     private readonly LoggingOptions _options;
     private readonly object _lock = new();
     private DateTime _currentDate = DateTime.UtcNow.Date;
@@ -50,9 +48,8 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
     private StreamWriter? _writer;
     private bool _disposed;
 
-    public RollingFileLogger(string category, LoggingOptions options)
+    public RollingFileLogSink(LoggingOptions options)
     {
-        _category = category;
         _options = options;
     }
 
@@ -74,34 +71,71 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
         var now = DateTime.UtcNow.Date;
         if (_writer == null)
         {
-            _writer = OpenWriter(FileMode.Append);
             _currentDate = now;
+            MoveToWritableFileIfCurrentFull();
+            _writer = OpenWriter(FileMode.Append);
             return;
         }
+
         if (now != _currentDate)
         {
             _writer.Dispose();
             _writer = null;
             _index = 0;
             _currentDate = now;
-            _writer = OpenWriter(FileMode.Create);
+            MoveToWritableFileIfCurrentFull();
+            _writer = OpenWriter(FileMode.Append);
             return;
         }
 
-        // ファイルサイズチェックを安全に行う
         try
         {
             if (new FileInfo(GetPath()).Length >= _options.MaxBytes)
             {
                 _writer.Dispose();
                 _writer = null;
-                _index++;
-                _writer = OpenWriter(FileMode.Create);
+                MoveToNextWritableFile();
+                _writer = OpenWriter(FileMode.Append);
             }
         }
         catch (IOException)
         {
             // ファイルアクセス中の場合は次回チェック
+        }
+    }
+
+    private void MoveToWritableFileIfCurrentFull()
+    {
+        try
+        {
+            if (File.Exists(GetPath()) && new FileInfo(GetPath()).Length >= _options.MaxBytes)
+            {
+                MoveToNextWritableFile();
+            }
+        }
+        catch (IOException)
+        {
+            // ファイルサイズ確認に失敗した場合は現在のファイルへ書き込みを試す
+        }
+    }
+
+    private void MoveToNextWritableFile()
+    {
+        while (true)
+        {
+            _index++;
+            var path = GetPath();
+            try
+            {
+                if (!File.Exists(path) || new FileInfo(path).Length < _options.MaxBytes)
+                {
+                    return;
+                }
+            }
+            catch (IOException)
+            {
+                return;
+            }
         }
     }
 
@@ -111,7 +145,10 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
         var path = GetPath();
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
+        {
             Directory.CreateDirectory(dir);
+        }
+
         var fs = new FileStream(path, mode, FileAccess.Write, FileShare.ReadWrite);
         try
         {
@@ -124,17 +161,12 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
         }
     }
 
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
-
-    public bool IsEnabled(LogLevel logLevel) => true;
-
-    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+    public void Write(string category, LogLevel logLevel, string message, Exception? exception)
     {
-        var message = formatter(state, exception);
         lock (_lock)
         {
             EnsureWriter();
-            _writer!.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{logLevel}] {_category} {message}");
+            _writer!.WriteLine($"{DateTime.Now:yyyy-MM-dd HH:mm:ss} [{logLevel}] {category} {message}");
             if (exception != null)
             {
                 _writer.WriteLine(exception);
@@ -150,10 +182,39 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
             {
                 return;
             }
+
             _writer?.Dispose();
             _writer = null;
             _disposed = true;
         }
+    }
+}
+
+/// <summary>
+/// カテゴリ名を保持し、共有シンクへログを書き込むロガー。
+/// </summary>
+internal sealed class RollingFileLogger : ILogger, IDisposable
+{
+    private readonly string _category;
+    private readonly RollingFileLogSink _sink;
+
+    public RollingFileLogger(string category, RollingFileLogSink sink)
+    {
+        _category = category;
+        _sink = sink;
+    }
+
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+
+    public bool IsEnabled(LogLevel logLevel) => true;
+
+    public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
+    {
+        _sink.Write(_category, logLevel, formatter(state, exception), exception);
+    }
+
+    public void Dispose()
+    {
     }
 
     /// <summary>
@@ -188,12 +249,14 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
             {
                 continue;
             }
+
             var remainder = name.Substring(prefix.Length);
             // 期待形式: YYYYMMDD または YYYYMMDD_n
             if (remainder.Length < 8)
             {
                 continue;
             }
+
             var datePart = remainder.Substring(0, 8);
             if (!DateTime.TryParseExact(datePart, "yyyyMMdd",
                 System.Globalization.CultureInfo.InvariantCulture,
@@ -202,10 +265,12 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
             {
                 continue;
             }
+
             if (fileDate.Date >= cutoff)
             {
                 continue;
             }
+
             try
             {
                 File.Delete(file);

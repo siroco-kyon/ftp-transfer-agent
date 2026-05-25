@@ -130,6 +130,83 @@ public class EndFileTransferTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_TransferEndFiles_WithParallelUploads_WaitsForDataBeforeEndFile()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        var file = Path.Combine(dir, "test.txt");
+        var endFile = Path.Combine(dir, "test.txt.END");
+        await File.WriteAllTextAsync(file, "data");
+        await File.WriteAllTextAsync(endFile, "end marker");
+
+        var watch = Options.Create(new WatchOptions
+        {
+            Path = dir,
+            RequireEndFile = true,
+            EndFileExtensions = new[] { ".END" },
+            TransferEndFiles = true
+        });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 2
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+        var hash = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+        var cleanup = Options.Create(new CleanupOptions());
+
+        var dataStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseData = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dataCompleted = 0;
+        var endStartedBeforeDataCompleted = 0;
+
+        var mock = new Mock<IFileTransferClient>();
+        mock.Setup(c => c.UploadAsync(file, "/remote/test.txt", It.IsAny<CancellationToken>()))
+            .Returns(async () =>
+            {
+                dataStarted.TrySetResult(true);
+                await releaseData.Task;
+                Interlocked.Exchange(ref dataCompleted, 1);
+            });
+        mock.Setup(c => c.UploadAsync(endFile, "/remote/test.txt.END", It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                if (Volatile.Read(ref dataCompleted) == 0)
+                {
+                    Interlocked.Exchange(ref endStartedBeforeDataCompleted, 1);
+                }
+                return Task.CompletedTask;
+            });
+        mock.Setup(c => c.Dispose());
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var provider = services.BuildServiceProvider();
+        var logger = provider.GetRequiredService<ILogger<Worker>>();
+
+        using var lifetime = new DummyLifetime();
+        var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
+        var workerTask = worker.RunAsync(CancellationToken.None);
+
+        await dataStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await Task.Delay(200);
+        Assert.Equal(0, Volatile.Read(ref endStartedBeforeDataCompleted));
+
+        releaseData.TrySetResult(true);
+        await workerTask;
+
+        mock.Verify(c => c.UploadAsync(endFile, "/remote/test.txt.END", It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(0, Volatile.Read(ref endStartedBeforeDataCompleted));
+
+        Directory.Delete(dir, true);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_TransferEndFiles_OnlyTransfersEndFilesWithDataFiles()
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
@@ -191,6 +268,68 @@ public class EndFileTransferTests
         
         // orphan.ENDは対応するデータファイルがないため転送されない
         mock.Verify(c => c.UploadAsync(endFileOrphan, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+
+        Directory.Delete(dir, true);
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_TransferEndFiles_WithSubfolders_DoesNotMatchOrphanEndFileByNameOnly()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        var sub1 = Path.Combine(dir, "a");
+        var sub2 = Path.Combine(dir, "b");
+        Directory.CreateDirectory(sub1);
+        Directory.CreateDirectory(sub2);
+
+        var file = Path.Combine(sub1, "report.txt");
+        var endFile = Path.Combine(sub1, "report.txt.END");
+        var orphanEndFile = Path.Combine(sub2, "report.txt.END");
+        await File.WriteAllTextAsync(file, "data");
+        await File.WriteAllTextAsync(endFile, "end marker");
+        await File.WriteAllTextAsync(orphanEndFile, "orphan marker");
+
+        var watch = Options.Create(new WatchOptions
+        {
+            Path = dir,
+            IncludeSubfolders = true,
+            AllowedExtensions = new[] { ".txt" },
+            RequireEndFile = true,
+            EndFileExtensions = new[] { ".END" },
+            TransferEndFiles = true
+        });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            PreserveFolderStructure = true,
+            Concurrency = 1
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+        var hash = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+        var cleanup = Options.Create(new CleanupOptions());
+
+        var mock = new Mock<IFileTransferClient>();
+        mock.Setup(c => c.UploadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        mock.Setup(c => c.Dispose());
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var provider = services.BuildServiceProvider();
+        var logger = provider.GetRequiredService<ILogger<Worker>>();
+
+        using var lifetime = new DummyLifetime();
+        var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
+        await worker.RunAsync(CancellationToken.None);
+
+        mock.Verify(c => c.UploadAsync(file, "/remote/a/report.txt", It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(c => c.UploadAsync(endFile, "/remote/a/report.txt.END", It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(c => c.UploadAsync(orphanEndFile, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
 
         Directory.Delete(dir, true);
     }

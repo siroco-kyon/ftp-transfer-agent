@@ -60,5 +60,62 @@ public class RollingFileLoggerTests
 
         Directory.Delete(dir, true);
     }
-}
 
+    [Fact]
+    public void Log_WhenCurrentFileAlreadyOverSize_RotatesBeforeFirstWrite()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        var options = new LoggingOptions { RollingFilePath = Path.Combine(dir, "log.txt"), MaxBytes = 1 };
+        var today = DateTime.UtcNow;
+        var baseName = Path.Combine(dir, $"{today:yyyy}", $"{today:MM}", $"log{today:yyyyMMdd}");
+        var currentFile = baseName + ".txt";
+        Directory.CreateDirectory(Path.GetDirectoryName(currentFile)!);
+        File.WriteAllText(currentFile, "already full");
+
+        var type = typeof(Worker).Assembly.GetType("FtpTransferAgent.Logging.RollingFileLoggerProvider", true)!;
+        using (var provider = (ILoggerProvider)Activator.CreateInstance(type, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public, null, new object[] { options }, null)!)
+        {
+            var logger = provider.CreateLogger("Test");
+            logger.LogInformation("fresh");
+        }
+
+        Assert.DoesNotContain("fresh", File.ReadAllText(currentFile));
+        Assert.Contains("fresh", File.ReadAllText(baseName + "_1.txt"));
+
+        Directory.Delete(dir, true);
+    }
+
+    [Fact]
+    public void Log_OverSize_WithMultipleCategories_DoesNotOverwriteRotatedFiles()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        var options = new LoggingOptions { RollingFilePath = Path.Combine(dir, "log.txt"), MaxBytes = 1 };
+        var type = typeof(Worker).Assembly.GetType("FtpTransferAgent.Logging.RollingFileLoggerProvider", true)!;
+
+        using (var provider = (ILoggerProvider)Activator.CreateInstance(type, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public, null, new object[] { options }, null)!)
+        {
+            var loggerA = provider.CreateLogger("CategoryA");
+            var loggerB = provider.CreateLogger("CategoryB");
+
+            loggerA.LogInformation("alpha");
+            loggerA.LogInformation("bravo");
+            loggerB.LogInformation("charlie");
+            loggerB.LogInformation("delta");
+        }
+
+        var content = string.Join(
+            Environment.NewLine,
+            Directory.EnumerateFiles(dir, "*.txt", SearchOption.AllDirectories)
+                .OrderBy(path => path)
+                .Select(File.ReadAllText));
+
+        Assert.Contains("alpha", content);
+        Assert.Contains("bravo", content);
+        Assert.Contains("charlie", content);
+        Assert.Contains("delta", content);
+
+        Directory.Delete(dir, true);
+    }
+}
