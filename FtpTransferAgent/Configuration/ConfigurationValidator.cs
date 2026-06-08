@@ -318,6 +318,21 @@ public class ConfigurationValidator
                 result.Warnings.Add("IncludeSubfolders is enabled for download but PreserveFolderStructure is disabled. Files from subdirectories will be saved to root directory and may overwrite each other.");
             }
 
+            if (watch.IncludeSubfolders &&
+                !transfer.PreserveFolderStructure &&
+                cleanup.DeleteRemoteAfterDownload)
+            {
+                result.Errors.Add("DeleteRemoteAfterDownload cannot be enabled when IncludeSubfolders is true and PreserveFolderStructure is false. Remote files from different subdirectories may overwrite the same local file before being deleted.");
+            }
+
+            if (watch.IncludeSubfolders &&
+                !transfer.PreserveFolderStructure &&
+                cleanup.DeleteRemoteEndFiles &&
+                watch.TransferEndFiles)
+            {
+                result.Errors.Add("DeleteRemoteEndFiles cannot be enabled with TransferEndFiles when IncludeSubfolders is true and PreserveFolderStructure is false. Remote END files may overwrite the same local file before being deleted.");
+            }
+
             if (!watch.IncludeSubfolders && transfer.PreserveFolderStructure)
             {
                 result.Warnings.Add("PreserveFolderStructure is enabled for download but IncludeSubfolders is disabled. Only root directory files will be downloaded.");
@@ -330,6 +345,29 @@ public class ConfigurationValidator
             if (watch.IncludeSubfolders && !transfer.PreserveFolderStructure)
             {
                 result.Warnings.Add("IncludeSubfolders is enabled for upload but PreserveFolderStructure is disabled. All files will be uploaded to remote root directory.");
+            }
+
+            if (watch.IncludeSubfolders && cleanup.DeleteAfterVerify)
+            {
+                var unsafeDestinations = new List<string>();
+                if (!transfer.PreserveFolderStructure)
+                {
+                    unsafeDestinations.Add("primary");
+                }
+
+                var additionalDestinations = transfer.AdditionalDestinations ?? new List<DestinationOptions>();
+                for (int i = 0; i < additionalDestinations.Count; i++)
+                {
+                    if (!additionalDestinations[i].PreserveFolderStructure)
+                    {
+                        unsafeDestinations.Add($"destination#{i + 1}");
+                    }
+                }
+
+                if (unsafeDestinations.Count > 0)
+                {
+                    result.Errors.Add($"DeleteAfterVerify cannot be enabled when IncludeSubfolders is true and any upload destination has PreserveFolderStructure=false ({string.Join(", ", unsafeDestinations)}). Local files with the same name in different subdirectories may overwrite each other remotely before the local sources are deleted.");
+                }
             }
         }
 

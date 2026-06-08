@@ -169,6 +169,74 @@ public class WorkerDownloadTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_DoesNotDeleteRemoteData_WhenRelatedEndFileDownloadFails()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+
+        var watch = Options.Create(new WatchOptions
+        {
+            Path = dir,
+            RequireEndFile = true,
+            TransferEndFiles = true,
+            EndFileExtensions = new[] { ".END" }
+        });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "get",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 1
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+        var hashOpt = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+        var cleanup = Options.Create(new CleanupOptions
+        {
+            DeleteRemoteAfterDownload = true,
+            DeleteRemoteEndFiles = true
+        });
+
+        var remoteFile = "/remote/sample.txt";
+        var remoteEndFile = "/remote/sample.txt.END";
+        var localPath = Path.Combine(dir, "sample.txt");
+        var localEndPath = Path.Combine(dir, "sample.txt.END");
+
+        var mock = new Mock<IFileTransferClient>();
+        mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(new[] { remoteFile, remoteEndFile });
+        mock.Setup(c => c.DownloadAsync(remoteFile, localPath, It.IsAny<CancellationToken>()))
+            .Callback<string, string, CancellationToken>((_, lp, _) =>
+            {
+                File.WriteAllText(lp, "data");
+            })
+            .Returns(Task.CompletedTask);
+        mock.Setup(c => c.DownloadAsync(remoteEndFile, localEndPath, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new IOException("end download failed"));
+        mock.Setup(c => c.Dispose());
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        using var provider = services.BuildServiceProvider();
+        var logger = provider.GetRequiredService<ILogger<Worker>>();
+
+        using var lifetime = new DummyLifetime();
+        var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
+        await worker.RunAsync(CancellationToken.None);
+
+        mock.Verify(c => c.DownloadAsync(remoteFile, localPath, It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(c => c.DownloadAsync(remoteEndFile, localEndPath, It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(c => c.DeleteAsync(remoteFile, It.IsAny<CancellationToken>()), Times.Never);
+        mock.Verify(c => c.DeleteAsync(remoteEndFile, It.IsAny<CancellationToken>()), Times.Never);
+        Assert.True(File.Exists(localPath));
+        Assert.False(File.Exists(localEndPath));
+
+        Directory.Delete(dir, true);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_DownloadsSubdirectoryFilesWithPreserveFolderStructure()
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
