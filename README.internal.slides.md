@@ -78,7 +78,7 @@ style: |
 
 ## FtpTransferAgent でできること
 
-- `put` / `get` / `both` によるアップロード・ダウンロード
+- `put` / `get` によるアップロード・ダウンロード
 - FTP / SFTP の両対応
 - ハッシュ検証による転送後確認
 - END ファイルを使った受け渡し制御
@@ -137,7 +137,7 @@ style: |
 | 項目 | 例 | 意味 |
 |---|---|---|
 | 転送方式 | `ftp` / `sftp` | どのプロトコルを使うか |
-| 転送方向 | `put` / `get` / `both` | どちら向きに流すか |
+| 転送方向 | `put` / `get` | どちら向きに流すか |
 | 対象 | `Watch.Path`, `AllowedExtensions` | 何を拾うか |
 | 安全性 | `Hash.Algorithm`, `HostKeyFingerprint` | どう検証するか |
 | 運用 | `Concurrency`, `Retry`, `Cleanup` | どのくらい堅く回すか |
@@ -211,4 +211,3 @@ style: |
 - FtpTransferAgent は **社内のファイル連携を共通部品化** するためのツール
 - 価値は「転送」だけでなく、**検証・再試行・完了判定・監査性** にある
 - 導入時は **SFTP 優先、設定レビュー、衝突回避** を押さえる
-

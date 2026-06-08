@@ -20,8 +20,8 @@ public class EndFileSecurityTests
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
 
-        var watch = Options.Create(new WatchOptions 
-        { 
+        var watch = Options.Create(new WatchOptions
+        {
             Path = dir,
             RequireEndFile = true,
             EndFileExtensions = new[] { ".END" }
@@ -50,14 +50,14 @@ public class EndFileSecurityTests
 
         var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
-        
+
         // nullファイルパスではエラーにならずfalseを返すことを確認
         var hasEndResult = worker.TestHasEndFile(null!);
         Assert.False(hasEndResult);
-        
+
         var isEndResult = worker.TestIsEndFile(null!);
         Assert.False(isEndResult);
-        
+
         Directory.Delete(dir, true);
     }
 
@@ -69,8 +69,8 @@ public class EndFileSecurityTests
         var file = Path.Combine(dir, "test.txt");
         await File.WriteAllTextAsync(file, "data");
 
-        var watch = Options.Create(new WatchOptions 
-        { 
+        var watch = Options.Create(new WatchOptions
+        {
             Path = dir,
             RequireEndFile = true,
             EndFileExtensions = Array.Empty<string>() // 空の配列
@@ -99,10 +99,10 @@ public class EndFileSecurityTests
 
         var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
-        
+
         var result = worker.TestHasEndFile(file);
         Assert.False(result);
-        
+
         Directory.Delete(dir, true);
     }
 
@@ -114,8 +114,8 @@ public class EndFileSecurityTests
         var file = Path.Combine(dir, "test.txt");
         await File.WriteAllTextAsync(file, "data");
 
-        var watch = Options.Create(new WatchOptions 
-        { 
+        var watch = Options.Create(new WatchOptions
+        {
             Path = dir,
             RequireEndFile = true,
             EndFileExtensions = null! // null配列
@@ -144,10 +144,10 @@ public class EndFileSecurityTests
 
         var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
-        
+
         var result = worker.TestHasEndFile(file);
         Assert.False(result);
-        
+
         Directory.Delete(dir, true);
     }
 
@@ -157,8 +157,8 @@ public class EndFileSecurityTests
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
 
-        var watch = Options.Create(new WatchOptions 
-        { 
+        var watch = Options.Create(new WatchOptions
+        {
             Path = dir,
             RequireEndFile = true,
             EndFileExtensions = new[] { ".END" }
@@ -187,9 +187,9 @@ public class EndFileSecurityTests
 
         var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
-        
+
         // 不正なパス文字を含むファイルパス
-        var invalidPaths = new[] 
+        var invalidPaths = new[]
         {
             "file<invalid>.txt",
             "file|invalid.txt",
@@ -202,7 +202,7 @@ public class EndFileSecurityTests
             var result = worker.TestHasEndFile(invalidPath);
             Assert.False(result);
         }
-        
+
         Directory.Delete(dir, true);
     }
 
@@ -216,8 +216,8 @@ public class EndFileSecurityTests
         await File.WriteAllTextAsync(file, "data");
         await File.WriteAllTextAsync(endFile, "");
 
-        var watch = Options.Create(new WatchOptions 
-        { 
+        var watch = Options.Create(new WatchOptions
+        {
             Path = dir,
             RequireEndFile = true,
             EndFileExtensions = new[] { null!, ".END", "", "   " } // null, 空文字、空白を含む
@@ -246,11 +246,11 @@ public class EndFileSecurityTests
 
         var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
-        
+
         // null値をスキップして有効な拡張子(.END)で検出される
         var result = worker.TestHasEndFile(file);
         Assert.True(result);
-        
+
         Directory.Delete(dir, true);
     }
 
@@ -260,8 +260,8 @@ public class EndFileSecurityTests
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
 
-        var watch = Options.Create(new WatchOptions 
-        { 
+        var watch = Options.Create(new WatchOptions
+        {
             Path = dir,
             RequireEndFile = true,
             EndFileExtensions = new[] { ".END", ".end", ".TRG", ".trg" }
@@ -290,14 +290,14 @@ public class EndFileSecurityTests
 
         var lifetime = new DummyLifetime();
         var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
-        
+
         // ENDファイルとして認識されるべきファイル
         Assert.True(worker.TestIsEndFile("test.txt.END"));
         Assert.True(worker.TestIsEndFile("test.txt.end"));
         Assert.True(worker.TestIsEndFile("test.txt.TRG"));
         Assert.True(worker.TestIsEndFile("test.txt.trg"));
         Assert.True(worker.TestIsEndFile("/path/to/file.txt.END"));
-        
+
         // ENDファイルとして認識されないファイル
         Assert.False(worker.TestIsEndFile("test.txt"));
         Assert.False(worker.TestIsEndFile("test.csv"));
@@ -305,7 +305,7 @@ public class EndFileSecurityTests
         Assert.False(worker.TestIsEndFile("test")); // 拡張子なし
         Assert.False(worker.TestIsEndFile(""));
         Assert.False(worker.TestIsEndFile(null!));
-        
+
         Directory.Delete(dir, true);
     }
 

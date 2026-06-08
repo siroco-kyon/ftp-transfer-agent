@@ -22,7 +22,8 @@ public record TransferItem(
     string Path,
     TransferAction Action,
     DestinationOptions? Destination = null,
-    string? GroupId = null)
+    string? GroupId = null,
+    IReadOnlyList<string>? RelatedEndFilePaths = null)
 {
     /// <summary>
     /// キュー上での重複抑止キー。Upload ファンアウトでは宛先が異なる兄弟アイテムを

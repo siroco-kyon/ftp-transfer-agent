@@ -339,7 +339,7 @@ public class EndFileFeatureTests
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
-        
+
         // アルファベット順でEND ファイルが先に来るようなファイル名を作成
         var files = new[]
         {
@@ -349,7 +349,7 @@ public class EndFileFeatureTests
             Path.Combine(dir, "b_data.txt.END"), // ENDファイル
             Path.Combine(dir, "a_data.txt")
         };
-        
+
         foreach (var file in files)
         {
             await File.WriteAllTextAsync(file, "data");
@@ -480,14 +480,14 @@ public class EndFileFeatureTests
 
         var localTestFile = Path.Combine(dir, "test.txt");
         var testData = "test data";
-        
+
         // メモリストリームを使ってハッシュを事前計算
         string expectedHash;
         {
             await using var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(testData));
             expectedHash = await HashUtil.ComputeHashAsync(ms, "SHA256", CancellationToken.None);
         }
-        
+
         var mock = new Mock<IFileTransferClient>();
         // リモートファイル一覧（対応するENDファイルあり）
         mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
@@ -672,12 +672,12 @@ public class EndFileFeatureTests
     {
         private readonly CancellationTokenSource _stoppingTokenSource = new();
         private readonly CancellationTokenSource _stoppedTokenSource = new();
-        
+
         public CancellationToken ApplicationStarted => CancellationToken.None;
         public CancellationToken ApplicationStopping => _stoppingTokenSource.Token;
         public CancellationToken ApplicationStopped => _stoppedTokenSource.Token;
-        
-        public void StopApplication() 
+
+        public void StopApplication()
         {
             _stoppingTokenSource.Cancel();
             _stoppedTokenSource.Cancel();

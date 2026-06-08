@@ -1,49 +1,55 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
+  "additionalProperties": true,
   "properties": {
     "Watch": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
-        "Path": { "type": "string", "minLength": 1 },
+        "Path": { "type": "string" },
         "IncludeSubfolders": { "type": "boolean" },
-        "AllowedExtensions": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
+        "AllowedExtensions": { "type": "array", "items": { "type": "string" } },
         "RequireEndFile": { "type": "boolean" },
-        "EndFileExtensions": {
-          "type": "array",
-          "items": { "type": "string" }
-        },
+        "EndFileExtensions": { "type": "array", "items": { "type": "string" } },
         "TransferEndFiles": { "type": "boolean" }
       },
-      "required": [ "Path" ]
+      "required": ["Path"]
     },
     "Transfer": {
-      "allOf": [
-        { "$ref": "#/definitions/destination" },
-        {
-          "type": "object",
-          "properties": {
-            "Direction": { "enum": [ "get", "put", "both" ] },
-            "AdditionalDestinations": {
-              "type": "array",
-              "items": { "$ref": "#/definitions/destination" }
-            }
-          },
-          "required": [ "Direction" ]
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "Mode": { "enum": ["ftp", "sftp"] },
+        "Direction": { "enum": ["get", "put"] },
+        "Host": { "type": "string" },
+        "Port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "Username": { "type": "string" },
+        "Password": { "type": "string" },
+        "PrivateKeyPath": { "type": "string" },
+        "PrivateKeyPassphrase": { "type": "string" },
+        "HostKeyFingerprint": { "type": "string" },
+        "RemotePath": { "type": "string" },
+        "Concurrency": { "type": "integer", "minimum": 1, "maximum": 16 },
+        "PreserveFolderStructure": { "type": "boolean" },
+        "TimeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 3600 },
+        "AdditionalDestinations": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/Destination" }
         }
-      ]
+      },
+      "required": ["Mode", "Direction", "Host", "Username", "RemotePath"]
     },
     "App": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "LockFilePath": { "type": "string" }
       }
     },
     "Retry": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "MaxAttempts": { "type": "integer", "minimum": 0 },
         "DelaySeconds": { "type": "integer", "minimum": 0 }
@@ -51,15 +57,17 @@
     },
     "Hash": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "Enabled": { "type": "boolean" },
-        "Algorithm": { "enum": [ "SHA256", "SHA512" ] },
+        "Algorithm": { "enum": ["SHA256", "SHA512"] },
         "UseServerCommand": { "type": "boolean" }
       },
-      "required": [ "Algorithm" ]
+      "required": ["Algorithm"]
     },
     "Cleanup": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "DeleteAfterVerify": { "type": "boolean" },
         "DeleteRemoteAfterDownload": { "type": "boolean" },
@@ -69,6 +77,7 @@
     },
     "Smtp": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
         "Enabled": { "type": "boolean" },
         "RelayHost": { "type": "string" },
@@ -77,51 +86,46 @@
         "Username": { "type": "string" },
         "Password": { "type": "string" },
         "From": { "type": "string", "format": "email" },
-        "To": {
-          "type": "array",
-          "items": { "type": "string", "format": "email" },
-          "minItems": 1
-        }
-      },
-      "required": [ "To" ]
+        "To": { "type": "array", "items": { "type": "string", "format": "email" }, "minItems": 1 }
+      }
     },
     "Logging": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
-        "Level": {
-          "enum": [ "Trace", "Debug", "Information", "Warning", "Error", "Critical", "None" ]
-        },
-        "RollingFilePath": { "type": "string", "minLength": 1 },
+        "Level": { "enum": ["Trace", "Debug", "Information", "Warning", "Error", "Critical", "None"] },
+        "RollingFilePath": { "type": "string" },
         "MaxBytes": { "type": "integer", "minimum": 1024 },
         "Retention": {
           "type": "object",
+          "additionalProperties": false,
           "properties": {
             "Enabled": { "type": "boolean" },
             "RetentionDays": { "type": "integer", "minimum": 1, "maximum": 3650 }
           }
         }
-      },
-      "required": [ "RollingFilePath" ]
+      }
     }
   },
   "definitions": {
-    "destination": {
+    "Destination": {
       "type": "object",
+      "additionalProperties": false,
       "properties": {
-        "Mode": { "enum": [ "ftp", "sftp" ] },
-        "Host": { "type": "string", "minLength": 1 },
+        "Mode": { "enum": ["ftp", "sftp"] },
+        "Host": { "type": "string" },
         "Port": { "type": "integer", "minimum": 1, "maximum": 65535 },
-        "Username": { "type": "string", "minLength": 1 },
+        "Username": { "type": "string" },
         "Password": { "type": "string" },
         "PrivateKeyPath": { "type": "string" },
         "PrivateKeyPassphrase": { "type": "string" },
         "HostKeyFingerprint": { "type": "string" },
-        "RemotePath": { "type": "string", "minLength": 1 },
+        "RemotePath": { "type": "string" },
         "Concurrency": { "type": "integer", "minimum": 1, "maximum": 16 },
         "PreserveFolderStructure": { "type": "boolean" },
         "TimeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 3600 }
       },
-      "required": [ "Mode", "Host", "Username", "RemotePath" ]
+      "required": ["Mode", "Host", "Username", "RemotePath"]
     }
   }
 }
