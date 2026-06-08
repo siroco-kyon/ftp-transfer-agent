@@ -66,6 +66,70 @@ public class WorkerFailureTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_FailedUpload_IsRetriedOnNextRunAndDeletesOnlyAfterSuccess()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        var file = Path.Combine(dir, "sample.txt");
+        await File.WriteAllTextAsync(file, "data");
+
+        var watch = Options.Create(new WatchOptions { Path = dir });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 1
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+        var hash = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+        var cleanup = Options.Create(new CleanupOptions { DeleteAfterVerify = true });
+        var remotePath = "/remote/sample.txt";
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        using var provider = services.BuildServiceProvider();
+        var logger = provider.GetRequiredService<ILogger<Worker>>();
+
+        var firstClient = new Mock<IFileTransferClient>();
+        firstClient.Setup(c => c.UploadAsync(file, remotePath, It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new TimeoutException("upload failed"));
+        firstClient.Setup(c => c.Dispose());
+
+        using (var lifetime = new DummyLifetime())
+        {
+            var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider,
+                logger, lifetime, new NoDisposeClient(firstClient.Object));
+
+            await worker.RunAsync(CancellationToken.None);
+        }
+
+        firstClient.Verify(c => c.UploadAsync(file, remotePath, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.True(File.Exists(file), "Local file should remain after a failed upload so the next run can retry it.");
+
+        var secondClient = new Mock<IFileTransferClient>();
+        secondClient.Setup(c => c.UploadAsync(file, remotePath, It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        secondClient.Setup(c => c.Dispose());
+
+        using (var lifetime = new DummyLifetime())
+        {
+            var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider,
+                logger, lifetime, new NoDisposeClient(secondClient.Object));
+
+            await worker.RunAsync(CancellationToken.None);
+        }
+
+        secondClient.Verify(c => c.UploadAsync(file, remotePath, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.False(File.Exists(file), "Local file should be deleted only after the retry run succeeds.");
+
+        Directory.Delete(dir, true);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_WhenRemoteListingFails_MarksFailureExitCode()
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());

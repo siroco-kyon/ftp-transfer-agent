@@ -435,6 +435,131 @@ public class ConfigurationValidationTests
     }
 
     [Fact]
+    public void ConfigurationValidator_ShouldRejectDeleteAfterVerify_WhenSubfolderUploadsCanCollide()
+    {
+        var logger = new Mock<ILogger<ConfigurationValidator>>();
+        var validator = new ConfigurationValidator(logger.Object);
+        var testDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(testDir);
+
+        try
+        {
+            var watch = new WatchOptions
+            {
+                Path = testDir,
+                IncludeSubfolders = true
+            };
+            var transfer = new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "put",
+                Host = "test.com",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/remote",
+                PreserveFolderStructure = false
+            };
+            var cleanup = new CleanupOptions { DeleteAfterVerify = true };
+
+            var result = validator.ValidateConfiguration(watch, transfer, new RetryOptions(), new HashOptions(), cleanup);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Errors, e => e.Contains("DeleteAfterVerify cannot be enabled"));
+            Assert.Contains(result.Errors, e => e.Contains("primary"));
+        }
+        finally
+        {
+            Directory.Delete(testDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ConfigurationValidator_ShouldRejectDeleteAfterVerify_WhenAdditionalUploadDestinationCanCollide()
+    {
+        var logger = new Mock<ILogger<ConfigurationValidator>>();
+        var validator = new ConfigurationValidator(logger.Object);
+        var testDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(testDir);
+
+        try
+        {
+            var watch = new WatchOptions
+            {
+                Path = testDir,
+                IncludeSubfolders = true
+            };
+            var transfer = new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "put",
+                Host = "test.com",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/remote",
+                PreserveFolderStructure = true,
+                AdditionalDestinations = new List<DestinationOptions>
+                {
+                    new()
+                    {
+                        Mode = "ftp",
+                        Host = "backup.example.com",
+                        Username = "user",
+                        Password = "pass",
+                        RemotePath = "/backup",
+                        PreserveFolderStructure = false
+                    }
+                }
+            };
+            var cleanup = new CleanupOptions { DeleteAfterVerify = true };
+
+            var result = validator.ValidateConfiguration(watch, transfer, new RetryOptions(), new HashOptions(), cleanup);
+
+            Assert.False(result.IsValid);
+            Assert.Contains(result.Errors, e => e.Contains("DeleteAfterVerify cannot be enabled"));
+            Assert.Contains(result.Errors, e => e.Contains("destination#1"));
+        }
+        finally
+        {
+            Directory.Delete(testDir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ConfigurationValidator_ShouldRejectRemoteDeletion_WhenSubfolderDownloadsCanCollide()
+    {
+        var logger = new Mock<ILogger<ConfigurationValidator>>();
+        var validator = new ConfigurationValidator(logger.Object);
+
+        var watch = new WatchOptions
+        {
+            Path = Path.GetTempPath(),
+            IncludeSubfolders = true,
+            TransferEndFiles = true
+        };
+        var transfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "get",
+            Host = "test.com",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            PreserveFolderStructure = false
+        };
+        var cleanup = new CleanupOptions
+        {
+            DeleteRemoteAfterDownload = true,
+            DeleteRemoteEndFiles = true
+        };
+
+        var result = validator.ValidateConfiguration(watch, transfer, new RetryOptions(), new HashOptions(), cleanup);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("DeleteRemoteAfterDownload cannot be enabled"));
+        Assert.Contains(result.Errors, e => e.Contains("DeleteRemoteEndFiles cannot be enabled"));
+    }
+
+    [Fact]
     public void ConfigurationValidator_ShouldValidateTransferEndFilesSettings()
     {
         using var loggerFactory = LoggerFactory.Create(builder => builder.AddConsole());
