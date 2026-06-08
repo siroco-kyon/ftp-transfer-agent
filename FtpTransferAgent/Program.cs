@@ -61,6 +61,7 @@ if (smtp.Enabled)
 
 // 設定バリデーターを登録
 builder.Services.AddSingleton<ConfigurationValidator>();
+builder.Services.AddSingleton<ApplicationExitCode>();
 
 // バックグラウンド処理を行う Worker を登録
 builder.Services.AddHostedService<Worker>();
@@ -126,6 +127,11 @@ try
     try
     {
         host.Run();
+        var exitCode = host.Services.GetRequiredService<ApplicationExitCode>().Code;
+        if (exitCode != 0)
+        {
+            Environment.ExitCode = exitCode;
+        }
     }
     finally
     {

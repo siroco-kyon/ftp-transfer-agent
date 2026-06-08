@@ -1,4 +1,5 @@
 using System.IO;
+using System.Runtime.ExceptionServices;
 using System.Threading.Channels;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Services;
@@ -21,12 +22,13 @@ public class Worker : BackgroundService
     private readonly CleanupOptions _cleanup;
     private readonly IServiceProvider _services;
     private readonly IHostApplicationLifetime _lifetime;
+    private readonly ApplicationExitCode? _exitCode;
     private readonly FanoutCoordinator _fanout = new();
 
     // 転送処理用のチャンネル（容量制限でメモリリーク防止）
 
     // DI された各種オプションを受け取る
-    public Worker(IOptions<WatchOptions> watch, IOptions<TransferOptions> transfer, IOptions<RetryOptions> retry, IOptions<HashOptions> hash, IOptions<CleanupOptions> cleanup, IServiceProvider services, ILogger<Worker> logger, IHostApplicationLifetime lifetime)
+    public Worker(IOptions<WatchOptions> watch, IOptions<TransferOptions> transfer, IOptions<RetryOptions> retry, IOptions<HashOptions> hash, IOptions<CleanupOptions> cleanup, IServiceProvider services, ILogger<Worker> logger, IHostApplicationLifetime lifetime, ApplicationExitCode? exitCode = null)
     {
         _watch = watch.Value;
         _transfer = transfer.Value;
@@ -36,6 +38,7 @@ public class Worker : BackgroundService
         _services = services;
         _logger = logger;
         _lifetime = lifetime;
+        _exitCode = exitCode;
     }
 
     private sealed class QueueContext
@@ -303,19 +306,21 @@ public class Worker : BackgroundService
             {
                 // 各転送処理の識別子
                 var id = Guid.NewGuid();
+                long bytesTransferred;
                 if (item.Action == TransferAction.Upload)
                 {
                     // Upload は宛先ごとに専用クライアントを生成
                     var dest = item.Destination ?? context.Destination;
                     using var perItemClient = CreateClientFor(dest);
-                    await ProcessUploadAsync(perItemClient, item, id, token).ConfigureAwait(false);
+                    bytesTransferred = await ProcessUploadAsync(perItemClient, item, id, token).ConfigureAwait(false);
                 }
                 else
                 {
                     // Download は primary のみ (Destination 未使用)
                     using var perItemClient = CreateClient();
-                    await ProcessDownloadAsync(perItemClient, item, id, token).ConfigureAwait(false);
+                    bytesTransferred = await ProcessDownloadAsync(perItemClient, item, id, token).ConfigureAwait(false);
                 }
+                context.Queue.RecordBytesTransferred(bytesTransferred);
             },
             onFinalOutcome: (item, ex) =>
             {
@@ -331,6 +336,8 @@ public class Worker : BackgroundService
             },
             stoppingToken))
             .ToArray();
+
+        Exception? enumerationException = null;
 
         // ファイル列挙フェーズ：例外発生時も必ず Channel を完了してワーカーを解放する
         try
@@ -552,6 +559,10 @@ public class Worker : BackgroundService
         }
 
         } // try（ファイル列挙フェーズ）
+        catch (Exception ex)
+        {
+            enumerationException = ex;
+        }
         finally
         {
             // 例外発生時もワーカーが WaitToReadAsync でブロックし続けないよう Channel を必ず完了する
@@ -581,16 +592,51 @@ public class Worker : BackgroundService
                 _logger.LogWarning("Performance monitoring task did not complete within timeout");
             }
         }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            _logger.LogInformation("Transfer was cancelled.");
+            throw;
+        }
         catch (Exception ex)
         {
+            _exitCode?.MarkFailure();
             _logger.LogError(ex, "Error during transfer: {Error}", ex.Message);
             throw;
         }
+        finally
+        {
+            monitorCts.Cancel();
+
+            try
+            {
+                await Task.WhenAll(monitorTasks).WaitAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                _logger.LogWarning("Performance monitoring task did not complete within timeout");
+            }
+        }
 
         // 最終統計情報をログ出力
+        if (enumerationException is not null)
+        {
+            if (enumerationException is not OperationCanceledException || !stoppingToken.IsCancellationRequested)
+            {
+                _exitCode?.MarkFailure();
+            }
+
+            ExceptionDispatchInfo.Capture(enumerationException).Throw();
+        }
+
         var finalStats = AggregateStatistics(queueContexts.Select(context => context.Queue.GetStatistics()));
-        _logger.LogInformation("Transfer completed. Total: {Total}, Success: {Success}, Failed: {Failed}, Critical Errors: {Critical}, Success Rate: {Rate:F1}%",
-            finalStats.TotalEnqueued, finalStats.TotalCompleted, finalStats.TotalFailed, finalStats.CriticalErrorCount, finalStats.SuccessRate);
+        _logger.LogInformation("Transfer completed. Total: {Total}, Success: {Success}, Failed: {Failed}, Critical Errors: {Critical}, Success Rate: {Rate:F1}%, Volume: {Volume}",
+            finalStats.TotalEnqueued, finalStats.TotalCompleted, finalStats.TotalFailed, finalStats.CriticalErrorCount, finalStats.SuccessRate, FormatBytes(finalStats.TotalBytesTransferred));
+
+        if (finalStats.TotalFailed > 0 || finalStats.CriticalErrorCount > 0)
+        {
+            _exitCode?.MarkFailure();
+            _logger.LogError("Transfer completed with failures. The process exit code will be set to 1.");
+        }
 
         // クリティカルエラーがあれば詳細をログ出力
         var criticalExceptions = queueContexts.SelectMany(context => context.Queue.GetCriticalExceptions());
@@ -616,9 +662,21 @@ public class Worker : BackgroundService
             aggregated.MemoryUsageMB = Math.Max(aggregated.MemoryUsageMB, stats.MemoryUsageMB);
             aggregated.ActiveWorkers += stats.ActiveWorkers;
             aggregated.CriticalErrorCount += stats.CriticalErrorCount;
+            aggregated.TotalBytesTransferred += stats.TotalBytesTransferred;
         }
 
         return aggregated;
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        const double KB = 1024.0;
+        const double MB = KB * 1024;
+        const double GB = MB * 1024;
+        if (bytes >= GB) return $"{bytes / GB:F2} GB";
+        if (bytes >= MB) return $"{bytes / MB:F2} MB";
+        if (bytes >= KB) return $"{bytes / KB:F2} KB";
+        return $"{bytes:N0} B";
     }
 
     private string BuildRemotePath(DestinationOptions dest, string localPath)
@@ -638,7 +696,7 @@ public class Worker : BackgroundService
         return remoteBase == "/" ? $"/{remoteName}" : $"{remoteBase}/{remoteName}";
     }
 
-    private async Task UploadPathWithHashAsync(
+    private async Task<long> UploadPathWithHashAsync(
         IFileTransferClient client,
         string localPath,
         string remotePath,
@@ -646,7 +704,8 @@ public class Worker : BackgroundService
         Guid id,
         CancellationToken token)
     {
-        _logger.LogInformation("[{Id}] Starting upload {File} to {Dest} ({Remote})", id, localPath, destLabel, remotePath);
+        var fileSize = new FileInfo(localPath).Length;
+        _logger.LogInformation("[{Id}] Starting upload {File} ({Size}) to {Dest} ({Remote})", id, localPath, FormatBytes(fileSize), destLabel, remotePath);
 
         if (_hash.Enabled)
         {
@@ -654,7 +713,7 @@ public class Worker : BackgroundService
             _logger.LogDebug("[{Id}] Local hash calculated for {File}: {Hash}", id, localPath, localHash);
 
             await client.UploadAsync(localPath, remotePath, token).ConfigureAwait(false);
-            _logger.LogInformation("[{Id}] Upload completed for {File} -> {Dest}", id, localPath, destLabel);
+            _logger.LogInformation("[{Id}] Upload completed for {File} -> {Dest} ({Size})", id, localPath, destLabel, FormatBytes(fileSize));
 
             var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token, _hash.UseServerCommand).ConfigureAwait(false);
             _logger.LogDebug("[{Id}] Remote hash calculated for {Remote}: {Hash}", id, remotePath, remoteHash);
@@ -667,11 +726,12 @@ public class Worker : BackgroundService
             }
 
             _logger.LogInformation("[{Id}] Hash verification successful for {File} at {Dest}", id, localPath, destLabel);
-            return;
+            return fileSize;
         }
 
         await client.UploadAsync(localPath, remotePath, token).ConfigureAwait(false);
-        _logger.LogInformation("[{Id}] Upload completed for {File} -> {Dest} (hash verification disabled)", id, localPath, destLabel);
+        _logger.LogInformation("[{Id}] Upload completed for {File} -> {Dest} ({Size}, hash verification disabled)", id, localPath, destLabel, FormatBytes(fileSize));
+        return fileSize;
     }
 
     private async Task TryDeleteRemoteEndFileAsync(
@@ -702,7 +762,7 @@ public class Worker : BackgroundService
     /// ファンアウト対応: item.Destination が示す 1 宛先へ送信し、
     /// FanoutCoordinator に成功/失敗を報告する。ローカル削除は coordinator 側で集約実施。
     /// </summary>
-    private async Task ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token)
+    private async Task<long> ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token)
     {
         var dest = item.Destination ?? _transfer;
         var destLabel = DescribeDestination(dest);
@@ -740,7 +800,9 @@ public class Worker : BackgroundService
             remotePath = $"{remoteBase}/{remoteName}";
         }
 
-        _logger.LogInformation("[{Id}] Starting upload {File} to {Dest} ({Remote})", id, item.Path, destLabel, remotePath);
+        var fileSize = new FileInfo(item.Path).Length;
+        var bytesTransferred = fileSize;
+        _logger.LogInformation("[{Id}] Starting upload {File} ({Size}) to {Dest} ({Remote})", id, item.Path, FormatBytes(fileSize), destLabel, remotePath);
 
         var isEndFile = IsEndFile(item.Path);
         if (_hash.Enabled)
@@ -749,7 +811,7 @@ public class Worker : BackgroundService
             _logger.LogDebug("[{Id}] Local hash calculated: {Hash}", id, localHash);
 
             await client.UploadAsync(item.Path, remotePath, token).ConfigureAwait(false);
-            _logger.LogInformation("[{Id}] Upload completed for {File} -> {Dest}", id, item.Path, destLabel);
+            _logger.LogInformation("[{Id}] Upload completed for {File} -> {Dest} ({Size})", id, item.Path, destLabel, FormatBytes(fileSize));
 
             var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token, _hash.UseServerCommand).ConfigureAwait(false);
             _logger.LogDebug("[{Id}] Remote hash calculated: {Hash}", id, remoteHash);
@@ -766,7 +828,7 @@ public class Worker : BackgroundService
         else
         {
             await client.UploadAsync(item.Path, remotePath, token).ConfigureAwait(false);
-            _logger.LogInformation("[{Id}] Upload completed for {File} -> {Dest} (hash verification disabled)", id, item.Path, destLabel);
+            _logger.LogInformation("[{Id}] Upload completed for {File} -> {Dest} ({Size}, hash verification disabled)", id, item.Path, destLabel, FormatBytes(fileSize));
         }
 
         if (!isEndFile && _watch.TransferEndFiles)
@@ -774,7 +836,7 @@ public class Worker : BackgroundService
             foreach (var endFile in GetExistingEndFilesForDataFile(item.Path))
             {
                 var endRemotePath = BuildRemotePath(dest, endFile);
-                await UploadPathWithHashAsync(client, endFile, endRemotePath, destLabel, id, token).ConfigureAwait(false);
+                bytesTransferred += await UploadPathWithHashAsync(client, endFile, endRemotePath, destLabel, id, token).ConfigureAwait(false);
                 await TryDeleteRemoteEndFileAsync(client, endRemotePath, destLabel, id, token).ConfigureAwait(false);
             }
         }
@@ -793,13 +855,15 @@ public class Worker : BackgroundService
             }
         }
 
+        return bytesTransferred;
+
         // ローカルファイル削除はファンアウト集約で実施するためここでは行わない
     }
 
     /// <summary>
     /// ダウンロード処理（確実なハッシュ検証付き）
     /// </summary>
-    private async Task ProcessDownloadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token)
+    private async Task<long> ProcessDownloadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token)
     {
         string localPath;
         
@@ -885,6 +949,7 @@ public class Worker : BackgroundService
 
         _logger.LogInformation("[{Id}] Starting download {Remote} to {Local}", id, item.Path, localPath);
 
+        long fileSize;
         if (_hash.Enabled)
         {
             // 事前にリモートファイルのハッシュを計算
@@ -893,7 +958,8 @@ public class Worker : BackgroundService
 
             // ダウンロード実行
             await client.DownloadAsync(item.Path, localPath, token).ConfigureAwait(false);
-            _logger.LogInformation("[{Id}] Download completed for {Remote}", id, item.Path);
+            fileSize = new FileInfo(localPath).Length;
+            _logger.LogInformation("[{Id}] Download completed for {Remote} ({Size})", id, item.Path, FormatBytes(fileSize));
 
             // ローカルファイルのハッシュを計算して検証
             var localHash = await HashUtil.ComputeHashAsync(localPath, _hash.Algorithm, token).ConfigureAwait(false);
@@ -912,17 +978,19 @@ public class Worker : BackgroundService
         {
             // ハッシュ検証なしでダウンロード
             await client.DownloadAsync(item.Path, localPath, token).ConfigureAwait(false);
-            _logger.LogInformation("[{Id}] Download completed for {Remote} (hash verification disabled)", id, item.Path);
+            fileSize = new FileInfo(localPath).Length;
+            _logger.LogInformation("[{Id}] Download completed for {Remote} ({Size}, hash verification disabled)", id, item.Path, FormatBytes(fileSize));
         }
 
         // ENDファイルまたは通常ファイルの削除判定
         var isEndFileRemote = IsEndFileRemote(item.Path);
+        var bytesTransferred = fileSize;
 
         if (!isEndFileRemote && item.RelatedEndFilePaths is { Count: > 0 })
         {
             foreach (var endFilePath in item.RelatedEndFilePaths)
             {
-                await ProcessDownloadAsync(
+                bytesTransferred += await ProcessDownloadAsync(
                     client,
                     new TransferItem(endFilePath, TransferAction.Download),
                     id,
@@ -946,6 +1014,8 @@ public class Worker : BackgroundService
                 _logger.LogWarning("[{Id}] Failed to delete remote file {Remote}: {Error}", id, item.Path, ex.Message);
             }
         }
+
+        return bytesTransferred;
     }
 
     /// <summary>

@@ -299,6 +299,23 @@ public class SftpClientWrapperTests : IDisposable
         wrapper.Dispose();
     }
 
+    [Theory]
+    [InlineData("remote/file.txt", new[] { "remote" })]
+    [InlineData("remote/sub/file.txt", new[] { "remote", "remote/sub" })]
+    [InlineData("/remote/file.txt", new[] { "/remote" })]
+    [InlineData("/remote/sub/file.txt", new[] { "/remote", "/remote/sub" })]
+    public void DirectoryCreationPaths_ShouldPreserveRelativeAndAbsoluteRemotePaths(string remotePath, string[] expected)
+    {
+        var dir = Path.GetDirectoryName(remotePath)!.Replace('\\', '/');
+        var method = typeof(SftpClientWrapper).GetMethod(
+            "GetDirectoryCreationPaths",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!;
+
+        var actual = ((IReadOnlyList<string>)method.Invoke(null, new object[] { dir })!).ToArray();
+
+        Assert.Equal(expected, actual);
+    }
+
     [Fact]
     public void PathSecurity_ShouldPreventTraversal()
     {

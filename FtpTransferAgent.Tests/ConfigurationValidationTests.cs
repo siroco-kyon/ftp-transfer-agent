@@ -335,6 +335,19 @@ public class ConfigurationValidationTests
             var emailValidation = ValidateObject(options);
             Assert.NotEmpty(emailValidation);
         }
+
+        var nullRecipients = new SmtpOptions
+        {
+            RelayHost = "smtp.test.com",
+            RelayPort = 587,
+            From = "test@example.com",
+            To = null!,
+            Username = "user",
+            Password = "pass"
+        };
+        var nullRecipientsValidation = ValidateObject(nullRecipients);
+        Assert.NotEmpty(nullRecipientsValidation);
+        Assert.Contains(nullRecipientsValidation, r => r.MemberNames.Contains(nameof(SmtpOptions.To)));
     }
 
     [Fact]

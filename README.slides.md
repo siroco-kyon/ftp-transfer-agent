@@ -68,7 +68,7 @@ FTP / SFTP / ハッシュ検証 / END ファイル制御
 
 ## 主な機能
 
-- 転送方向: `put` / `get` / `both`
+- 転送方向: `put` / `get`
 - 認証: FTP パスワード、SFTP パスワード、SFTP 秘密鍵
 - 安全性: SFTP ホスト鍵フィンガープリント検証
 - 信頼性: 指数バックオフ再試行、最大 16 並列転送
@@ -226,4 +226,3 @@ dotnet run --project FtpTransferAgent -- --Transfer:Concurrency=4 --Hash:Algorit
 - FtpTransferAgent は **定期実行向けの堅実な転送バッチ**
 - 転送だけでなく **検証、再試行、END 制御、後始末** までカバー
 - 実運用では **SFTP + ホスト鍵検証 + 衝突回避設定** が重要
-

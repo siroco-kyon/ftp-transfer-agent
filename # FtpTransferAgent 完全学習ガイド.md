@@ -362,7 +362,7 @@ public class TransferOptions
     public string Mode { get; set; } = "ftp";
     
     [Required]
-    [RegularExpression("^(get|put|both)$")]
+    [RegularExpression("^(get|put)$")]
     public string Direction { get; set; } = "put";
     
     [Range(1, 16)]

@@ -87,6 +87,88 @@ public class WorkerDownloadTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_TransferEndFiles_WithParallelDownloads_WaitsForDataBeforeEndFile()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+
+        var watch = Options.Create(new WatchOptions
+        {
+            Path = dir,
+            RequireEndFile = true,
+            TransferEndFiles = true,
+            EndFileExtensions = new[] { ".END" }
+        });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "get",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 2
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+        var hashOpt = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+        var cleanup = Options.Create(new CleanupOptions());
+
+        var remoteFile = "/remote/sample.txt";
+        var remoteEndFile = "/remote/sample.txt.END";
+        var localPath = Path.Combine(dir, "sample.txt");
+        var localEndPath = Path.Combine(dir, "sample.txt.END");
+
+        var dataStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseData = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var dataCompleted = 0;
+        var endStartedBeforeDataCompleted = 0;
+
+        var mock = new Mock<IFileTransferClient>();
+        mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(new[] { remoteFile, remoteEndFile });
+        mock.Setup(c => c.DownloadAsync(remoteFile, localPath, It.IsAny<CancellationToken>()))
+            .Returns(async () =>
+            {
+                dataStarted.TrySetResult(true);
+                await releaseData.Task;
+                File.WriteAllText(localPath, "data");
+                Interlocked.Exchange(ref dataCompleted, 1);
+            });
+        mock.Setup(c => c.DownloadAsync(remoteEndFile, localEndPath, It.IsAny<CancellationToken>()))
+            .Returns(() =>
+            {
+                if (Volatile.Read(ref dataCompleted) == 0)
+                {
+                    Interlocked.Exchange(ref endStartedBeforeDataCompleted, 1);
+                }
+                File.WriteAllText(localEndPath, "end");
+                return Task.CompletedTask;
+            });
+        mock.Setup(c => c.Dispose());
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var provider = services.BuildServiceProvider();
+        var logger = provider.GetRequiredService<ILogger<Worker>>();
+
+        using var lifetime = new DummyLifetime();
+        var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
+        var workerTask = worker.RunAsync(CancellationToken.None);
+
+        await dataStarted.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        await Task.Delay(200);
+        Assert.Equal(0, Volatile.Read(ref endStartedBeforeDataCompleted));
+
+        releaseData.TrySetResult(true);
+        await workerTask;
+
+        mock.Verify(c => c.DownloadAsync(remoteEndFile, localEndPath, It.IsAny<CancellationToken>()), Times.Once);
+        Assert.Equal(0, Volatile.Read(ref endStartedBeforeDataCompleted));
+
+        Directory.Delete(dir, true);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_DownloadsSubdirectoryFilesWithPreserveFolderStructure()
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
