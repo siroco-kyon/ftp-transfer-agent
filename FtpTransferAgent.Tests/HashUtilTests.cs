@@ -57,14 +57,14 @@ public class HashUtilTests
     }
 
     [Fact]
-    public void ComputeHashSync_ReturnsSameValueAsAsync()
+    public async Task ComputeHashSync_ReturnsSameValueAsAsync()
     {
         var bytes = Encoding.UTF8.GetBytes("sync hash test data");
         using var syncStream = new MemoryStream(bytes);
         using var asyncStream = new MemoryStream(bytes);
 
         var syncHash = HashUtil.ComputeHashSync(syncStream, "SHA256");
-        var asyncHash = HashUtil.ComputeHashAsync(asyncStream, "SHA256", CancellationToken.None).GetAwaiter().GetResult();
+        var asyncHash = await HashUtil.ComputeHashAsync(asyncStream, "SHA256", CancellationToken.None);
 
         Assert.Equal(asyncHash, syncHash);
     }

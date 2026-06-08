@@ -53,7 +53,7 @@ public class ConfigurationValidator
             return;
         }
 
-        if (transfer.Direction is "get" or "both")
+        if (transfer.Direction is "get")
         {
             result.Warnings.Add($"AdditionalDestinations is set ({transfer.AdditionalDestinations.Count} entries) but Direction is '{transfer.Direction}'. Additional destinations are used only for uploads.");
         }
@@ -108,8 +108,13 @@ public class ConfigurationValidator
 
     private void ValidateBasicConfiguration(WatchOptions watch, TransferOptions transfer, ConfigurationValidationResult result)
     {
+        if (transfer.Direction is not "put" and not "get")
+        {
+            result.Errors.Add($"Direction must be 'put' or 'get' (got '{transfer.Direction}')");
+        }
+
         // ローカルパスの存在チェック
-        if (transfer.Direction is "put" or "both")
+        if (transfer.Direction is "put")
         {
             if (!Directory.Exists(watch.Path))
             {
@@ -122,7 +127,7 @@ public class ConfigurationValidator
         }
         
         // ダウンロード先ディレクトリの存在チェック
-        if (transfer.Direction is "get" or "both")
+        if (transfer.Direction is "get")
         {
             if (!Directory.Exists(watch.Path))
             {
@@ -190,7 +195,7 @@ public class ConfigurationValidator
         // TransferEndFiles の設定検証（RequireEndFileに関係なく独立してチェック）
         if (watch.TransferEndFiles && !watch.RequireEndFile)
         {
-            result.Warnings.Add("TransferEndFiles is enabled but RequireEndFile is disabled. END files will be transferred even without corresponding data files");
+            result.Warnings.Add("TransferEndFiles is enabled but RequireEndFile is disabled. END files will only be transferred when their corresponding data files are also selected for transfer.");
         }
 
         if (watch.TransferEndFiles && (watch.EndFileExtensions == null || watch.EndFileExtensions.Length == 0))
@@ -226,11 +231,6 @@ public class ConfigurationValidator
         }
 
         // 双方向転送で並行処理数が多い場合の警告
-        if (transfer.Direction == "both" && transfer.Concurrency > 4)
-        {
-            result.Warnings.Add("High concurrency with bidirectional transfer may cause connection issues");
-        }
-
         // リトライ間隔の設定チェック
         if (retry.DelaySeconds < 1)
         {
@@ -296,14 +296,6 @@ public class ConfigurationValidator
         }
 
         // 双方向転送での潜在的な問題
-        if (transfer.Direction == "both")
-        {
-            if (cleanup.DeleteAfterVerify && cleanup.DeleteRemoteAfterDownload)
-            {
-                result.Warnings.Add("Bidirectional transfer with file deletion may cause data loss");
-            }
-        }
-
         // 大量ファイル処理の警告
         if (watch.IncludeSubfolders && transfer.Concurrency > 8)
         {
@@ -311,7 +303,7 @@ public class ConfigurationValidator
         }
 
         // ダウンロード方向でのサブディレクトリ設定検証
-        if (transfer.Direction is "get" or "both")
+        if (transfer.Direction is "get")
         {
             if (watch.IncludeSubfolders && !transfer.PreserveFolderStructure)
             {
@@ -325,7 +317,7 @@ public class ConfigurationValidator
         }
 
         // アップロード方向でのサブディレクトリ設定検証
-        if (transfer.Direction is "put" or "both")
+        if (transfer.Direction is "put")
         {
             if (watch.IncludeSubfolders && !transfer.PreserveFolderStructure)
             {
@@ -359,12 +351,6 @@ public class ConfigurationValidator
         if (watch.TransferEndFiles && (watch.EndFileExtensions == null || watch.EndFileExtensions.Length == 0))
         {
             result.Errors.Add("TransferEndFiles is enabled but no END file extensions are configured.");
-        }
-        
-        // ENDファイル機能の設定整合性チェック
-        if (watch.TransferEndFiles && !watch.RequireEndFile)
-        {
-            result.Warnings.Add("TransferEndFiles is enabled but RequireEndFile is disabled. This may result in unexpected behavior.");
         }
         
         // 並列度とタイムアウトの組み合わせ警告

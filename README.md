@@ -6,7 +6,7 @@
 ## 概要
 
 - 起動時に 1 回だけ処理して終了します（常駐監視はしません）
-- `put`（アップロード）/`get`（ダウンロード）/`both`（双方向）に対応します
+- `put`（アップロード）/`get`（ダウンロード）に対応します
 - 並列転送、再試行、ENDファイル制御、転送後クリーンアップに対応します
 
 ## 主な機能
@@ -197,14 +197,14 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `AllowedExtensions` | string[] | 任意 | `[]` | 対象ファイルのフィルタ。拡張子 (`"txt"` / `".txt"`) またはワイルドカード (`"*.txt"` / `"data_*.csv"`) を指定可能。空配列は全ファイル対象（起動時警告あり） |
 | `RequireEndFile` | bool | 任意 | `false` | 対応する END ファイルがあるデータのみ転送 |
 | `EndFileExtensions` | string[] | 任意 | `[".END", ".end"]` | END 拡張子一覧 |
-| `TransferEndFiles` | bool | 任意 | `false` | END ファイル自体も転送キューに入れる |
+| `TransferEndFiles` | bool | 任意 | `false` | 対応するデータ転送の成功後に END ファイル自体も転送する |
 
 ### Transfer
 
 | 項目 | 型 | 必須 | 既定値 | 説明 |
 |---|---|---|---|---|
 | `Mode` | string | 必須 | `"ftp"` | `ftp` / `sftp` |
-| `Direction` | string | 必須 | `"put"` | `put` / `get` / `both` |
+| `Direction` | string | 必須 | `"put"` | `put` / `get` |
 | `Host` | string | 必須 | `""` | 接続先ホスト |
 | `Port` | int | 任意 | `21` | 接続ポート（SFTP は通常 22） |
 | `Username` | string | 必須 | `""` | 認証ユーザー |
@@ -292,7 +292,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 ```
 
 - `TransferEndFiles: false` のとき、END ファイルは転送されずローカルに残る
-- `DeleteLocalSkippedEndFiles: true` を併用すると、データ転送完了後に END ファイルもローカルから削除される
+- `DeleteLocalSkippedEndFiles: true` を併用すると、対応するデータ転送が成功した後に END ファイルもローカルから削除される
 
 #### 4. ワイルドカードでファイル指定
 
@@ -339,7 +339,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 - **全宛先成功時のみ**ローカルファイルを削除（`Cleanup.DeleteAfterVerify: true` 時）
 - 1 つでも失敗した場合はローカル保持 + ERROR ログ出力 → 次回起動で再送
 - 部分失敗時の再実行は all-or-nothing で、失敗宛先だけでなく成功済み宛先にも再送する
-- `Direction: get` / `both` では追加宛先は使用されず、警告が表示される
+- `Direction: get` では追加宛先は使用されず、警告が表示される
 
 ### Cleanup
 
@@ -348,7 +348,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `DeleteAfterVerify` | bool | 任意 | `false` | `put` 成功後、ローカルファイルを削除 |
 | `DeleteRemoteAfterDownload` | bool | 任意 | `false` | `get` 成功後、リモートファイルを削除 |
 | `DeleteRemoteEndFiles` | bool | 任意 | `false` | END ファイル成功時のリモート END ファイル削除 |
-| `DeleteLocalSkippedEndFiles` | bool | 任意 | `false` | `put` で `TransferEndFiles=false` のとき、転送しなかった END ファイルをローカルから削除する |
+| `DeleteLocalSkippedEndFiles` | bool | 任意 | `false` | `put` で `TransferEndFiles=false` のとき、転送成功したデータに対応する未転送 END ファイルをローカルから削除する |
 
 ### Smtp
 
@@ -400,7 +400,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 
 関連警告:
 
-- `TransferEndFiles: true` かつ `RequireEndFile: false` の組み合わせでは、起動時に警告が表示されます。
+- `TransferEndFiles: true` かつ `RequireEndFile: false` の組み合わせでは、起動時に警告が表示されます。対応するデータが転送対象になった END ファイルだけが転送されます。
 
 ## ENDファイル制御
 
@@ -422,7 +422,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 - `TransferEndFiles: true` のとき END ファイルも転送（転送成功後にローカルの END ファイルを削除）
 - 順序は「データ -> END」を保証
 - 対応データがない END は転送しない
-- `TransferEndFiles: false` かつ `Cleanup.DeleteLocalSkippedEndFiles: true` のとき、転送しなかった END ファイルをローカルから削除する
+- `TransferEndFiles: false` かつ `Cleanup.DeleteLocalSkippedEndFiles: true` のとき、転送成功したデータに対応する END ファイルをローカルから削除する
 
 ## 二重起動防止（ロックファイル）
 

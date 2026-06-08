@@ -11,7 +11,7 @@ namespace FtpTransferAgent.Configuration;
 public class TransferOptions : DestinationOptions
 {
     [Required]
-    [RegularExpression("^(get|put|both)$")]
+    [RegularExpression("^(get|put)$")]
     public string Direction { get; set; } = "put";
 
     /// <summary>

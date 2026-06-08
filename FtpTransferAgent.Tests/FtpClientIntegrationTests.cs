@@ -62,7 +62,7 @@ public class FtpClientIntegrationTests
             var opts = new TransferOptions
             {
                 Mode = "ftp",
-                Direction = "both",
+                Direction = "put",
                 Host = "localhost",
                 Port = 2121,
                 Username = "user",

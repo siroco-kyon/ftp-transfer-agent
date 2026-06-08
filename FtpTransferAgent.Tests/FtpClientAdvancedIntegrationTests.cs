@@ -90,7 +90,7 @@ public class FtpClientAdvancedIntegrationTests
         return new TransferOptions
         {
             Mode = "ftp",
-            Direction = "both",
+            Direction = "put",
             Host = "localhost",
             Port = port,
             Username = "user",

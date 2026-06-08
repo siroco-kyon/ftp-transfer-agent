@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Net;
 using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Services;
 using Microsoft.Extensions.Logging;
@@ -15,7 +16,10 @@ public sealed class DockerFactAttribute : FactAttribute
 {
     private static readonly Lazy<string?> SkipReason = new(DetectSkipReason);
 
-    public DockerFactAttribute()
+    public DockerFactAttribute(
+        [CallerFilePath] string? sourceFilePath = null,
+        [CallerLineNumber] int sourceLineNumber = 0)
+        : base(sourceFilePath, sourceLineNumber)
     {
         var reason = SkipReason.Value;
         if (!string.IsNullOrEmpty(reason))
@@ -81,7 +85,7 @@ public sealed class DockerSftpFixture : IAsyncLifetime
     private readonly string _containerName = $"ftp-transfer-agent-sftp-{Guid.NewGuid():N}";
     private bool _containerStarted;
 
-    public async Task InitializeAsync()
+    public async ValueTask InitializeAsync()
     {
         Port = GetAvailablePort();
 
@@ -122,7 +126,7 @@ public sealed class DockerSftpFixture : IAsyncLifetime
         IsAvailable = true;
     }
 
-    public async Task DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         IsAvailable = false;
 
@@ -337,7 +341,7 @@ public class SftpClientDockerIntegrationTests
         return new TransferOptions
         {
             Mode = "sftp",
-            Direction = "both",
+            Direction = "put",
             Host = _fixture.Host,
             Port = _fixture.Port,
             Username = _fixture.Username,

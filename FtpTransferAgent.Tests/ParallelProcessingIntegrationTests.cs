@@ -230,7 +230,7 @@ public class ParallelProcessingIntegrationTests : IDisposable
         var transfer = new TransferOptions
         {
             Mode = "ftp", // セキュリティ警告対象
-            Direction = "both", // 双方向
+            Direction = "put", // upload
             Host = "example.com",
             Username = "user",
             Password = "plaintext",
@@ -279,7 +279,7 @@ public class ParallelProcessingIntegrationTests : IDisposable
             Port = 22, // 変更
             Username = "newuser", // 変更
             Concurrency = 8, // 4倍増加
-            Direction = "both" // 変更
+            Direction = "get" // 変更
         };
 
         // Act

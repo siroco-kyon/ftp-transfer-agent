@@ -15,7 +15,7 @@ namespace FtpTransferAgent.Tests;
 public class EndFileSecurityTests
 {
     [Fact]
-    public async Task HasEndFile_WithNullFilePath_ShouldReturnFalse()
+    public void HasEndFile_WithNullFilePath_ShouldReturnFalse()
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
@@ -152,7 +152,7 @@ public class EndFileSecurityTests
     }
 
     [Fact]
-    public async Task HasEndFile_WithInvalidPath_ShouldReturnFalse()
+    public void HasEndFile_WithInvalidPath_ShouldReturnFalse()
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
@@ -255,7 +255,7 @@ public class EndFileSecurityTests
     }
 
     [Fact]
-    public async Task IsEndFile_ShouldIdentifyEndFilesCorrectly()
+    public void IsEndFile_ShouldIdentifyEndFilesCorrectly()
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);

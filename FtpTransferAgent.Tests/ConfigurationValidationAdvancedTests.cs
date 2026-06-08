@@ -102,7 +102,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     }
 
     [Fact]
-    public void ValidateConfiguration_WithBidirectionalAndHighConcurrency_ShouldWarn()
+    public void ValidateConfiguration_WithBothDirection_ShouldFail()
     {
         // Arrange
         var watch = new WatchOptions { Path = _testDirectory };
@@ -123,8 +123,8 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
 
         // Assert
-        Assert.True(result.HasWarnings);
-        Assert.Contains(result.Warnings, w => w.Contains("High concurrency with bidirectional transfer"));
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("Direction must be 'put' or 'get'"));
     }
 
     [Fact]
@@ -338,7 +338,7 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     {
         // Arrange
         var oldConfig = new TransferOptions { Direction = "put" };
-        var newConfig = new TransferOptions { Direction = "both" };
+        var newConfig = new TransferOptions { Direction = "get" };
 
         // Act
         var assessment = _validator.AssessConfigurationChange(oldConfig, newConfig);

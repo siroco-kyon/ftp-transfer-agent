@@ -51,8 +51,7 @@ public class ConfigurationValidationTests
         var validOptions = new[]
         {
             new TransferOptions { Mode = "ftp", Direction = "get", Host = "test.com", Username = "user", Password = "pass", RemotePath = "/remote" },
-            new TransferOptions { Mode = "ftp", Direction = "put", Host = "test.com", Username = "user", Password = "pass", RemotePath = "/remote" },
-            new TransferOptions { Mode = "ftp", Direction = "both", Host = "test.com", Username = "user", Password = "pass", RemotePath = "/remote" }
+            new TransferOptions { Mode = "ftp", Direction = "put", Host = "test.com", Username = "user", Password = "pass", RemotePath = "/remote" }
         };
 
         foreach (var option in validOptions)
@@ -65,6 +64,7 @@ public class ConfigurationValidationTests
         var invalidOptions = new[]
         {
             new TransferOptions { Mode = "ftp", Direction = "upload", Host = "test.com", Username = "user", Password = "pass", RemotePath = "/remote" },
+            new TransferOptions { Mode = "ftp", Direction = "both", Host = "test.com", Username = "user", Password = "pass", RemotePath = "/remote" },
             new TransferOptions { Mode = "ftp", Direction = "GET", Host = "test.com", Username = "user", Password = "pass", RemotePath = "/remote" }, // 大文字
             new TransferOptions { Mode = "ftp", Direction = "", Host = "test.com", Username = "user", Password = "pass", RemotePath = "/remote" },
             new TransferOptions { Mode = "ftp", Direction = null!, Host = "test.com", Username = "user", Password = "pass", RemotePath = "/remote" }
@@ -588,7 +588,7 @@ public class ConfigurationValidationTests
         Assert.False(invalidResult.IsValid);
         Assert.Contains(invalidResult.Errors, e => e.Contains("END file extensions must be specified"));
 
-        // Note: END file feature now works for both upload and download operations
+        // Note: END file feature now works for upload and download operations
         // so no warning is expected for bidirectional transfers
     }
 
