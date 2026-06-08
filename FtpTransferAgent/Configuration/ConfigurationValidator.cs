@@ -125,7 +125,7 @@ public class ConfigurationValidator
                 result.Warnings.Add($"May not have read permission for watch directory: {watch.Path}");
             }
         }
-        
+
         // ダウンロード先ディレクトリの存在チェック
         if (transfer.Direction is "get")
         {
@@ -166,10 +166,10 @@ public class ConfigurationValidator
             else
             {
                 var invalidEndExtensions = watch.EndFileExtensions
-                    .Where(ext => string.IsNullOrWhiteSpace(ext) || 
-                                  ext.Contains(' ') || 
-                                  ext.Contains("..") || 
-                                  ext.Contains('/') || 
+                    .Where(ext => string.IsNullOrWhiteSpace(ext) ||
+                                  ext.Contains(' ') ||
+                                  ext.Contains("..") ||
+                                  ext.Contains('/') ||
                                   ext.Contains('\\') ||
                                   ext.Length > 50) // 異常に長い拡張子を防ぐ
                     .Select(ext => ext ?? "<null>") // null値を安全に表示
@@ -317,7 +317,7 @@ public class ConfigurationValidator
             {
                 result.Warnings.Add("IncludeSubfolders is enabled for download but PreserveFolderStructure is disabled. Files from subdirectories will be saved to root directory and may overwrite each other.");
             }
-            
+
             if (!watch.IncludeSubfolders && transfer.PreserveFolderStructure)
             {
                 result.Warnings.Add("PreserveFolderStructure is enabled for download but IncludeSubfolders is disabled. Only root directory files will be downloaded.");
@@ -332,13 +332,13 @@ public class ConfigurationValidator
                 result.Warnings.Add("IncludeSubfolders is enabled for upload but PreserveFolderStructure is disabled. All files will be uploaded to remote root directory.");
             }
         }
-        
+
         // UseServerCommand設定の適用範囲チェック（ハッシュ検証有効時のみ）
         if (hash.Enabled && hash.UseServerCommand && transfer.Mode == "sftp")
         {
             result.Warnings.Add("UseServerCommand is enabled but SFTP does not support server-side hash commands. Local hash calculation will be used.");
         }
-        
+
         // タイムアウト設定の妥当性チェック
         if (transfer.TimeoutSeconds < 30)
         {
@@ -348,19 +348,19 @@ public class ConfigurationValidator
         {
             result.Warnings.Add("Very long timeout may mask network connectivity issues.");
         }
-        
+
         // AllowedExtensions設定が空の場合の警告
         if (watch.AllowedExtensions?.Length == 0)
         {
             result.Warnings.Add("No file extensions specified in AllowedExtensions. All files will be processed.");
         }
-        
+
         // ENDファイル機能の使用状況（null安全性を確保）
         if (watch.TransferEndFiles && (watch.EndFileExtensions == null || watch.EndFileExtensions.Length == 0))
         {
             result.Errors.Add("TransferEndFiles is enabled but no END file extensions are configured.");
         }
-        
+
         // 並列度とタイムアウトの組み合わせ警告
         if (transfer.Concurrency > 8 && transfer.TimeoutSeconds < 120)
         {

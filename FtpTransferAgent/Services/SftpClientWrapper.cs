@@ -268,7 +268,7 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     public Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct, bool includeSubdirectories = false)
     {
         EnsureConnected();
-        
+
         if (!includeSubdirectories)
         {
             var files = _client.ListDirectory(remotePath)
@@ -276,17 +276,17 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
                 .Select(f => f.FullName);
             return Task.FromResult((IEnumerable<string>)files.ToArray());
         }
-        
+
         // サブディレクトリを含む再帰的な検索
         var allFiles = new List<string>();
         ListFilesRecursive(remotePath, allFiles);
         return Task.FromResult((IEnumerable<string>)allFiles);
     }
-    
+
     private void ListFilesRecursive(string currentPath, List<string> allFiles)
     {
         var entries = _client.ListDirectory(currentPath);
-        
+
         foreach (var entry in entries)
         {
             if (!entry.IsDirectory && !entry.IsSymbolicLink)

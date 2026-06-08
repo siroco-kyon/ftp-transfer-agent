@@ -524,12 +524,12 @@ public class WorkerTests
     {
         private readonly CancellationTokenSource _stoppingTokenSource = new();
         private readonly CancellationTokenSource _stoppedTokenSource = new();
-        
+
         public CancellationToken ApplicationStarted => CancellationToken.None;
         public CancellationToken ApplicationStopping => _stoppingTokenSource.Token;
         public CancellationToken ApplicationStopped => _stoppedTokenSource.Token;
-        
-        public void StopApplication() 
+
+        public void StopApplication()
         {
             _stoppingTokenSource.Cancel();
             _stoppedTokenSource.Cancel();

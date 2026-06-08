@@ -173,11 +173,11 @@ public class WorkerDownloadTests
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
-        
-        var watch = Options.Create(new WatchOptions 
-        { 
-            Path = dir, 
-            IncludeSubfolders = true 
+
+        var watch = Options.Create(new WatchOptions
+        {
+            Path = dir,
+            IncludeSubfolders = true
         });
         var transfer = Options.Create(new TransferOptions
         {
@@ -200,7 +200,7 @@ public class WorkerDownloadTests
             "/remote/subdir/file2.txt",
             "/remote/subdir/nested/file3.txt"
         };
-        
+
         var remoteContent = "test data";
         string remoteHash;
         {
@@ -263,11 +263,11 @@ public class WorkerDownloadTests
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
-        
-        var watch = Options.Create(new WatchOptions 
-        { 
-            Path = dir, 
-            IncludeSubfolders = true 
+
+        var watch = Options.Create(new WatchOptions
+        {
+            Path = dir,
+            IncludeSubfolders = true
         });
         var transfer = Options.Create(new TransferOptions
         {
@@ -290,7 +290,7 @@ public class WorkerDownloadTests
             "/remote/subdir/file2.txt",
             "/remote/subdir/nested/file3.txt"
         };
-        
+
         var remoteContent = "test data";
         string remoteHash;
         {
@@ -380,12 +380,12 @@ public class WorkerDownloadTests
     {
         private readonly CancellationTokenSource _stoppingTokenSource = new();
         private readonly CancellationTokenSource _stoppedTokenSource = new();
-        
+
         public CancellationToken ApplicationStarted => CancellationToken.None;
         public CancellationToken ApplicationStopping => _stoppingTokenSource.Token;
         public CancellationToken ApplicationStopped => _stoppedTokenSource.Token;
-        
-        public void StopApplication() 
+
+        public void StopApplication()
         {
             _stoppingTokenSource.Cancel();
             _stoppedTokenSource.Cancel();

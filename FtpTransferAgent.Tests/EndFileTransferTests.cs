@@ -188,7 +188,7 @@ public class EndFileTransferTests
         // test1.txtとtest1.txt.ENDは転送される
         mock.Verify(c => c.UploadAsync(file1, "/remote/test1.txt", It.IsAny<CancellationToken>()), Times.Once);
         mock.Verify(c => c.UploadAsync(endFile1, "/remote/test1.txt.END", It.IsAny<CancellationToken>()), Times.Once);
-        
+
         // orphan.ENDは対応するデータファイルがないため転送されない
         mock.Verify(c => c.UploadAsync(endFileOrphan, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
 
@@ -356,12 +356,12 @@ public class EndFileTransferTests
     {
         private readonly CancellationTokenSource _stoppingTokenSource = new();
         private readonly CancellationTokenSource _stoppedTokenSource = new();
-        
+
         public CancellationToken ApplicationStarted => CancellationToken.None;
         public CancellationToken ApplicationStopping => _stoppingTokenSource.Token;
         public CancellationToken ApplicationStopped => _stoppedTokenSource.Token;
-        
-        public void StopApplication() 
+
+        public void StopApplication()
         {
             _stoppingTokenSource.Cancel();
             _stoppedTokenSource.Cancel();
@@ -436,7 +436,7 @@ public class EndFileTransferTests
         mock.Verify(c => c.UploadAsync(dataFile, "/remote/data1.txt", It.IsAny<CancellationToken>()), Times.Once);
         // data1.txt.ENDも転送されることを確認
         mock.Verify(c => c.UploadAsync(endFile, "/remote/data1.txt.END", It.IsAny<CancellationToken>()), Times.Once);
-        
+
         // ENDファイルが削除されることを確認
         Assert.False(File.Exists(endFile), "END file should be deleted after successful transfer");
 

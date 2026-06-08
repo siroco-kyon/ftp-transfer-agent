@@ -343,220 +343,220 @@ public class Worker : BackgroundService
         try
         {
 
-        // アップロード処理が有効な場合は指定フォルダ内のファイルを列挙
-        if (_transfer.Direction is "put")
-        {
-            var patterns = _watch.AllowedExtensions ?? System.Array.Empty<string>();
-            var option = _watch.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
-            try
+            // アップロード処理が有効な場合は指定フォルダ内のファイルを列挙
+            if (_transfer.Direction is "put")
             {
-                // ファイル順序を安定化し、ENDファイルが先に処理されないようにソート
-                var files = Directory.EnumerateFiles(_watch.Path, "*", option)
-                    .OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-
-                // データファイルとENDファイルのペアを収集
-                var dataFiles = new List<string>();
-                var endFiles = new List<string>();
-
-                foreach (var file in files)
-                {
-                    // ENDファイルかどうかを先にチェック
-                    if (IsEndFile(file))
-                    {
-                        // ENDファイルは常に別リストに保存（転送するかどうかは後で判断）
-                        endFiles.Add(file);
-                        continue;
-                    }
-
-                    // 通常ファイルに対してファイル名パターン (拡張子 or ワイルドカード) を適用
-                    if (!FileNameMatcher.IsMatch(Path.GetFileName(file), patterns))
-                    {
-                        continue;
-                    }
-
-                    // ENDファイル検証が有効な場合は、対応するENDファイルの存在を確認
-                    if (_watch.RequireEndFile)
-                    {
-                        if (!HasEndFile(file))
-                        {
-                            _logger.LogDebug("Skipping file {File} - no corresponding END file found", file);
-                            continue;
-                        }
-                    }
-
-                    dataFiles.Add(file);
-                }
-
-                var destinations = GetUploadDestinations();
-                var endFileSet = new HashSet<string>(endFiles, StringComparer.OrdinalIgnoreCase);
-                var relatedEndFilesByDataFile = dataFiles.ToDictionary(
-                    file => file,
-                    file => GetExistingEndFilesForDataFile(file, endFileSet),
-                    StringComparer.OrdinalIgnoreCase);
-                var relatedEndFileCount = relatedEndFilesByDataFile.Values.Sum(files => files.Count);
-
-                _logger.LogInformation("Upload fanout: {DataFileCount} data file(s), {EndFileCount} related END file(s), {DestCount} destination(s), {Total} queued data transfer item(s)",
-                    dataFiles.Count,
-                    _watch.TransferEndFiles || _cleanup.DeleteLocalSkippedEndFiles ? relatedEndFileCount : 0,
-                    destinations.Count,
-                    dataFiles.Count * destinations.Count);
-
-                // 1. まずデータファイルを全宛先に対してファンアウトしてキューへ投入
-                foreach (var file in dataFiles)
-                {
-                    var relatedEndFiles = relatedEndFilesByDataFile[file];
-                    var endFilesToDeleteOnSuccess =
-                        _watch.TransferEndFiles || _cleanup.DeleteLocalSkippedEndFiles
-                            ? relatedEndFiles
-                            : Array.Empty<string>();
-                    await EnqueueFanoutAsync(file, destinations, queueContexts, endFilesToDeleteOnSuccess, stoppingToken).ConfigureAwait(false);
-                }
-            }
-            catch (DirectoryNotFoundException ex)
-            {
-                _logger.LogError("Watch directory not found: {Path}. Error: {Error}", _watch.Path, ex.Message);
-                throw;
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                _logger.LogError("Access denied to watch directory: {Path}. Error: {Error}", _watch.Path, ex.Message);
-                throw;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError("Error enumerating files in {Path}: {Error}", _watch.Path, ex.Message);
-                throw;
-            }
-        }
-
-        // ダウンロード方向で追加宛先が設定されていれば警告（未使用になる）
-        if (_transfer.Direction is "get" && _transfer.AdditionalDestinations is { Count: > 0 })
-        {
-            _logger.LogWarning("AdditionalDestinations is set but Direction is '{Direction}'. Additional destinations are used only for uploads and will be ignored for downloads.",
-                _transfer.Direction);
-        }
-
-        // ダウンロード処理が有効な場合はリモート一覧を取得
-        if (_transfer.Direction is "get")
-        {
-            try
-            {
-                // リモート一覧取得用に専用のクライアントを生成する
-                using var listClient = CreateClient();
-                // リモートファイル一覧を取得
-                var files = await listClient.ListFilesAsync(_transfer.RemotePath, stoppingToken, _watch.IncludeSubfolders).ConfigureAwait(false);
-
-                // ファイルごとに正規化パス(先頭に "/" を付与)と元のパスを保持する辞書を作成する
-                var normalizedMap = new Dictionary<string, string>();
-                foreach (var f in files)
-                {
-                    if (string.IsNullOrEmpty(f)) continue;
-                    var norm = f.StartsWith("/") ? f : "/" + f;
-                    // 末尾の無駄なスラッシュは除去
-                    norm = norm.TrimEnd('/');
-                    normalizedMap[norm] = f;
-                }
-
-                // AllowedExtensions (ファイル名パターン) フィルタ用
                 var patterns = _watch.AllowedExtensions ?? System.Array.Empty<string>();
-
-                // 正規化パスでソートしてENDファイルとデータファイルを分ける
-                var sortedNormPaths = normalizedMap.Keys
-                    .OrderBy(p => Path.GetFileName(p), StringComparer.OrdinalIgnoreCase)
-                    .ToList();
-
-                var dataFiles = new List<string>();    // キューに追加するオリジナルパス
-                var endFiles = new List<string>();     // キューに追加するオリジナルパス
-
-                foreach (var normPath in sortedNormPaths)
+                var option = _watch.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+                try
                 {
-                    var originalPath = normalizedMap[normPath];
+                    // ファイル順序を安定化し、ENDファイルが先に処理されないようにソート
+                    var files = Directory.EnumerateFiles(_watch.Path, "*", option)
+                        .OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
+                        .ToList();
 
-                    // ENDファイルかどうかを正規化パスで判定
-                    if (IsEndFileRemote(normPath))
+                    // データファイルとENDファイルのペアを収集
+                    var dataFiles = new List<string>();
+                    var endFiles = new List<string>();
+
+                    foreach (var file in files)
                     {
-                        if (_watch.TransferEndFiles)
+                        // ENDファイルかどうかを先にチェック
+                        if (IsEndFile(file))
                         {
-                            endFiles.Add(originalPath);
-                        }
-                        continue;
-                    }
-
-                    // ファイル名パターン (拡張子 or ワイルドカード) フィルタをオリジナルパスに対して適用
-                    if (!FileNameMatcher.IsMatch(Path.GetFileName(originalPath), patterns))
-                    {
-                        continue;
-                    }
-
-                    // ENDファイル必須の場合は対応ENDファイルの存在を確認
-                    if (_watch.RequireEndFile)
-                    {
-                        if (!HasEndFileRemote(normPath, sortedNormPaths))
-                        {
-                            _logger.LogDebug("Skipping remote file {File} - no corresponding END file found", originalPath);
+                            // ENDファイルは常に別リストに保存（転送するかどうかは後で判断）
+                            endFiles.Add(file);
                             continue;
                         }
+
+                        // 通常ファイルに対してファイル名パターン (拡張子 or ワイルドカード) を適用
+                        if (!FileNameMatcher.IsMatch(Path.GetFileName(file), patterns))
+                        {
+                            continue;
+                        }
+
+                        // ENDファイル検証が有効な場合は、対応するENDファイルの存在を確認
+                        if (_watch.RequireEndFile)
+                        {
+                            if (!HasEndFile(file))
+                            {
+                                _logger.LogDebug("Skipping file {File} - no corresponding END file found", file);
+                                continue;
+                            }
+                        }
+
+                        dataFiles.Add(file);
                     }
 
-                    dataFiles.Add(originalPath);
-                }
+                    var destinations = GetUploadDestinations();
+                    var endFileSet = new HashSet<string>(endFiles, StringComparer.OrdinalIgnoreCase);
+                    var relatedEndFilesByDataFile = dataFiles.ToDictionary(
+                        file => file,
+                        file => GetExistingEndFilesForDataFile(file, endFileSet),
+                        StringComparer.OrdinalIgnoreCase);
+                    var relatedEndFileCount = relatedEndFilesByDataFile.Values.Sum(files => files.Count);
 
-                // 1. まずデータファイルを転送キューに追加
-                var relatedEndFilesByDataFile = dataFiles.ToDictionary(
-                    file => file,
-                    file => (IReadOnlyList<string>)Array.Empty<string>(),
-                    StringComparer.OrdinalIgnoreCase);
+                    _logger.LogInformation("Upload fanout: {DataFileCount} data file(s), {EndFileCount} related END file(s), {DestCount} destination(s), {Total} queued data transfer item(s)",
+                        dataFiles.Count,
+                        _watch.TransferEndFiles || _cleanup.DeleteLocalSkippedEndFiles ? relatedEndFileCount : 0,
+                        destinations.Count,
+                        dataFiles.Count * destinations.Count);
 
-                if (_watch.TransferEndFiles && endFiles.Count > 0)
-                {
+                    // 1. まずデータファイルを全宛先に対してファンアウトしてキューへ投入
                     foreach (var file in dataFiles)
                     {
-                        var dataNorm = file.StartsWith("/") ? file : "/" + file;
-                        dataNorm = dataNorm.TrimEnd('/', '\\');
-                        var related = endFiles
-                            .Where(endFile =>
-                            {
-                                var endNorm = endFile.StartsWith("/") ? endFile : "/" + endFile;
-                                endNorm = endNorm.TrimEnd('/', '\\');
-                                var dataForEnd = GetDataFileForEndFileRemote(endNorm);
-                                if (string.IsNullOrEmpty(dataForEnd))
-                                {
-                                    return false;
-                                }
-                                var dataForEndNorm = dataForEnd.StartsWith("/") ? dataForEnd : "/" + dataForEnd;
-                                dataForEndNorm = dataForEndNorm.TrimEnd('/', '\\');
-                                return string.Equals(dataForEndNorm, dataNorm, StringComparison.OrdinalIgnoreCase);
-                            })
-                            .ToArray();
-                        relatedEndFilesByDataFile[file] = related;
+                        var relatedEndFiles = relatedEndFilesByDataFile[file];
+                        var endFilesToDeleteOnSuccess =
+                            _watch.TransferEndFiles || _cleanup.DeleteLocalSkippedEndFiles
+                                ? relatedEndFiles
+                                : Array.Empty<string>();
+                        await EnqueueFanoutAsync(file, destinations, queueContexts, endFilesToDeleteOnSuccess, stoppingToken).ConfigureAwait(false);
                     }
                 }
-
-                foreach (var file in dataFiles)
+                catch (DirectoryNotFoundException ex)
                 {
-                    await primaryQueue.Channel.Writer.WriteAsync(new TransferItem(
-                        file,
-                        TransferAction.Download,
-                        RelatedEndFilePaths: relatedEndFilesByDataFile[file]), stoppingToken);
+                    _logger.LogError("Watch directory not found: {Path}. Error: {Error}", _watch.Path, ex.Message);
+                    throw;
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    _logger.LogError("Access denied to watch directory: {Path}. Error: {Error}", _watch.Path, ex.Message);
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Error enumerating files in {Path}: {Error}", _watch.Path, ex.Message);
+                    throw;
                 }
             }
-            catch (DirectoryNotFoundException ex)
+
+            // ダウンロード方向で追加宛先が設定されていれば警告（未使用になる）
+            if (_transfer.Direction is "get" && _transfer.AdditionalDestinations is { Count: > 0 })
             {
-                _logger.LogError("Remote directory not found: {RemotePath}. Error: {Error}", _transfer.RemotePath, ex.Message);
-                throw;
+                _logger.LogWarning("AdditionalDestinations is set but Direction is '{Direction}'. Additional destinations are used only for uploads and will be ignored for downloads.",
+                    _transfer.Direction);
             }
-            catch (UnauthorizedAccessException ex)
+
+            // ダウンロード処理が有効な場合はリモート一覧を取得
+            if (_transfer.Direction is "get")
             {
-                _logger.LogError("Access denied to remote directory: {RemotePath}. Error: {Error}", _transfer.RemotePath, ex.Message);
-                throw;
+                try
+                {
+                    // リモート一覧取得用に専用のクライアントを生成する
+                    using var listClient = CreateClient();
+                    // リモートファイル一覧を取得
+                    var files = await listClient.ListFilesAsync(_transfer.RemotePath, stoppingToken, _watch.IncludeSubfolders).ConfigureAwait(false);
+
+                    // ファイルごとに正規化パス(先頭に "/" を付与)と元のパスを保持する辞書を作成する
+                    var normalizedMap = new Dictionary<string, string>();
+                    foreach (var f in files)
+                    {
+                        if (string.IsNullOrEmpty(f)) continue;
+                        var norm = f.StartsWith("/") ? f : "/" + f;
+                        // 末尾の無駄なスラッシュは除去
+                        norm = norm.TrimEnd('/');
+                        normalizedMap[norm] = f;
+                    }
+
+                    // AllowedExtensions (ファイル名パターン) フィルタ用
+                    var patterns = _watch.AllowedExtensions ?? System.Array.Empty<string>();
+
+                    // 正規化パスでソートしてENDファイルとデータファイルを分ける
+                    var sortedNormPaths = normalizedMap.Keys
+                        .OrderBy(p => Path.GetFileName(p), StringComparer.OrdinalIgnoreCase)
+                        .ToList();
+
+                    var dataFiles = new List<string>();    // キューに追加するオリジナルパス
+                    var endFiles = new List<string>();     // キューに追加するオリジナルパス
+
+                    foreach (var normPath in sortedNormPaths)
+                    {
+                        var originalPath = normalizedMap[normPath];
+
+                        // ENDファイルかどうかを正規化パスで判定
+                        if (IsEndFileRemote(normPath))
+                        {
+                            if (_watch.TransferEndFiles)
+                            {
+                                endFiles.Add(originalPath);
+                            }
+                            continue;
+                        }
+
+                        // ファイル名パターン (拡張子 or ワイルドカード) フィルタをオリジナルパスに対して適用
+                        if (!FileNameMatcher.IsMatch(Path.GetFileName(originalPath), patterns))
+                        {
+                            continue;
+                        }
+
+                        // ENDファイル必須の場合は対応ENDファイルの存在を確認
+                        if (_watch.RequireEndFile)
+                        {
+                            if (!HasEndFileRemote(normPath, sortedNormPaths))
+                            {
+                                _logger.LogDebug("Skipping remote file {File} - no corresponding END file found", originalPath);
+                                continue;
+                            }
+                        }
+
+                        dataFiles.Add(originalPath);
+                    }
+
+                    // 1. まずデータファイルを転送キューに追加
+                    var relatedEndFilesByDataFile = dataFiles.ToDictionary(
+                        file => file,
+                        file => (IReadOnlyList<string>)Array.Empty<string>(),
+                        StringComparer.OrdinalIgnoreCase);
+
+                    if (_watch.TransferEndFiles && endFiles.Count > 0)
+                    {
+                        foreach (var file in dataFiles)
+                        {
+                            var dataNorm = file.StartsWith("/") ? file : "/" + file;
+                            dataNorm = dataNorm.TrimEnd('/', '\\');
+                            var related = endFiles
+                                .Where(endFile =>
+                                {
+                                    var endNorm = endFile.StartsWith("/") ? endFile : "/" + endFile;
+                                    endNorm = endNorm.TrimEnd('/', '\\');
+                                    var dataForEnd = GetDataFileForEndFileRemote(endNorm);
+                                    if (string.IsNullOrEmpty(dataForEnd))
+                                    {
+                                        return false;
+                                    }
+                                    var dataForEndNorm = dataForEnd.StartsWith("/") ? dataForEnd : "/" + dataForEnd;
+                                    dataForEndNorm = dataForEndNorm.TrimEnd('/', '\\');
+                                    return string.Equals(dataForEndNorm, dataNorm, StringComparison.OrdinalIgnoreCase);
+                                })
+                                .ToArray();
+                            relatedEndFilesByDataFile[file] = related;
+                        }
+                    }
+
+                    foreach (var file in dataFiles)
+                    {
+                        await primaryQueue.Channel.Writer.WriteAsync(new TransferItem(
+                            file,
+                            TransferAction.Download,
+                            RelatedEndFilePaths: relatedEndFilesByDataFile[file]), stoppingToken);
+                    }
+                }
+                catch (DirectoryNotFoundException ex)
+                {
+                    _logger.LogError("Remote directory not found: {RemotePath}. Error: {Error}", _transfer.RemotePath, ex.Message);
+                    throw;
+                }
+                catch (UnauthorizedAccessException ex)
+                {
+                    _logger.LogError("Access denied to remote directory: {RemotePath}. Error: {Error}", _transfer.RemotePath, ex.Message);
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError("Error listing remote files from {RemotePath}: {Error}", _transfer.RemotePath, ex.Message);
+                    throw;
+                }
             }
-            catch (Exception ex)
-            {
-                _logger.LogError("Error listing remote files from {RemotePath}: {Error}", _transfer.RemotePath, ex.Message);
-                throw;
-            }
-        }
 
         } // try（ファイル列挙フェーズ）
         catch (Exception ex)
@@ -573,15 +573,15 @@ public class Worker : BackgroundService
         }
 
         // 書き込みを完了してキュー処理の完了を待機（正常パスでは TryComplete が Complete の役割を担う）
-        
+
         try
         {
             // まずキュー処理の完了を待機
             await Task.WhenAll(queueTasks).ConfigureAwait(false);
-            
+
             // キュー処理が完了したら監視タスクをキャンセル
             monitorCts.Cancel();
-            
+
             // 監視タスクの完了を少し待機（強制終了を避けるため）
             try
             {
@@ -866,7 +866,7 @@ public class Worker : BackgroundService
     private async Task<long> ProcessDownloadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token)
     {
         string localPath;
-        
+
         if (_transfer.PreserveFolderStructure && _watch.IncludeSubfolders)
         {
             // サブディレクトリ構造を保持する場合
@@ -877,7 +877,7 @@ public class Worker : BackgroundService
             // item.Path が先頭に '/' を持たない場合は付与して正規化する
             var normalizedItemPath = item.Path.StartsWith("/") ? item.Path : "/" + item.Path;
             var relativePath = Path.GetRelativePath(normalizedRemoteBase, normalizedItemPath);
-            
+
             // パストラバーサル攻撃対策（包括的検証）
             if (relativePath.Contains("..") || Path.IsPathRooted(relativePath) ||
                 relativePath.Contains("\\..\\") || relativePath.Contains("/../") ||
@@ -886,19 +886,19 @@ public class Worker : BackgroundService
             {
                 throw new ArgumentException($"Unsafe relative path detected: {relativePath}");
             }
-            
+
             var safePath = Path.Combine(_watch.Path, relativePath);
             var fullPath = Path.GetFullPath(safePath);
             var watchFullPath = Path.GetFullPath(_watch.Path);
-            
+
             if (!fullPath.StartsWith(watchFullPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) &&
                 !string.Equals(fullPath, watchFullPath, StringComparison.OrdinalIgnoreCase))
             {
                 throw new ArgumentException($"Unsafe file path detected: {relativePath}");
             }
-            
+
             localPath = safePath;
-            
+
             // ディレクトリが存在しない場合は作成
             var localDir = Path.GetDirectoryName(localPath);
             if (!string.IsNullOrEmpty(localDir) && !Directory.Exists(localDir))
@@ -1291,11 +1291,11 @@ public class Worker : BackgroundService
 
                 var endFileExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
                 var endFileName = fileName + endFileExt;
-                
+
                 // リモートパスはUnix形式（/）を使用（パス正規化）
                 var normalizedDirectory = directory?.Replace('\\', '/');
                 // ディレクトリが空でない場合、先頭の/を保持
-                var endFilePath = string.IsNullOrEmpty(normalizedDirectory) ? endFileName : 
+                var endFilePath = string.IsNullOrEmpty(normalizedDirectory) ? endFileName :
                     normalizedDirectory.StartsWith("/") ? $"{normalizedDirectory}/{endFileName}" : $"/{normalizedDirectory}/{endFileName}";
 
                 // リモートファイル一覧から対応するENDファイルを検索

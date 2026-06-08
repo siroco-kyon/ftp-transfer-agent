@@ -444,7 +444,7 @@ public class ConfigurationValidationTests
         // Valid configuration: TransferEndFiles enabled with RequireEndFile
         var testDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(testDir);
-        
+
         var validWatch = new WatchOptions
         {
             Path = testDir,
@@ -471,14 +471,14 @@ public class ConfigurationValidationTests
         {
             throw new Exception($"Validation failed with exception: {ex.Message}", ex);
         }
-        
+
         // デバッグ用: エラーと警告の内容を確認
         if (!result.IsValid)
         {
             var errorMessage = $"Validation failed. Errors: [{string.Join(", ", result.Errors)}], Warnings: [{string.Join(", ", result.Warnings)}]";
             throw new Exception(errorMessage);
         }
-        
+
         Assert.DoesNotContain(result.Warnings, w => w.Contains("TransferEndFiles"));
 
         // Warning: TransferEndFiles enabled but RequireEndFile disabled
@@ -490,14 +490,14 @@ public class ConfigurationValidationTests
             TransferEndFiles = true
         };
         var warningResult = validator.ValidateConfiguration(warningWatch, transfer, new RetryOptions(), new HashOptions { Algorithm = "SHA256" }, new CleanupOptions());
-        
+
         // デバッグ: warningResultがInvalidの場合のエラー内容確認
         if (!warningResult.IsValid)
         {
             var errorMessage = $"Warning test failed. Errors: [{string.Join(", ", warningResult.Errors)}], Warnings: [{string.Join(", ", warningResult.Warnings)}]";
             throw new Exception(errorMessage);
         }
-        
+
         Assert.Contains(warningResult.Warnings, w => w.Contains("TransferEndFiles is enabled but RequireEndFile is disabled"));
 
         // Error: TransferEndFiles enabled but no EndFileExtensions
@@ -612,8 +612,8 @@ public class ConfigurationValidationTests
         var validator = new ConfigurationValidator(logger.Object);
 
         // 悪意のある拡張子を含む設定
-        var maliciousWatch = new WatchOptions 
-        { 
+        var maliciousWatch = new WatchOptions
+        {
             Path = Path.GetTempPath(),
             RequireEndFile = true,
             EndFileExtensions = new[] { ".END", "../.end", ".trg", "file/.exe", "file\\.bat", new string('A', 100) }
@@ -643,8 +643,8 @@ public class ConfigurationValidationTests
         var validator = new ConfigurationValidator(logger.Object);
 
         // 重複した拡張子を含む設定
-        var duplicateWatch = new WatchOptions 
-        { 
+        var duplicateWatch = new WatchOptions
+        {
             Path = Path.GetTempPath(),
             RequireEndFile = true,
             EndFileExtensions = new[] { ".END", ".end", ".END", ".TRG", ".trg" } // 大文字小文字の重複も検出
@@ -674,8 +674,8 @@ public class ConfigurationValidationTests
         var validator = new ConfigurationValidator(logger.Object);
 
         // null値を含む拡張子配列
-        var nullWatch = new WatchOptions 
-        { 
+        var nullWatch = new WatchOptions
+        {
             Path = Path.GetTempPath(),
             RequireEndFile = true,
             EndFileExtensions = new[] { ".END", null!, "", "   ", ".TRG" }

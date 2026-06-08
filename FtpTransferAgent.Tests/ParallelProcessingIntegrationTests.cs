@@ -181,7 +181,7 @@ public class ParallelProcessingIntegrationTests : IDisposable
         GC.Collect();
         GC.WaitForPendingFinalizers();
         GC.Collect();
-        
+
         var initialMemory = GC.GetTotalMemory(false);
 
         async Task MemoryHandler(TransferItem item, CancellationToken ct)
@@ -190,7 +190,7 @@ public class ParallelProcessingIntegrationTests : IDisposable
             var largeArray = new byte[5 * 1024 * 1024]; // 5MBに増加
             await Task.Delay(200, ct); // より長い遅延
             GC.KeepAlive(largeArray);
-            
+
             // メモリ使用量を強制的に更新
             GC.Collect();
             GC.WaitForPendingFinalizers();
