@@ -267,52 +267,9 @@ public class EndFileTransferTests
         Directory.Delete(dir, true);
     }
 
-    [Fact]
-    public void GetDataFileForEndFile_ShouldReturnCorrectDataFileName()
-    {
-        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
-        Directory.CreateDirectory(dir);
-
-        var watch = Options.Create(new WatchOptions
-        {
-            Path = dir,
-            EndFileExtensions = new[] { ".END", ".TRG" }
-        });
-        var transfer = Options.Create(new TransferOptions
-        {
-            Mode = "ftp",
-            Direction = "put",
-            Host = "host",
-            Username = "user",
-            Password = "pass",
-            RemotePath = "/remote",
-            Concurrency = 1
-        });
-        var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
-        var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
-        var cleanup = Options.Create(new CleanupOptions());
-
-        var mock = new Mock<IFileTransferClient>();
-        mock.Setup(c => c.Dispose());
-
-        var services = new ServiceCollection();
-        services.AddLogging();
-        var provider = services.BuildServiceProvider();
-        var logger = provider.GetRequiredService<ILogger<Worker>>();
-
-        using var lifetime = new DummyLifetime();
-        var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
-
-        // GetDataFileForEndFile メソッドをテスト
-        Assert.Equal("test.txt", worker.TestGetDataFileForEndFile("test.txt.END"));
-        Assert.Equal("test.txt", worker.TestGetDataFileForEndFile("test.txt.TRG"));
-        Assert.Equal("document.csv", worker.TestGetDataFileForEndFile("document.csv.END"));
-        Assert.Equal("", worker.TestGetDataFileForEndFile("invalid.XXX"));
-        Assert.Equal("", worker.TestGetDataFileForEndFile(""));
-        Assert.Equal("", worker.TestGetDataFileForEndFile(null!));
-
-        Directory.Delete(dir, true);
-    }
+    // GetDataFileForEndFile (ローカル版) はプロダクションコードで未使用となり削除されたため、
+    // 対応するリフレクションベースのテストも削除した。
+    // リモート版 (GetDataFileForEndFileRemote) の動作は get 方向の END 連携テストで検証される。
 
     private class TestWorker : Worker
     {
@@ -331,13 +288,6 @@ public class EndFileTransferTests
             using var combinedCts = CancellationTokenSource.CreateLinkedTokenSource(token, timeoutCts.Token);
             await base.ExecuteAsync(combinedCts.Token);
         }
-
-        // GetDataFileForEndFileメソッドをテスト用に公開
-        public string TestGetDataFileForEndFile(string endFilePath)
-        {
-            var method = typeof(Worker).GetMethod("GetDataFileForEndFile", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
-            return (string)method!.Invoke(this, new object[] { endFilePath })!;
-        }
     }
 
     private class NoDisposeClient : IFileTransferClient
@@ -349,6 +299,7 @@ public class EndFileTransferTests
         public Task DownloadAsync(string remotePath, string localPath, CancellationToken ct) => _inner.DownloadAsync(remotePath, localPath, ct);
         public Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = false) => _inner.GetRemoteHashAsync(remotePath, algorithm, ct, useServerCommand);
         public Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct, bool includeSubdirectories = false) => _inner.ListFilesAsync(remotePath, ct, includeSubdirectories);
+        public Task<bool> ExistsAsync(string remotePath, CancellationToken ct) => _inner.ExistsAsync(remotePath, ct);
         public Task DeleteAsync(string remotePath, CancellationToken ct) => _inner.DeleteAsync(remotePath, ct);
     }
 

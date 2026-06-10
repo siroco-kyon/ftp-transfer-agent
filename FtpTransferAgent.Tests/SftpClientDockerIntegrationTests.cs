@@ -336,6 +336,44 @@ public class SftpClientDockerIntegrationTests
             Times.AtLeastOnce);
     }
 
+    [DockerFact]
+    public async Task Connection_ShouldSucceed_WhenSha256HostKeyFingerprintMatches()
+    {
+        Assert.True(_fixture.IsAvailable, _fixture.UnavailableReason ?? "Docker fixture is not ready.");
+
+        var sha256 = GetServerSha256Fingerprint();
+        using var wrapper = new SftpClientWrapper(CreateOptions("SHA256:" + sha256), _logger.Object);
+
+        var exception = await Record.ExceptionAsync(() =>
+            wrapper.ListFilesAsync("/", CancellationToken.None, includeSubdirectories: false));
+        Assert.Null(exception);
+    }
+
+    [DockerFact]
+    public async Task Connection_ShouldFail_WhenSha256HostKeyFingerprintDoesNotMatch()
+    {
+        Assert.True(_fixture.IsAvailable, _fixture.UnavailableReason ?? "Docker fixture is not ready.");
+
+        var sha256 = GetServerSha256Fingerprint();
+        var wrong = (sha256.StartsWith('A') ? "B" : "A") + sha256.Substring(1);
+
+        using var wrapper = new SftpClientWrapper(CreateOptions("SHA256:" + wrong), _logger.Object);
+
+        var exception = await Record.ExceptionAsync(() =>
+            wrapper.ListFilesAsync("/", CancellationToken.None, includeSubdirectories: false));
+        Assert.NotNull(exception);
+        Assert.True(exception is SshException || exception!.InnerException is SshException);
+
+        _logger.Verify(
+            x => x.Log(
+                LogLevel.Error,
+                It.IsAny<EventId>(),
+                It.Is<It.IsAnyType>((v, t) => v.ToString()!.Contains("Host key fingerprint mismatch", StringComparison.Ordinal)),
+                It.IsAny<Exception?>(),
+                It.IsAny<Func<It.IsAnyType, Exception?, string>>()),
+            Times.AtLeastOnce);
+    }
+
     private TransferOptions CreateOptions(string? hostKeyFingerprint = null)
     {
         return new TransferOptions
@@ -350,6 +388,23 @@ public class SftpClientDockerIntegrationTests
             RemotePath = "/",
             TimeoutSeconds = 30
         };
+    }
+
+    private string GetServerSha256Fingerprint()
+    {
+        string? fingerprint = null;
+        using var client = new SftpClient(_fixture.Host, _fixture.Port, _fixture.Username, _fixture.Password);
+        client.HostKeyReceived += (_, e) =>
+        {
+            fingerprint = e.FingerPrintSHA256;
+            e.CanTrust = true;
+        };
+
+        client.Connect();
+        client.Disconnect();
+
+        Assert.NotNull(fingerprint);
+        return fingerprint!;
     }
 
     private string GetServerFingerprint()

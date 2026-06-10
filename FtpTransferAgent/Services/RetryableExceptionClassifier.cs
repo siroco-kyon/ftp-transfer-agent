@@ -28,6 +28,8 @@ public static class RetryableExceptionClassifier
             SshConnectionException => true,
             // SshOperationTimeoutException は SshException を継承しており TimeoutException ではないため個別に指定
             SshOperationTimeoutException => true,
+            // ハッシュ不一致は転送中の一過性破損で起きるため再転送で回復し得る
+            HashMismatchException => true,
             FtpException ftpEx when IsRetryableFtpException(ftpEx) => true,
 
             // ファイルシステム関連の一時的な例外（リトライ可能）
@@ -83,14 +85,27 @@ public static class RetryableExceptionClassifier
     /// </summary>
     private static bool IsRetryableIOException(IOException ioException)
     {
-        // Win32エラーコードに基づいて判定
-        var hResult = ioException.HResult;
-        return hResult switch
+        if (OperatingSystem.IsWindows())
         {
-            unchecked((int)0x80070020) => true, // ERROR_SHARING_VIOLATION (ファイルが他のプロセスで使用中)
-            unchecked((int)0x80070021) => true, // ERROR_LOCK_VIOLATION (ファイルがロックされている)
-            unchecked((int)0x80070070) => true, // ERROR_DISK_FULL (ディスク容量不足)
-            unchecked((int)0x8007006E) => true, // ERROR_OPEN_FAILED (ファイルオープン失敗)
+            // Win32エラーコードに基づいて判定
+            var hResult = ioException.HResult;
+            return hResult switch
+            {
+                unchecked((int)0x80070020) => true, // ERROR_SHARING_VIOLATION (ファイルが他のプロセスで使用中)
+                unchecked((int)0x80070021) => true, // ERROR_LOCK_VIOLATION (ファイルがロックされている)
+                unchecked((int)0x80070070) => true, // ERROR_DISK_FULL (ディスク容量不足)
+                unchecked((int)0x8007006E) => true, // ERROR_OPEN_FAILED (ファイルオープン失敗)
+                _ => false
+            };
+        }
+
+        // Unix 系では .NET ランタイムが IOException.HResult に errno を設定する
+        return ioException.HResult switch
+        {
+            11 => true, // EAGAIN (リソースが一時的に利用不可)
+            16 => true, // EBUSY (デバイス/リソースがビジー)
+            26 => true, // ETXTBSY (テキストファイルがビジー)
+            28 => true, // ENOSPC (空き容量なし。Windows 側の DISK_FULL と整合)
             _ => false
         };
     }

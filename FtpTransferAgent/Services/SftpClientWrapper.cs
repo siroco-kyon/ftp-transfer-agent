@@ -5,6 +5,7 @@ using System.Linq;
 using FtpTransferAgent.Configuration;
 using Microsoft.Extensions.Logging;
 using Renci.SshNet;
+using Renci.SshNet.Common;
 using Renci.SshNet.Sftp;
 
 namespace FtpTransferAgent.Services;
@@ -18,6 +19,8 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     private readonly ILogger<SftpClientWrapper> _logger;
     // 設定値全体を保持。ホスト鍵検証で利用するため。
     private readonly DestinationOptions _options;
+    // posix-rename 拡張のサポート状況 (接続先サーバごと)。null = 未判定
+    private bool? _posixRenameSupported;
 
     // テスト用に既存の SftpClient を渡せるようにする
     public SftpClientWrapper(DestinationOptions options, ILogger<SftpClientWrapper> logger, SftpClient? client = null)
@@ -93,21 +96,11 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     }
 
     // 接続されていなければ接続を確立
-    private async Task EnsureConnectedAsync()
+    private async Task EnsureConnectedAsync(CancellationToken ct)
     {
         if (!_client.IsConnected)
         {
-            await Task.Run(() => _client.Connect()).ConfigureAwait(false);
-            LogConnectionEstablished();
-        }
-    }
-
-    // 同期版は既存コード互換性のため保持
-    private void EnsureConnected()
-    {
-        if (!_client.IsConnected)
-        {
-            _client.Connect();
+            await _client.ConnectAsync(ct).ConfigureAwait(false);
             LogConnectionEstablished();
         }
     }
@@ -129,23 +122,47 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     }
 
     // リモートディレクトリが存在しなければ作成
-    private void EnsureDirectory(string path)
+    private async Task EnsureDirectoryAsync(string path, CancellationToken ct)
     {
         var dir = Path.GetDirectoryName(path)?.Replace('\\', '/');
         if (string.IsNullOrEmpty(dir))
         {
             return;
         }
-        if (_client.Exists(dir))
+        if (await _client.ExistsAsync(dir, ct).ConfigureAwait(false))
         {
             return;
         }
 
         foreach (var current in GetDirectoryCreationPaths(dir))
         {
-            if (!_client.Exists(current))
+            if (await _client.ExistsAsync(current, ct).ConfigureAwait(false))
             {
-                _client.CreateDirectory(current);
+                continue;
+            }
+
+            try
+            {
+                await _client.CreateDirectoryAsync(current, ct).ConfigureAwait(false);
+            }
+            catch (SshException)
+            {
+                // 並列ワーカーが同じディレクトリを同時に作成すると Exists -> Create の間で
+                // 競合して失敗することがある。作成後に存在していれば成功として扱う。
+                bool exists;
+                try
+                {
+                    exists = await _client.ExistsAsync(current, ct).ConfigureAwait(false);
+                }
+                catch
+                {
+                    exists = false;
+                }
+
+                if (!exists)
+                {
+                    throw;
+                }
             }
         }
     }
@@ -183,8 +200,8 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     // ファイルを一時名でアップロードしてからリネーム
     public async Task UploadAsync(string localPath, string remotePath, CancellationToken ct)
     {
-        await EnsureConnectedAsync().ConfigureAwait(false);
-        EnsureDirectory(remotePath);
+        await EnsureConnectedAsync(ct).ConfigureAwait(false);
+        await EnsureDirectoryAsync(remotePath, ct).ConfigureAwait(false);
 
         // 一意な一時ファイル名で衝突防止
         var temp = $"{remotePath}.tmp.{Guid.NewGuid():N}";
@@ -192,26 +209,26 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
 
         try
         {
-            await using var fs = File.OpenRead(localPath);
-            _client.UploadFile(fs, temp, true);
-            _logger.LogDebug("SFTP UploadFile completed. Temp exists: {Exists}", _client.Exists(temp));
-
-            if (_client.Exists(remotePath))
+            ct.ThrowIfCancellationRequested();
+            await using (var fs = File.OpenRead(localPath))
             {
-                _logger.LogDebug("SFTP: Remote file exists, deleting before rename: {RemotePath}", remotePath);
-                _client.DeleteFile(remotePath);
+                // UploadFile は SFTP 要求をパイプライン化するため大容量でも高速。
+                // SSH.NET にキャンセル対応の同等 API が無いため、転送中のキャンセルは次のチェックまで遅延する
+                _client.UploadFile(fs, temp, true);
             }
-            _client.RenameFile(temp, remotePath);
+            ct.ThrowIfCancellationRequested();
+
+            await RenameOverwriteAsync(temp, remotePath, ct).ConfigureAwait(false);
         }
         catch
         {
-            // RenameFile 失敗時にリモートの一時ファイルが蓄積しないよう削除を試みる
+            // リネーム失敗時にリモートの一時ファイルが蓄積しないよう削除を試みる
             try { if (_client.Exists(temp)) _client.DeleteFile(temp); } catch { }
             throw;
         }
 
-        // RenameFile 後の存在確認
-        if (!_client.Exists(remotePath))
+        // リネーム後の存在確認
+        if (!await _client.ExistsAsync(remotePath, ct).ConfigureAwait(false))
         {
             throw new InvalidOperationException(
                 $"SFTP RenameFile completed without error but destination file not found: {remotePath}.");
@@ -219,18 +236,68 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         _logger.LogDebug("SFTP upload confirmed at: {RemotePath}", remotePath);
     }
 
+    /// <summary>
+    /// 一時ファイルを宛先名へリネームする。posix-rename 拡張が使えるサーバでは
+    /// 宛先が存在していても原子的に置き換える (既存ファイルが消失する瞬間を作らない)。
+    /// 拡張未対応のサーバのみ従来の削除 + リネームにフォールバックする。
+    /// </summary>
+    private async Task RenameOverwriteAsync(string tempPath, string remotePath, CancellationToken ct)
+    {
+        if (_posixRenameSupported != false)
+        {
+            try
+            {
+                _client.RenameFile(tempPath, remotePath, isPosix: true);
+                _posixRenameSupported = true;
+                return;
+            }
+            catch (Exception ex) when (ex is NotSupportedException or SshException && SafeExists(tempPath))
+            {
+                // 一時ファイルが残ったまま失敗した場合のみ「拡張未対応」とみなしフォールバックする。
+                // (接続断など本物の障害では SafeExists も失敗し、ここには入らず元の例外が伝播する)
+                _posixRenameSupported = false;
+                _logger.LogDebug("posix-rename is not supported by the server, falling back to delete+rename: {Error}", ex.Message);
+            }
+        }
+
+        // フォールバック: 非原子的な置換。Delete と Rename の間に障害が起きると
+        // 宛先ファイルが存在しない瞬間が生じる (posix-rename 未対応サーバの制約)
+        if (await _client.ExistsAsync(remotePath, ct).ConfigureAwait(false))
+        {
+            _logger.LogDebug("SFTP: Remote file exists, deleting before rename: {RemotePath}", remotePath);
+            await _client.DeleteFileAsync(remotePath, ct).ConfigureAwait(false);
+        }
+        await _client.RenameFileAsync(tempPath, remotePath, ct).ConfigureAwait(false);
+    }
+
+    private bool SafeExists(string path)
+    {
+        try
+        {
+            return _client.Exists(path);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
     // ダウンロードも一時ファイル経由で行う
     public async Task DownloadAsync(string remotePath, string localPath, CancellationToken ct)
     {
-        await EnsureConnectedAsync().ConfigureAwait(false);
+        await EnsureConnectedAsync(ct).ConfigureAwait(false);
         var temp = $"{localPath}.tmp.{Guid.NewGuid():N}";
 
         try
         {
+            ct.ThrowIfCancellationRequested();
             await using (var fs = File.Create(temp))
             {
+                // DownloadFile は SFTP 要求をパイプライン化するため大容量でも高速。
+                // 転送中のキャンセルは次のチェックまで遅延する
                 _client.DownloadFile(remotePath, fs);
             }
+            ct.ThrowIfCancellationRequested();
 
             File.Move(temp, localPath, true);
         }
@@ -242,10 +309,10 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         }
     }
 
-    // リモートファイルのハッシュ値を取得（Task.Run 内で同期 Read を使ってストリーム計算）
+    // リモートファイルのハッシュ値を取得（ストリーミングで計算し、一時ファイルへのダウンロード不要）
     public async Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = false)
     {
-        await EnsureConnectedAsync().ConfigureAwait(false);
+        await EnsureConnectedAsync(ct).ConfigureAwait(false);
 
         // SFTPプロトコルではサーバーサイドハッシュコマンドが標準サポートされていないため
         // useServerCommandパラメータが指定されている場合は警告ログを出力
@@ -254,57 +321,47 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
             _logger.LogDebug("Server-side hash command is not supported in SFTP protocol. Using local calculation for {Algorithm}", algorithm);
         }
 
-        // SftpFileStream は ReadAsync(Memory<byte>, CancellationToken) との互換性が保証されないため、
-        // Task.Run 内で SSH.NET の同期 Read を使ってストリームを流しながらハッシュを計算する。
-        // これにより一時ファイルへのダウンロード不要でFTPと同等の帯域消費で検証できる。
-        return await Task.Run(() =>
-        {
-            using var stream = _client.OpenRead(remotePath);
-            return HashUtil.ComputeHashSync(stream, algorithm);
-        }, ct).ConfigureAwait(false);
+        // SftpFileStream は ReadAsync(byte[], int, int, CancellationToken) をネイティブ実装している
+        // (SSH.NET 2025.0.0) ため、キャンセル可能な非同期ストリーミングでハッシュを計算できる。
+        await using var stream = await _client.OpenAsync(remotePath, FileMode.Open, FileAccess.Read, ct).ConfigureAwait(false);
+        return await HashUtil.ComputeHashAsync(stream, algorithm, ct).ConfigureAwait(false);
     }
 
     // 指定ディレクトリのファイル一覧を取得
-    public Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct, bool includeSubdirectories = false)
+    public async Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct, bool includeSubdirectories = false)
     {
-        EnsureConnected();
+        await EnsureConnectedAsync(ct).ConfigureAwait(false);
 
-        if (!includeSubdirectories)
-        {
-            var files = _client.ListDirectory(remotePath)
-                .Where(f => !f.IsDirectory && !f.IsSymbolicLink)
-                .Select(f => f.FullName);
-            return Task.FromResult((IEnumerable<string>)files.ToArray());
-        }
-
-        // サブディレクトリを含む再帰的な検索
         var allFiles = new List<string>();
-        ListFilesRecursive(remotePath, allFiles);
-        return Task.FromResult((IEnumerable<string>)allFiles);
+        await ListFilesCoreAsync(remotePath, allFiles, includeSubdirectories, ct).ConfigureAwait(false);
+        return allFiles;
     }
 
-    private void ListFilesRecursive(string currentPath, List<string> allFiles)
+    private async Task ListFilesCoreAsync(string currentPath, List<string> allFiles, bool recursive, CancellationToken ct)
     {
-        var entries = _client.ListDirectory(currentPath);
-
-        foreach (var entry in entries)
+        await foreach (var entry in _client.ListDirectoryAsync(currentPath, ct).ConfigureAwait(false))
         {
             if (!entry.IsDirectory && !entry.IsSymbolicLink)
             {
                 allFiles.Add(entry.FullName);
             }
-            else if (entry.IsDirectory && entry.Name != "." && entry.Name != "..")
+            else if (recursive && entry.IsDirectory && entry.Name != "." && entry.Name != "..")
             {
-                ListFilesRecursive(entry.FullName, allFiles);
+                await ListFilesCoreAsync(entry.FullName, allFiles, recursive, ct).ConfigureAwait(false);
             }
         }
     }
 
-    public Task DeleteAsync(string remotePath, CancellationToken ct)
+    public async Task<bool> ExistsAsync(string remotePath, CancellationToken ct)
     {
-        EnsureConnected();
-        _client.DeleteFile(remotePath);
-        return Task.CompletedTask;
+        await EnsureConnectedAsync(ct).ConfigureAwait(false);
+        return await _client.ExistsAsync(remotePath, ct).ConfigureAwait(false);
+    }
+
+    public async Task DeleteAsync(string remotePath, CancellationToken ct)
+    {
+        await EnsureConnectedAsync(ct).ConfigureAwait(false);
+        await _client.DeleteFileAsync(remotePath, ct).ConfigureAwait(false);
     }
 
     public void Dispose()
@@ -342,6 +399,8 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     /// <summary>
     /// SftpClient にホスト鍵検証ハンドラを登録する。
     /// 期待される指紋が設定されている場合は照合し、一致しない場合は接続を拒否する。
+    /// "SHA256:" プレフィックス付きの場合は OpenSSH 形式の SHA-256 指紋として、
+    /// それ以外は従来の MD5 16 進指紋として比較する。
     /// 未設定の場合は受信した指紋をログに出力して信頼する。
     /// </summary>
     private void AttachHostKeyValidation()
@@ -349,33 +408,50 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         // SftpClient のホスト鍵受信イベントにハンドラを追加
         _client.HostKeyReceived += (sender, e) =>
         {
-            // 受信した指紋 (MD5) を16進数表記に変換
-            var received = BitConverter.ToString(e.FingerPrint).Replace("-", "").ToLowerInvariant();
-
-            // TransferOptions.HostKeyFingerprint から期待値を直接取得
             var expected = _options.HostKeyFingerprint;
 
-            if (!string.IsNullOrEmpty(expected))
-            {
-                // コロンやハイフンを除去して比較用に整形
-                expected = expected.Replace(":", "").Replace("-", "").ToLowerInvariant();
-                if (!string.Equals(expected, received, StringComparison.OrdinalIgnoreCase))
-                {
-                    // 指紋が一致しない場合は信頼せず接続を拒否
-                    e.CanTrust = false;
-                    _logger.LogError("Host key fingerprint mismatch. Expected {Expected}, but got {Received}", expected, received);
-                    return;
-                }
-                e.CanTrust = true;
-                _logger.LogInformation("Host key fingerprint verified: {Fingerprint}", received);
-            }
-            else
+            if (string.IsNullOrEmpty(expected))
             {
                 // 期待値が無い場合は受信した指紋をログ出力し、そのまま信頼
                 // HostKeyFingerprint を設定することで MITM 攻撃を防止できます
-                _logger.LogWarning("HostKeyFingerprint is not configured. Trusting server key without verification: {Fingerprint}", received);
+                _logger.LogWarning("HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:{Sha256} (MD5: {Md5})",
+                    e.FingerPrintSHA256, FormatMd5Fingerprint(e.FingerPrint));
                 e.CanTrust = true;
+                return;
             }
+
+            expected = expected.Trim();
+            if (expected.StartsWith("SHA256:", StringComparison.OrdinalIgnoreCase))
+            {
+                // OpenSSH (ssh-keygen -lf) 形式: パディング無し base64。base64 は大文字小文字を区別する
+                var expectedSha = expected.Substring("SHA256:".Length).Trim().TrimEnd('=');
+                var receivedSha = e.FingerPrintSHA256.TrimEnd('=');
+                if (!string.Equals(expectedSha, receivedSha, StringComparison.Ordinal))
+                {
+                    e.CanTrust = false;
+                    _logger.LogError("Host key fingerprint mismatch. Expected SHA256:{Expected}, but got SHA256:{Received}", expectedSha, receivedSha);
+                    return;
+                }
+                e.CanTrust = true;
+                _logger.LogInformation("Host key fingerprint verified: SHA256:{Fingerprint}", receivedSha);
+                return;
+            }
+
+            // 後方互換: MD5 16 進指紋 (コロンやハイフン区切りを許容)
+            var received = FormatMd5Fingerprint(e.FingerPrint);
+            var normalizedExpected = expected.Replace(":", "").Replace("-", "").ToLowerInvariant();
+            if (!string.Equals(normalizedExpected, received, StringComparison.OrdinalIgnoreCase))
+            {
+                // 指紋が一致しない場合は信頼せず接続を拒否
+                e.CanTrust = false;
+                _logger.LogError("Host key fingerprint mismatch. Expected {Expected}, but got {Received}", normalizedExpected, received);
+                return;
+            }
+            e.CanTrust = true;
+            _logger.LogInformation("Host key fingerprint verified: {Fingerprint}", received);
         };
     }
+
+    private static string FormatMd5Fingerprint(byte[] fingerprint) =>
+        BitConverter.ToString(fingerprint).Replace("-", "").ToLowerInvariant();
 }

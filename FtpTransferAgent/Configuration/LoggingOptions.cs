@@ -11,7 +11,10 @@ public class LoggingOptions
     [RegularExpression("^(Trace|Debug|Information|Warning|Error|Critical|None)$")]
     public string Level { get; set; } = "Information";
 
-    [Required]
+    /// <summary>
+    /// ローリングファイルログの出力先パス。
+    /// 空の場合はファイルログを無効化し、コンソールログのみとなる。
+    /// </summary>
     public string RollingFilePath { get; set; } = string.Empty;
 
     /// <summary>

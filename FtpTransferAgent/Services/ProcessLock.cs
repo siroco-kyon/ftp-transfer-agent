@@ -38,7 +38,7 @@ public sealed class ProcessLock : IDisposable
         // 既存ロックがあれば PID を読み、生存確認
         if (File.Exists(path))
         {
-            if (TryReadPid(path, out var existingPid) && IsProcessAlive(existingPid))
+            if (TryReadLockInfo(path, out var existingPid, out var existingName) && IsProcessAlive(existingPid, existingName))
             {
                 throw new InvalidOperationException(
                     $"Another instance is running (PID={existingPid}, lock file={path}).");
@@ -69,8 +69,12 @@ public sealed class ProcessLock : IDisposable
 
         try
         {
-            var pidBytes = System.Text.Encoding.UTF8.GetBytes(
-                Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture));
+            // 1 行目: PID、2 行目: プロセス名。
+            // プロセス名も照合することで、PID が無関係なプロセスに再利用された場合の
+            // 「実行中」誤判定 (起動拒否) を防ぐ
+            var content = Environment.ProcessId.ToString(System.Globalization.CultureInfo.InvariantCulture)
+                + "\n" + GetCurrentProcessName();
+            var pidBytes = System.Text.Encoding.UTF8.GetBytes(content);
             fs.Write(pidBytes, 0, pidBytes.Length);
             fs.Flush();
         }
@@ -100,13 +104,36 @@ public sealed class ProcessLock : IDisposable
         return Path.Combine(baseDir, "FtpTransferAgent", "ftp-transfer-agent.lock");
     }
 
-    private static bool TryReadPid(string path, out int pid)
+    private static string GetCurrentProcessName()
     {
-        pid = 0;
         try
         {
-            var text = File.ReadAllText(path).Trim();
-            return int.TryParse(text, System.Globalization.NumberStyles.Integer,
+            using var current = Process.GetCurrentProcess();
+            return current.ProcessName;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private static bool TryReadLockInfo(string path, out int pid, out string? processName)
+    {
+        pid = 0;
+        processName = null;
+        try
+        {
+            var lines = File.ReadAllLines(path);
+            if (lines.Length == 0)
+            {
+                return false;
+            }
+            // 2 行目が無い旧形式のロックファイルも PID のみで判定できるよう許容する
+            if (lines.Length > 1 && !string.IsNullOrWhiteSpace(lines[1]))
+            {
+                processName = lines[1].Trim();
+            }
+            return int.TryParse(lines[0].Trim(), System.Globalization.NumberStyles.Integer,
                 System.Globalization.CultureInfo.InvariantCulture, out pid);
         }
         catch
@@ -115,7 +142,7 @@ public sealed class ProcessLock : IDisposable
         }
     }
 
-    private static bool IsProcessAlive(int pid)
+    private static bool IsProcessAlive(int pid, string? expectedProcessName)
     {
         if (pid <= 0)
         {
@@ -124,7 +151,17 @@ public sealed class ProcessLock : IDisposable
         try
         {
             using var proc = Process.GetProcessById(pid);
-            return !proc.HasExited;
+            if (proc.HasExited)
+            {
+                return false;
+            }
+            // プロセス名が記録されている場合は照合し、PID 再利用による誤判定を防ぐ
+            if (!string.IsNullOrEmpty(expectedProcessName)
+                && !string.Equals(proc.ProcessName, expectedProcessName, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+            return true;
         }
         catch (ArgumentException)
         {

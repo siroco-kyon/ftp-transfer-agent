@@ -26,6 +26,12 @@ public record TransferItem(
     IReadOnlyList<string>? RelatedEndFilePaths = null)
 {
     /// <summary>
+    /// ログ追跡用の転送 ID。リトライ時もアイテム単位で同じ ID を保ち、
+    /// 1 アイテムのログを通しで追えるようにする。
+    /// </summary>
+    public Guid Id { get; init; } = Guid.NewGuid();
+
+    /// <summary>
     /// キュー上での重複抑止キー。Upload ファンアウトでは宛先が異なる兄弟アイテムを
     /// 別物として扱う必要があるため、宛先情報と GroupId を含める。
     /// </summary>
@@ -41,4 +47,17 @@ public record TransferItem(
             return $"{Action}:{Path}";
         }
     }
+
+    // Id はログ追跡用の付随情報であり、転送対象としての同一性には含めない
+    // (record 既定の equality だと同じ転送対象でも Id 違いで不等になるため手動実装)
+    public virtual bool Equals(TransferItem? other) =>
+        other is not null
+        && Path == other.Path
+        && Action == other.Action
+        && Equals(Destination, other.Destination)
+        && GroupId == other.GroupId
+        && Equals(RelatedEndFilePaths, other.RelatedEndFilePaths);
+
+    public override int GetHashCode() =>
+        HashCode.Combine(Path, Action, Destination, GroupId, RelatedEndFilePaths);
 }

@@ -32,15 +32,25 @@ public class ProcessLockTests : IDisposable
         return sr.ReadToEnd().Trim();
     }
 
+    // ロックファイルは「1 行目: PID、2 行目: プロセス名」形式
+    private static string ReadLockPid(string path)
+    {
+        var lines = ReadShared(path).Split('\n');
+        return lines[0].Trim();
+    }
+
     [Fact]
-    public void Acquire_CreatesFileWithCurrentPid()
+    public void Acquire_CreatesFileWithCurrentPidAndProcessName()
     {
         var path = NewLockPath();
         using var l = ProcessLock.Acquire(path);
 
         Assert.True(File.Exists(path));
-        var content = ReadShared(path);
-        Assert.Equal(Environment.ProcessId.ToString(), content);
+        var lines = ReadShared(path).Split('\n');
+        Assert.Equal(Environment.ProcessId.ToString(), lines[0].Trim());
+        Assert.Equal(2, lines.Length);
+        using var current = System.Diagnostics.Process.GetCurrentProcess();
+        Assert.Equal(current.ProcessName, lines[1].Trim());
     }
 
     [Fact]
@@ -73,7 +83,7 @@ public class ProcessLockTests : IDisposable
         using var l = ProcessLock.Acquire(path);
 
         Assert.True(File.Exists(path));
-        Assert.Equal(Environment.ProcessId.ToString(), ReadShared(path));
+        Assert.Equal(Environment.ProcessId.ToString(), ReadLockPid(path));
     }
 
     [Fact]
@@ -83,7 +93,28 @@ public class ProcessLockTests : IDisposable
         File.WriteAllText(path, "not-a-pid");
 
         using var l = ProcessLock.Acquire(path);
-        Assert.Equal(Environment.ProcessId.ToString(), ReadShared(path));
+        Assert.Equal(Environment.ProcessId.ToString(), ReadLockPid(path));
+    }
+
+    [Fact]
+    public void LockHeldByReusedPid_IsOverwritten_WhenProcessNameDiffers()
+    {
+        var path = NewLockPath();
+        // 現在プロセスの PID は生存中だが、プロセス名が異なる -> PID 再利用とみなし取得できる
+        File.WriteAllText(path, Environment.ProcessId + "\nsome-other-process-name");
+
+        using var l = ProcessLock.Acquire(path);
+        Assert.Equal(Environment.ProcessId.ToString(), ReadLockPid(path));
+    }
+
+    [Fact]
+    public void LegacyPidOnlyLockFile_StillBlocks_WhenProcessAlive()
+    {
+        var path = NewLockPath();
+        // 旧形式 (PID のみ) のロックファイルでも、PID が生存していれば取得は失敗する
+        File.WriteAllText(path, Environment.ProcessId.ToString());
+
+        Assert.Throws<InvalidOperationException>(() => ProcessLock.Acquire(path));
     }
 
     [Fact]

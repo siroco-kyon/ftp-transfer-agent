@@ -103,6 +103,16 @@ public class ConfigurationValidator
             {
                 result.Errors.Add($"{label} Private key file not found: {d.PrivateKeyPath}");
             }
+            // DataAnnotations はネストされたオブジェクトには適用されないため、
+            // ルートの TransferOptions と同じ範囲チェックをここで行う
+            if (d.Concurrency < 1 || d.Concurrency > 16)
+            {
+                result.Errors.Add($"{label} Concurrency must be between 1 and 16 (got {d.Concurrency})");
+            }
+            if (d.TimeoutSeconds < 1 || d.TimeoutSeconds > 3600)
+            {
+                result.Errors.Add($"{label} TimeoutSeconds must be between 1 and 3600 (got {d.TimeoutSeconds})");
+            }
         }
     }
 
@@ -180,10 +190,11 @@ public class ConfigurationValidator
                     result.Errors.Add($"Invalid END file extensions: {string.Join(", ", invalidEndExtensions)}");
                 }
 
-                // 重複チェック
+                // 重複チェック (完全一致のみ)。大文字小文字違い (".END" と ".end" 等) は
+                // 大文字小文字を区別するファイルシステムでは別ファイルを指すため重複とみなさない
                 var duplicateExtensions = watch.EndFileExtensions
                     .Where(ext => !string.IsNullOrWhiteSpace(ext))
-                    .GroupBy(ext => ext.ToLowerInvariant())
+                    .GroupBy(ext => ext, StringComparer.Ordinal)
                     .Where(g => g.Count() > 1)
                     .Select(g => g.Key)
                     .ToList();

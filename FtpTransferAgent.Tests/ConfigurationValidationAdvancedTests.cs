@@ -442,6 +442,45 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         Assert.Contains(result.Errors, e => e.Contains("[Destination#1] is null"));
     }
 
+    [Fact]
+    public void ValidateConfiguration_WithOutOfRangeAdditionalDestinationSettings_ShouldReportErrors()
+    {
+        // DataAnnotations はネストされた AdditionalDestinations には適用されないため、
+        // ConfigurationValidator が範囲チェックを行うことを検証する
+        var watch = new WatchOptions { Path = _testDirectory };
+        var transfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "example.com",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            AdditionalDestinations = new List<DestinationOptions>
+            {
+                new()
+                {
+                    Mode = "ftp",
+                    Host = "second.example.com",
+                    Username = "user2",
+                    Password = "pass2",
+                    RemotePath = "/remote2",
+                    Concurrency = 0,      // 範囲外 (1-16)
+                    TimeoutSeconds = 0    // 範囲外 (1-3600)
+                }
+            }
+        };
+        var retry = new RetryOptions();
+        var hash = new HashOptions { Algorithm = "SHA256" };
+        var cleanup = new CleanupOptions();
+
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("Concurrency must be between 1 and 16"));
+        Assert.Contains(result.Errors, e => e.Contains("TimeoutSeconds must be between 1 and 3600"));
+    }
+
     public void Dispose()
     {
         try
