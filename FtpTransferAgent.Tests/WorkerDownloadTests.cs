@@ -207,6 +207,9 @@ public class WorkerDownloadTests
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(new[] { remoteFile, remoteEndFile });
+        // DeleteRemoteEndFiles 有効時、Worker は END ダウンロード前に存在確認を行う
+        mock.Setup(c => c.ExistsAsync(remoteEndFile, It.IsAny<CancellationToken>()))
+            .ReturnsAsync(true);
         mock.Setup(c => c.DownloadAsync(remoteFile, localPath, It.IsAny<CancellationToken>()))
             .Callback<string, string, CancellationToken>((_, lp, _) =>
             {
@@ -415,6 +418,61 @@ public class WorkerDownloadTests
         Directory.Delete(dir, true);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_RemoteFilesDifferingOnlyByCase_DoNotCrashEnumeration()
+    {
+        // 大文字小文字を区別するリモートサーバは "Sample.txt" と "sample.txt" を同時に返し得る。
+        // 大小無視のキー比較だと重複キー例外で列挙全体が失敗する回帰を防ぐ
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+
+        var watch = Options.Create(new WatchOptions { Path = dir });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "get",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 1
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+        var hashOpt = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+        var cleanup = Options.Create(new CleanupOptions());
+
+        var remoteFiles = new[] { "/remote/Sample.txt", "/remote/sample.txt" };
+        var downloaded = new List<string>();
+
+        var mock = new Mock<IFileTransferClient>();
+        mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(remoteFiles);
+        mock.Setup(c => c.DownloadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, CancellationToken>((remote, local, _) =>
+            {
+                lock (downloaded) { downloaded.Add(remote); }
+                File.WriteAllText(local, "data");
+            })
+            .Returns(Task.CompletedTask);
+        mock.Setup(c => c.Dispose());
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        using var provider = services.BuildServiceProvider();
+        var logger = provider.GetRequiredService<ILogger<Worker>>();
+
+        using var lifetime = new DummyLifetime();
+        var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
+        await worker.RunAsync(CancellationToken.None);
+
+        // 両ファイルが列挙エラーなく個別に処理される
+        Assert.Equal(2, downloaded.Count);
+        Assert.Contains("/remote/Sample.txt", downloaded);
+        Assert.Contains("/remote/sample.txt", downloaded);
+
+        Directory.Delete(dir, true);
+    }
+
     private class TestWorker : Worker
     {
         private readonly IFileTransferClient _client;
@@ -441,6 +499,7 @@ public class WorkerDownloadTests
         public Task DownloadAsync(string remotePath, string localPath, CancellationToken ct) => _inner.DownloadAsync(remotePath, localPath, ct);
         public Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = false) => _inner.GetRemoteHashAsync(remotePath, algorithm, ct, useServerCommand);
         public Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct, bool includeSubdirectories = false) => _inner.ListFilesAsync(remotePath, ct, includeSubdirectories);
+        public Task<bool> ExistsAsync(string remotePath, CancellationToken ct) => _inner.ExistsAsync(remotePath, ct);
         public Task DeleteAsync(string remotePath, CancellationToken ct) => _inner.DeleteAsync(remotePath, ct);
     }
 

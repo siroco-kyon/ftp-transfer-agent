@@ -43,7 +43,8 @@ internal sealed class RollingFileLogSink : IDisposable
 {
     private readonly LoggingOptions _options;
     private readonly object _lock = new();
-    private DateTime _currentDate = DateTime.UtcNow.Date;
+    // ログ行のタイムスタンプ (DateTime.Now) と整合させるため、ファイル名の日付もローカル時刻基準にする
+    private DateTime _currentDate = DateTime.Now.Date;
     private int _index;
     private StreamWriter? _writer;
     private bool _disposed;
@@ -68,7 +69,7 @@ internal sealed class RollingFileLogSink : IDisposable
     // ログファイルのローテーションを管理
     private void EnsureWriter()
     {
-        var now = DateTime.UtcNow.Date;
+        var now = DateTime.Now.Date;
         if (_writer == null)
         {
             _currentDate = now;
@@ -238,7 +239,8 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
 
         var prefix = Path.GetFileNameWithoutExtension(rollingFilePath);
         var ext = Path.GetExtension(rollingFilePath);
-        var cutoff = DateTime.UtcNow.Date.AddDays(-retentionDays);
+        // ファイル名の日付 (ローカル時刻基準) と同じ基準で保持期間を判定する
+        var cutoff = DateTime.Now.Date.AddDays(-retentionDays);
         var cleanupDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         int deleted = 0;

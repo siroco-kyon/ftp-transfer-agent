@@ -169,8 +169,8 @@ schtasks /create /tn "FtpTransferAgent" /tr "C:\path\to\FtpTransferAgent.exe" /s
 |---|---|---|
 | `appsettings.json` | 常時 | ベース設定。全環境共通の設定値を定義する **必須ファイル** |
 | `appsettings.Development.json` | 開発時のみ | `DOTNET_ENVIRONMENT=Development` のときだけ `appsettings.json` に上書きされる。開発用の接続先など |
-| `appsettings.backup.json` | されない | `appsettings.json` のバックアップコピー。アプリは参照しない |
-| `appsettings.invalid.json` | されない | 意図的に不正な JSON を含む設定バリデーションのテスト用サンプル |
+| `appsettings.backup.json` | されない | `appsettings.json` のバックアップコピー。アプリは参照せず、ビルド出力・publish にもコピーされない |
+| `appsettings.invalid.json` | されない | 意図的に不正な JSON を含む設定バリデーションのテスト用サンプル。ビルド出力・publish にもコピーされない |
 
 ### 環境による読み込み挙動
 
@@ -211,7 +211,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `Password` | string | 条件付き | `null` | FTP では必須。SFTP は鍵認証のみなら省略可 |
 | `PrivateKeyPath` | string | 条件付き | `null` | SFTP 秘密鍵パス（SFTP では Password かどちらか必須） |
 | `PrivateKeyPassphrase` | string | 任意 | `null` | 鍵のパスフレーズ |
-| `HostKeyFingerprint` | string | 任意 | `null` | SFTP サーバー鍵指紋（未設定だと検証スキップ警告） |
+| `HostKeyFingerprint` | string | 任意 | `null` | SFTP サーバー鍵指紋（未設定だと検証スキップ警告）。`SHA256:` プレフィックス付きで OpenSSH 形式の SHA-256 指紋（`ssh-keygen -lf` の出力）、プレフィックス無しで MD5 16 進指紋として照合 |
 | `RemotePath` | string | 必須 | `""` | リモート基準パス |
 | `Concurrency` | int | 任意 | `1` | primary 宛先の並列転送数（1-16）。`get` と primary への `put` に適用。`AdditionalDestinations` は各要素の `Concurrency` を個別に使用 |
 | `PreserveFolderStructure` | bool | 任意 | `false` | サブフォルダ構造を維持して転送 |
@@ -271,10 +271,12 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
     "Port": 22,
     "Username": "user",
     "PrivateKeyPath": "./id_ed25519",
-    "HostKeyFingerprint": "a1b2c3d4..."
+    "HostKeyFingerprint": "SHA256:ohD8VZEXGWo6Ez8GSEJQ9WpafgLFsOfLOtGGQCQo6Og"
   }
 }
 ```
+
+`HostKeyFingerprint` は `ssh-keygen -lf <ホスト鍵ファイル>` で表示される SHA-256 形式 (`SHA256:...`) を推奨します。従来の MD5 16 進指紋（コロン区切り可）も後方互換として使用できます。
 
 #### 3. ENDファイル必須（END自体は転送しない）
 
@@ -352,26 +354,33 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 
 ### Smtp
 
+接続・宛先の必須チェックは `Enabled: true` の場合のみ行われます。メール通知を使わない場合は `Smtp` セクションを省略しても起動できます。
+
 | 項目 | 型 | 必須 | 既定値 | 説明 |
 |---|---|---|---|---|
 | `Enabled` | bool | 任意 | `false` | エラーメール通知有効化 |
-| `RelayHost` | string | 任意 | `""` | SMTP リレー先 |
-| `RelayPort` | int | 任意 | `25` | SMTP ポート |
+| `RelayHost` | string | Enabled 時必須 | `""` | SMTP リレー先 |
+| `RelayPort` | int | 任意 | `25` | SMTP ポート（1-65535） |
 | `UseTls` | bool | 任意 | `false` | TLS 使用 |
 | `Username` | string | 任意 | `""` | SMTP 認証ユーザー |
 | `Password` | string | 任意 | `""` | SMTP 認証パスワード |
-| `From` | string | 任意 | `""` | 送信元メールアドレス |
-| `To` | string[] | 実質必須 | `[]` | 宛先（1件以上。`Enabled: false` でも起動時検証対象） |
+| `From` | string | Enabled 時必須 | `""` | 送信元メールアドレス |
+| `To` | string[] | Enabled 時必須 | `[]` | 宛先（1件以上） |
+| `MaxEmailsPerRun` | int | 任意 | `100` | 1 回のバッチ実行で送信するエラーメールの上限（メール洪水防止）。0 以下で無制限 |
+
+エラーメールは非同期送信ですが、プロセス終了時には送信中のメールの完了を最大 15 秒待機するため、バッチ終了直前のエラー通知も失われません。
 
 ### Logging
 
 | 項目 | 型 | 必須 | 既定値 | 説明 |
 |---|---|---|---|---|
 | `Level` | string | 必須 | `"Information"` | `Trace`〜`None` |
-| `RollingFilePath` | string | 必須 | `""` | ログファイル基準名（例: `logs/ftp-transfer-.log`） |
+| `RollingFilePath` | string | 任意 | `""` | ログファイル基準名（例: `logs/ftp-transfer-.log`）。空にするとファイルログ無効（コンソールのみ） |
 | `MaxBytes` | long | 任意 | `10485760` | ローテーション上限バイト（1024以上） |
 | `Retention.Enabled` | bool | 任意 | `false` | 起動時に古いログを削除する。`false` なら削除しない |
 | `Retention.RetentionDays` | int | 任意 | `30` | 保持日数（1-3650）。この日数より古いログファイルと、空になった年/月フォルダを起動時に削除する |
+
+ログファイル名の日付・ローテーション・保持期間の判定は、ログ行のタイムスタンプと同じローカル時刻基準です。
 
 ## 重要な警告: 同名ファイル衝突
 

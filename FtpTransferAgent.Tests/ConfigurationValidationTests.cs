@@ -306,9 +306,10 @@ public class ConfigurationValidationTests
     [Fact]
     public void SmtpOptions_ShouldValidateEmailAddresses()
     {
-        // Valid email configuration
+        // Valid email configuration (検証は Enabled = true の場合のみ実施される)
         var validOptions = new SmtpOptions
         {
+            Enabled = true,
             RelayHost = "smtp.test.com",
             RelayPort = 587,
             From = "test@example.com",
@@ -325,6 +326,7 @@ public class ConfigurationValidationTests
         {
             var options = new SmtpOptions
             {
+                Enabled = true,
                 RelayHost = "smtp.test.com",
                 RelayPort = 587,
                 From = email,
@@ -334,10 +336,15 @@ public class ConfigurationValidationTests
             };
             var emailValidation = ValidateObject(options);
             Assert.NotEmpty(emailValidation);
+
+            // 無効化されていれば同じ設定でも検証エラーにならない (Smtp 未使用構成で起動可能)
+            options.Enabled = false;
+            Assert.Empty(ValidateObject(options));
         }
 
         var nullRecipients = new SmtpOptions
         {
+            Enabled = true,
             RelayHost = "smtp.test.com",
             RelayPort = 587,
             From = "test@example.com",
@@ -359,6 +366,7 @@ public class ConfigurationValidationTests
         {
             var options = new SmtpOptions
             {
+                Enabled = true,
                 RelayHost = "smtp.test.com",
                 RelayPort = port,
                 From = "test@example.com",
@@ -370,12 +378,13 @@ public class ConfigurationValidationTests
             Assert.Empty(validation);
         }
 
-        // Invalid ports (Note: SmtpOptions doesn't have port validation, so this test may not find errors)
+        // Invalid ports (Enabled = true の場合のみ範囲チェックされる)
         var invalidPorts = new[] { 0, -1, 65536, 100000 };
         foreach (var port in invalidPorts)
         {
             var options = new SmtpOptions
             {
+                Enabled = true,
                 RelayHost = "smtp.test.com",
                 RelayPort = port,
                 From = "test@example.com",
@@ -384,7 +393,7 @@ public class ConfigurationValidationTests
                 Password = "pass"
             };
             var validation = ValidateObject(options);
-            // SmtpOptions may not have port range validation, so test passes
+            Assert.Contains(validation, r => r.MemberNames.Contains(nameof(SmtpOptions.RelayPort)));
         }
     }
 
@@ -396,10 +405,10 @@ public class ConfigurationValidationTests
         var validation = ValidateObject(validOptions);
         Assert.Empty(validation);
 
-        // Empty file path should be invalid (required)
+        // 空のパスは「ファイルログ無効」を意味する有効な設定
         var emptyOptions = new LoggingOptions { RollingFilePath = "" };
         var emptyValidation = ValidateObject(emptyOptions);
-        Assert.NotEmpty(emptyValidation);
+        Assert.Empty(emptyValidation);
     }
 
     [Fact]
@@ -767,12 +776,14 @@ public class ConfigurationValidationTests
         var logger = new Mock<ILogger<ConfigurationValidator>>();
         var validator = new ConfigurationValidator(logger.Object);
 
-        // 重複した拡張子を含む設定
+        // 重複した拡張子を含む設定。
+        // 完全一致 (".END" が 2 回) のみ重複として警告される。大文字小文字違い
+        // (".END" と ".end") は大小を区別するファイルシステムでは別ファイルを指すため重複ではない
         var duplicateWatch = new WatchOptions
         {
             Path = Path.GetTempPath(),
             RequireEndFile = true,
-            EndFileExtensions = new[] { ".END", ".end", ".END", ".TRG", ".trg" } // 大文字小文字の重複も検出
+            EndFileExtensions = new[] { ".END", ".end", ".END", ".TRG", ".trg" }
         };
         var validTransfer = new TransferOptions
         {

@@ -156,6 +156,15 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
     {
         await EnsureConnectedAsync(ct).ConfigureAwait(false);
 
+        // FTP サーバの多くは存在しないディレクトリの LIST に空応答を返すため、
+        // RemotePath の設定ミスが「0 件成功」として見逃されないよう明示的に確認する
+        // (SFTP 側は例外で失敗するので挙動を揃える)。ルートはチェック不要。
+        if (!string.IsNullOrEmpty(remotePath) && remotePath != "/" && remotePath != "."
+            && !await _client.DirectoryExists(remotePath, ct).ConfigureAwait(false))
+        {
+            throw new DirectoryNotFoundException($"Remote directory not found: {remotePath}");
+        }
+
         if (!includeSubdirectories)
         {
             var listing = await _client.GetListing(remotePath, ct).ConfigureAwait(false);
@@ -183,6 +192,12 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
                 await ListFilesRecursiveAsync(item.FullName, allFiles, ct).ConfigureAwait(false);
             }
         }
+    }
+
+    public async Task<bool> ExistsAsync(string remotePath, CancellationToken ct)
+    {
+        await EnsureConnectedAsync(ct).ConfigureAwait(false);
+        return await _client.FileExists(remotePath, ct).ConfigureAwait(false);
     }
 
     public async Task DeleteAsync(string remotePath, CancellationToken ct)

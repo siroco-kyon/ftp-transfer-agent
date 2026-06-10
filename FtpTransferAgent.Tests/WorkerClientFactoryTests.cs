@@ -141,6 +141,8 @@ public class WorkerClientFactoryTests
         public Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct, bool includeSubdirectories = false)
             => Task.FromResult<IEnumerable<string>>(Array.Empty<string>());
 
+        public Task<bool> ExistsAsync(string remotePath, CancellationToken ct) => Task.FromResult(true);
+
         public Task DeleteAsync(string remotePath, CancellationToken ct) => Task.CompletedTask;
 
         public void Dispose()

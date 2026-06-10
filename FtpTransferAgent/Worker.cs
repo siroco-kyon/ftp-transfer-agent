@@ -99,6 +99,13 @@ public class Worker : BackgroundService
     private static string DescribeDestination(DestinationOptions d) =>
         $"{d.Mode}://{d.Host}:{d.Port}{d.RemotePath}";
 
+    // リモートパスを比較用に正規化する (先頭に "/" を付与し、末尾の区切り文字を除去)
+    private static string NormalizeRemotePath(string path)
+    {
+        var norm = path.StartsWith("/") ? path : "/" + path;
+        return norm.TrimEnd('/', '\\');
+    }
+
     private static Channel<TransferItem> CreateTransferChannel()
     {
         return Channel.CreateBounded<TransferItem>(new BoundedChannelOptions(QueueCapacity)
@@ -304,8 +311,8 @@ public class Worker : BackgroundService
             .Select(context => context.Queue.StartAsync(
             async (item, token) =>
             {
-                // 各転送処理の識別子
-                var id = Guid.NewGuid();
+                // 各転送処理の識別子 (リトライ時も同一 ID でログを通しで追跡できるようアイテム由来の ID を使う)
+                var id = item.Id;
                 long bytesTransferred;
                 if (item.Action == TransferAction.Upload)
                 {
@@ -350,7 +357,7 @@ public class Worker : BackgroundService
                 var option = _watch.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
                 try
                 {
-                    // ファイル順序を安定化し、ENDファイルが先に処理されないようにソート
+                    // ファイル順序を安定化するためファイル名でソート (END ファイルの振り分けは後段で行う)
                     var files = Directory.EnumerateFiles(_watch.Path, "*", option)
                         .OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
                         .ToList();
@@ -390,10 +397,12 @@ public class Worker : BackgroundService
 
                     var destinations = GetUploadDestinations();
                     var endFileSet = new HashSet<string>(endFiles, StringComparer.OrdinalIgnoreCase);
+                    // キー比較は Ordinal にする (大文字小文字を区別するファイルシステムでは
+                    // 大小違いの同名ファイルが併存し得るため、大小無視だと重複キーで列挙全体が失敗する)
                     var relatedEndFilesByDataFile = dataFiles.ToDictionary(
                         file => file,
                         file => GetExistingEndFilesForDataFile(file, endFileSet),
-                        StringComparer.OrdinalIgnoreCase);
+                        StringComparer.Ordinal);
                     var relatedEndFileCount = relatedEndFilesByDataFile.Values.Sum(files => files.Count);
 
                     _logger.LogInformation("Upload fanout: {DataFileCount} data file(s), {EndFileCount} related END file(s), {DestCount} destination(s), {Total} queued data transfer item(s)",
@@ -503,33 +512,42 @@ public class Worker : BackgroundService
                     }
 
                     // 1. まずデータファイルを転送キューに追加
+                    // キー比較は Ordinal にする (リモートサーバは大文字小文字違いの同名ファイルを
+                    // 同時に返し得るため、大小無視の比較だと重複キーで列挙全体が失敗する)
                     var relatedEndFilesByDataFile = dataFiles.ToDictionary(
                         file => file,
                         file => (IReadOnlyList<string>)Array.Empty<string>(),
-                        StringComparer.OrdinalIgnoreCase);
+                        StringComparer.Ordinal);
 
                     if (_watch.TransferEndFiles && endFiles.Count > 0)
                     {
+                        // END ファイル側から「対応データファイルの正規化パス → END ファイル一覧」の
+                        // 辞書を構築し、データ × END の総当たり比較を避ける
+                        var endFilesByDataNorm = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+                        foreach (var endFile in endFiles)
+                        {
+                            var endNorm = NormalizeRemotePath(endFile);
+                            var dataForEnd = GetDataFileForEndFileRemote(endNorm);
+                            if (string.IsNullOrEmpty(dataForEnd))
+                            {
+                                continue;
+                            }
+
+                            var dataForEndNorm = NormalizeRemotePath(dataForEnd);
+                            if (!endFilesByDataNorm.TryGetValue(dataForEndNorm, out var list))
+                            {
+                                list = new List<string>();
+                                endFilesByDataNorm[dataForEndNorm] = list;
+                            }
+                            list.Add(endFile);
+                        }
+
                         foreach (var file in dataFiles)
                         {
-                            var dataNorm = file.StartsWith("/") ? file : "/" + file;
-                            dataNorm = dataNorm.TrimEnd('/', '\\');
-                            var related = endFiles
-                                .Where(endFile =>
-                                {
-                                    var endNorm = endFile.StartsWith("/") ? endFile : "/" + endFile;
-                                    endNorm = endNorm.TrimEnd('/', '\\');
-                                    var dataForEnd = GetDataFileForEndFileRemote(endNorm);
-                                    if (string.IsNullOrEmpty(dataForEnd))
-                                    {
-                                        return false;
-                                    }
-                                    var dataForEndNorm = dataForEnd.StartsWith("/") ? dataForEnd : "/" + dataForEnd;
-                                    dataForEndNorm = dataForEndNorm.TrimEnd('/', '\\');
-                                    return string.Equals(dataForEndNorm, dataNorm, StringComparison.OrdinalIgnoreCase);
-                                })
-                                .ToArray();
-                            relatedEndFilesByDataFile[file] = related;
+                            if (endFilesByDataNorm.TryGetValue(NormalizeRemotePath(file), out var related))
+                            {
+                                relatedEndFilesByDataFile[file] = related;
+                            }
                         }
                     }
 
@@ -628,25 +646,38 @@ public class Worker : BackgroundService
             ExceptionDispatchInfo.Capture(enumerationException).Throw();
         }
 
-        var finalStats = AggregateStatistics(queueContexts.Select(context => context.Queue.GetStatistics()));
-        _logger.LogInformation("Transfer completed. Total: {Total}, Success: {Success}, Failed: {Failed}, Critical Errors: {Critical}, Success Rate: {Rate:F1}%, Volume: {Volume}",
-            finalStats.TotalEnqueued, finalStats.TotalCompleted, finalStats.TotalFailed, finalStats.CriticalErrorCount, finalStats.SuccessRate, FormatBytes(finalStats.TotalBytesTransferred));
-
-        if (finalStats.TotalFailed > 0 || finalStats.CriticalErrorCount > 0)
+        try
         {
+            var finalStats = AggregateStatistics(queueContexts.Select(context => context.Queue.GetStatistics()));
+            _logger.LogInformation("Transfer completed. Total: {Total}, Success: {Success}, Failed: {Failed}, Critical Errors: {Critical}, Success Rate: {Rate:F1}%, Volume: {Volume}",
+                finalStats.TotalEnqueued, finalStats.TotalCompleted, finalStats.TotalFailed, finalStats.CriticalErrorCount, finalStats.SuccessRate, FormatBytes(finalStats.TotalBytesTransferred));
+
+            if (finalStats.TotalFailed > 0 || finalStats.CriticalErrorCount > 0)
+            {
+                _exitCode?.MarkFailure();
+                _logger.LogError("Transfer completed with failures. The process exit code will be set to 1.");
+            }
+
+            // クリティカルエラーがあれば詳細をログ出力
+            var criticalExceptions = queueContexts.SelectMany(context => context.Queue.GetCriticalExceptions());
+            foreach (var ex in criticalExceptions)
+            {
+                _logger.LogError(ex, "Critical error occurred during transfer: {Message}", ex.Message);
+            }
+        }
+        catch (Exception ex)
+        {
+            // .NET の既定 (StopHost) では ExecuteAsync の例外は Run() に再スローされず
+            // プロセスが終了コード 0 で終わるため、終盤処理の想定外の例外でも失敗を記録する
             _exitCode?.MarkFailure();
-            _logger.LogError("Transfer completed with failures. The process exit code will be set to 1.");
+            _logger.LogError(ex, "Unexpected error during finalization: {Error}", ex.Message);
+            throw;
         }
-
-        // クリティカルエラーがあれば詳細をログ出力
-        var criticalExceptions = queueContexts.SelectMany(context => context.Queue.GetCriticalExceptions());
-        foreach (var ex in criticalExceptions)
+        finally
         {
-            _logger.LogError(ex, "Critical error occurred during transfer: {Message}", ex.Message);
+            // すべての処理が完了したらアプリケーションを停止
+            _lifetime.StopApplication();
         }
-
-        // すべての処理が完了したらアプリケーションを停止
-        _lifetime.StopApplication();
     }
 
     private static TransferStatistics AggregateStatistics(IEnumerable<TransferStatistics> allStats)
@@ -722,7 +753,8 @@ public class Worker : BackgroundService
             {
                 var error = $"Hash mismatch for {localPath} at {destLabel}: Local={localHash}, Remote={remoteHash}";
                 _logger.LogError("[{Id}] {Error}", id, error);
-                throw new InvalidOperationException(error);
+                // 転送中の一過性破損で起こり得るためリトライ可能な専用例外を投げる
+                throw new HashMismatchException(error);
             }
 
             _logger.LogInformation("[{Id}] Hash verification successful for {File} at {Dest}", id, localPath, destLabel);
@@ -766,70 +798,10 @@ public class Worker : BackgroundService
     {
         var dest = item.Destination ?? _transfer;
         var destLabel = DescribeDestination(dest);
-        var name = dest.PreserveFolderStructure
-            ? Path.GetRelativePath(_watch.Path, item.Path)
-            : Path.GetFileName(item.Path);
-        // リモートパスを組み立てる際、Path.Combineでは余計なセパレーターが入る場合があるため手動で結合する。
-        // 宛先ごとの RemotePath の末尾のスラッシュを除去し、ファイル名または相対パスを '/' で連結する。
-        // 元のRemotePathがルート("/")の場合はそのまま保持する。
-        var rawBase = dest.RemotePath ?? string.Empty;
-        string remoteBase;
-        if (rawBase == "/")
-        {
-            remoteBase = "/";
-        }
-        else
-        {
-            // 末尾の区切り文字を削除（Windowsの '\' も対象）
-            remoteBase = rawBase.TrimEnd('/', '\\');
-        }
-        var remoteName = name.Replace('\\', '/');
-        string remotePath;
-        if (string.IsNullOrEmpty(remoteBase))
-        {
-            // ベースが空ならそのまま名前を返す
-            remotePath = remoteName;
-        }
-        else if (remoteBase == "/")
-        {
-            // ルートの場合はルートと名前を連結
-            remotePath = $"/{remoteName}";
-        }
-        else
-        {
-            remotePath = $"{remoteBase}/{remoteName}";
-        }
-
-        var fileSize = new FileInfo(item.Path).Length;
-        var bytesTransferred = fileSize;
-        _logger.LogInformation("[{Id}] Starting upload {File} ({Size}) to {Dest} ({Remote})", id, item.Path, FormatBytes(fileSize), destLabel, remotePath);
-
+        var remotePath = BuildRemotePath(dest, item.Path);
         var isEndFile = IsEndFile(item.Path);
-        if (_hash.Enabled)
-        {
-            var localHash = await HashUtil.ComputeHashAsync(item.Path, _hash.Algorithm, token).ConfigureAwait(false);
-            _logger.LogDebug("[{Id}] Local hash calculated: {Hash}", id, localHash);
 
-            await client.UploadAsync(item.Path, remotePath, token).ConfigureAwait(false);
-            _logger.LogInformation("[{Id}] Upload completed for {File} -> {Dest} ({Size})", id, item.Path, destLabel, FormatBytes(fileSize));
-
-            var remoteHash = await client.GetRemoteHashAsync(remotePath, _hash.Algorithm, token, _hash.UseServerCommand).ConfigureAwait(false);
-            _logger.LogDebug("[{Id}] Remote hash calculated: {Hash}", id, remoteHash);
-
-            if (!string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
-            {
-                var error = $"Hash mismatch for {item.Path} at {destLabel}: Local={localHash}, Remote={remoteHash}";
-                _logger.LogError("[{Id}] {Error}", id, error);
-                throw new InvalidOperationException(error);
-            }
-
-            _logger.LogInformation("[{Id}] Hash verification successful for {File} at {Dest}", id, item.Path, destLabel);
-        }
-        else
-        {
-            await client.UploadAsync(item.Path, remotePath, token).ConfigureAwait(false);
-            _logger.LogInformation("[{Id}] Upload completed for {File} -> {Dest} ({Size}, hash verification disabled)", id, item.Path, destLabel, FormatBytes(fileSize));
-        }
+        var bytesTransferred = await UploadPathWithHashAsync(client, item.Path, remotePath, destLabel, id, token).ConfigureAwait(false);
 
         if (!isEndFile && _watch.TransferEndFiles)
         {
@@ -842,17 +814,9 @@ public class Worker : BackgroundService
         }
 
         // 転送先のENDファイル削除判定（宛先ごとの操作）
-        if (isEndFile && _cleanup.DeleteRemoteEndFiles)
+        if (isEndFile)
         {
-            try
-            {
-                await client.DeleteAsync(remotePath, token).ConfigureAwait(false);
-                _logger.LogInformation("[{Id}] Deleted remote END file {Remote} at {Dest}", id, remotePath, destLabel);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning("[{Id}] Failed to delete remote END file {Remote} at {Dest}: {Error}", id, remotePath, destLabel, ex.Message);
-            }
+            await TryDeleteRemoteEndFileAsync(client, remotePath, destLabel, id, token).ConfigureAwait(false);
         }
 
         return bytesTransferred;
@@ -878,11 +842,10 @@ public class Worker : BackgroundService
             var normalizedItemPath = item.Path.StartsWith("/") ? item.Path : "/" + item.Path;
             var relativePath = Path.GetRelativePath(normalizedRemoteBase, normalizedItemPath);
 
-            // パストラバーサル攻撃対策（包括的検証）
-            if (relativePath.Contains("..") || Path.IsPathRooted(relativePath) ||
-                relativePath.Contains("\\..\\") || relativePath.Contains("/../") ||
-                relativePath.StartsWith("..\\\\") ||
-                relativePath.StartsWith("../") || relativePath.EndsWith("\\..") || relativePath.EndsWith("/.."))
+            // パストラバーサル攻撃対策: ".." はパスセグメント単位で検査する
+            // (単純な文字列包含だと "report..pdf" のような正当なファイル名まで誤検知する)
+            if (Path.IsPathRooted(relativePath) ||
+                relativePath.Split('/', '\\').Any(segment => segment == ".."))
             {
                 throw new ArgumentException($"Unsafe relative path detected: {relativePath}");
             }
@@ -918,8 +881,9 @@ public class Worker : BackgroundService
 
             // ファイル名の安全性をチェック（パストラバーサル攻撃対策）
             // 危険な文字とパターンをチェック（プラットフォーム依存文字を考慮）
+            // ".." を含むだけの名前 (例: "report..pdf") は正当なため、".." そのものの場合のみ拒否する
             var invalidChars = Path.GetInvalidFileNameChars();
-            if (fileName.Contains("..") || fileName.Contains('/') || fileName.Contains('\\') ||
+            if (fileName is ".." or "." || fileName.Contains('/') || fileName.Contains('\\') ||
                 fileName.Any(c => invalidChars.Contains(c)) || fileName.Any(c => c < 32) ||
                 fileName.Length > 255) // ファイル名長制限
             {
@@ -969,7 +933,8 @@ public class Worker : BackgroundService
             {
                 var error = $"Hash mismatch for {item.Path}: Remote={remoteHash}, Local={localHash}";
                 _logger.LogError("[{Id}] {Error}", id, error);
-                throw new InvalidOperationException(error);
+                // 転送中の一過性破損で起こり得るためリトライ可能な専用例外を投げる
+                throw new HashMismatchException(error);
             }
 
             _logger.LogInformation("[{Id}] Hash verification successful for {Remote}", id, item.Path);
@@ -990,6 +955,14 @@ public class Worker : BackgroundService
         {
             foreach (var endFilePath in item.RelatedEndFilePaths)
             {
+                // DeleteRemoteEndFiles 有効時は、前回試行で取得・削除済みの END ファイルを
+                // リトライで再取得しようとして失敗しないよう存在を確認する (リトライの冪等化)
+                if (_cleanup.DeleteRemoteEndFiles && !await client.ExistsAsync(endFilePath, token).ConfigureAwait(false))
+                {
+                    _logger.LogInformation("[{Id}] Related END file {Remote} no longer exists (already processed in a previous attempt). Skipping.", id, endFilePath);
+                    continue;
+                }
+
                 bytesTransferred += await ProcessDownloadAsync(
                     client,
                     new TransferItem(endFilePath, TransferAction.Download),
@@ -1051,45 +1024,6 @@ public class Worker : BackgroundService
             _logger.LogWarning("Error checking if file is END file for {FilePath}: {Error}", filePath, ex.Message);
             return false;
         }
-    }
-
-    /// <summary>
-    /// ENDファイルから対応するデータファイル名を取得
-    /// </summary>
-    private string GetDataFileForEndFile(string endFilePath)
-    {
-        if (string.IsNullOrEmpty(endFilePath) || _watch.EndFileExtensions == null)
-        {
-            return string.Empty;
-        }
-
-        try
-        {
-            var fileName = Path.GetFileName(endFilePath);
-            var extension = Path.GetExtension(endFilePath);
-
-            // ENDファイル拡張子を除去してデータファイル名を取得
-            foreach (var endExt in _watch.EndFileExtensions)
-            {
-                if (string.IsNullOrWhiteSpace(endExt))
-                {
-                    continue;
-                }
-
-                var normalizedEndExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
-                if (string.Equals(extension, normalizedEndExt, StringComparison.OrdinalIgnoreCase))
-                {
-                    // ENDファイル拡張子を除去してデータファイル名を返す
-                    return fileName.Substring(0, fileName.Length - normalizedEndExt.Length);
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning("Error getting data file name for END file {EndFile}: {Error}", endFilePath, ex.Message);
-        }
-
-        return string.Empty;
     }
 
     /// <summary>

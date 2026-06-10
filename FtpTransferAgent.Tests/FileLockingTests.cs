@@ -64,16 +64,21 @@ public class FileLockingTests : IDisposable
     [Fact]
     public void RetryableExceptionClassifier_ShouldIdentifyFileLockExceptions()
     {
-        // Arrange - プラットフォーム依存を考慮した例外作成
+        // Arrange - Win32 エラーコード体系の例外 (実行プラットフォームに依らず判定可能)
         var sharingViolationException = CreateIOExceptionWithHResult(unchecked((int)0x80070020));
         var lockViolationException = CreateIOExceptionWithHResult(unchecked((int)0x80070021));
         var diskFullException = CreateIOExceptionWithHResult(unchecked((int)0x80070070));
+        // Unix errno 体系の例外 (Linux/macOS では .NET が HResult に errno を設定する)
+        var eagainException = CreateIOExceptionWithHResult(11);  // EAGAIN
+        var ebusyException = CreateIOExceptionWithHResult(16);   // EBUSY
         var genericIOException = new IOException("Generic IO error");
 
         // Act & Assert
         Assert.True(RetryableExceptionClassifier.IsRetryable(sharingViolationException));
         Assert.True(RetryableExceptionClassifier.IsRetryable(lockViolationException));
         Assert.True(RetryableExceptionClassifier.IsRetryable(diskFullException));
+        Assert.True(RetryableExceptionClassifier.IsRetryable(eagainException));
+        Assert.True(RetryableExceptionClassifier.IsRetryable(ebusyException));
         Assert.False(RetryableExceptionClassifier.IsRetryable(genericIOException)); // HResultが設定されていない場合
     }
 

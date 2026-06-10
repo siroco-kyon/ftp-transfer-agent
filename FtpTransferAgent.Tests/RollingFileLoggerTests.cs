@@ -27,7 +27,8 @@ public class RollingFileLoggerTests
 
             logger.LogInformation("hello");
 
-            file = Path.Combine(dir, $"{DateTime.UtcNow:yyyy}", $"{DateTime.UtcNow:MM}", $"log{DateTime.UtcNow:yyyyMMdd}.txt");
+            // ファイル名の日付はログ行のタイムスタンプと同じローカル時刻基準
+            file = Path.Combine(dir, $"{DateTime.Now:yyyy}", $"{DateTime.Now:MM}", $"log{DateTime.Now:yyyyMMdd}.txt");
             Assert.True(File.Exists(file));
         }
 
@@ -52,7 +53,7 @@ public class RollingFileLoggerTests
             logger.LogInformation("first");
             logger.LogInformation("second");
 
-            baseName = Path.Combine(dir, $"{DateTime.UtcNow:yyyy}", $"{DateTime.UtcNow:MM}", $"log{DateTime.UtcNow:yyyyMMdd}");
+            baseName = Path.Combine(dir, $"{DateTime.Now:yyyy}", $"{DateTime.Now:MM}", $"log{DateTime.Now:yyyyMMdd}");
         }
 
         Assert.True(File.Exists(baseName + ".txt"));
@@ -67,7 +68,7 @@ public class RollingFileLoggerTests
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
         var options = new LoggingOptions { RollingFilePath = Path.Combine(dir, "log.txt"), MaxBytes = 1 };
-        var today = DateTime.UtcNow;
+        var today = DateTime.Now;
         var baseName = Path.Combine(dir, $"{today:yyyy}", $"{today:MM}", $"log{today:yyyyMMdd}");
         var currentFile = baseName + ".txt";
         Directory.CreateDirectory(Path.GetDirectoryName(currentFile)!);

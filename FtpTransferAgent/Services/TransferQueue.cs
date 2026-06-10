@@ -13,6 +13,10 @@ namespace FtpTransferAgent.Services;
 /// </summary>
 public class TransferQueue
 {
+    // 指数バックオフの上限。これが無いと MaxAttempts が大きい設定で
+    // 2^attempt が発散し TimeSpan.FromSeconds がオーバーフローする
+    private const double MaxRetryDelaySeconds = 300;
+
     private readonly ChannelReader<TransferItem> _reader;
     private readonly AsyncRetryPolicy _policy;
     private readonly ILogger<TransferQueue> _logger;
@@ -35,12 +39,14 @@ public class TransferQueue
             .Handle<Exception>(ex => RetryableExceptionClassifier.IsRetryable(ex))
             .WaitAndRetryAsync(
                 retryCount: options.MaxAttempts,
-                sleepDurationProvider: attempt => TimeSpan.FromSeconds(options.DelaySeconds * Math.Pow(2, attempt - 1)), // 指数バックオフ（初回は基本遅延）
+                // 指数バックオフ（初回は基本遅延）。上限でキャップしてオーバーフローを防ぐ
+                sleepDurationProvider: attempt => TimeSpan.FromSeconds(
+                    Math.Min(options.DelaySeconds * Math.Pow(2, attempt - 1), MaxRetryDelaySeconds)),
                 onRetry: (ex, ts, attempt, ctx) =>
                 {
                     var itemPath = ctx.ContainsKey("ItemPath") ? ctx["ItemPath"].ToString() : "Unknown";
                     _logger.LogWarning(ex, "Retry {Attempt}/{MaxAttempts} for {ItemPath}: {Error}",
-                        attempt, options.MaxAttempts + 1, itemPath, ex.Message);
+                        attempt, options.MaxAttempts, itemPath, ex.Message);
                 });
     }
 

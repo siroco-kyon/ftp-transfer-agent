@@ -61,7 +61,7 @@ This is a .NET 8 console application that performs batch FTP/SFTP file transfers
 - **Services/**: Contains transfer clients and utilities
   - `AsyncFtpClientWrapper` (FtpClient.cs) / `SftpClientWrapper.cs`: Protocol-specific implementations
   - `TransferQueue.cs`: Manages parallel transfers with intelligent retry logic and real-time statistics
-  - `HashUtil.cs`: File integrity verification (MD5/SHA256) with stream support
+  - `HashUtil.cs`: File integrity verification (SHA256/SHA512) with stream support
   - `RetryableExceptionClassifier.cs`: Smart exception classification for retry decisions
 - **Configuration/**: Strongly-typed configuration classes with comprehensive validation
   - `ConfigurationValidator.cs`: Cross-setting validation and change impact assessment
@@ -98,7 +98,7 @@ The application uses `appsettings.json` with these main sections:
 - `Watch`: Local folder settings and file filters
 - `Transfer`: FTP/SFTP connection and transfer settings  
 - `Retry`: Error retry behavior using Polly
-- `Hash`: Integrity verification settings (MD5/SHA256)
+- `Hash`: Integrity verification settings (SHA256/SHA512)
 - `Cleanup`: Post-transfer file deletion options
 - `Smtp`: Email notification for errors
 - `Logging`: File logging with rolling behavior
