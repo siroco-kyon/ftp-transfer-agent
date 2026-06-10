@@ -81,27 +81,21 @@ public static class RetryableExceptionClassifier
     }
 
     /// <summary>
-    /// IO例外がリトライ可能かどうかを判定
+    /// IO例外がリトライ可能かどうかを判定。
+    /// HResult は Windows では Win32 エラーコード (0x8007xxxx)、Unix では .NET ランタイムが
+    /// errno を設定する。両者の値域は重ならないため、例外がどちらの体系で生成されても
+    /// 判定できるよう常に両方の集合をチェックする。
     /// </summary>
     private static bool IsRetryableIOException(IOException ioException)
     {
-        if (OperatingSystem.IsWindows())
-        {
-            // Win32エラーコードに基づいて判定
-            var hResult = ioException.HResult;
-            return hResult switch
-            {
-                unchecked((int)0x80070020) => true, // ERROR_SHARING_VIOLATION (ファイルが他のプロセスで使用中)
-                unchecked((int)0x80070021) => true, // ERROR_LOCK_VIOLATION (ファイルがロックされている)
-                unchecked((int)0x80070070) => true, // ERROR_DISK_FULL (ディスク容量不足)
-                unchecked((int)0x8007006E) => true, // ERROR_OPEN_FAILED (ファイルオープン失敗)
-                _ => false
-            };
-        }
-
-        // Unix 系では .NET ランタイムが IOException.HResult に errno を設定する
         return ioException.HResult switch
         {
+            // Windows (Win32 エラーコード)
+            unchecked((int)0x80070020) => true, // ERROR_SHARING_VIOLATION (ファイルが他のプロセスで使用中)
+            unchecked((int)0x80070021) => true, // ERROR_LOCK_VIOLATION (ファイルがロックされている)
+            unchecked((int)0x80070070) => true, // ERROR_DISK_FULL (ディスク容量不足)
+            unchecked((int)0x8007006E) => true, // ERROR_OPEN_FAILED (ファイルオープン失敗)
+            // Unix (errno)
             11 => true, // EAGAIN (リソースが一時的に利用不可)
             16 => true, // EBUSY (デバイス/リソースがビジー)
             26 => true, // ETXTBSY (テキストファイルがビジー)
