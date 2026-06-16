@@ -175,25 +175,42 @@ public class Worker : BackgroundService
         string file,
         IReadOnlyList<DestinationOptions> destinations,
         IReadOnlyList<QueueContext> queueContexts,
-        IReadOnlyList<string> localEndFilesToDeleteOnSuccess,
+        IReadOnlyList<string> relatedEndFiles,
         CancellationToken token)
     {
         var groupId = Guid.NewGuid().ToString("N");
+
+        // 全宛先成功時にローカル削除する END ファイル:
+        //   - TransferEndFiles=true: 転送済みなので削除
+        //   - DeleteLocalSkippedEndFiles=true: 未転送だがクリーンアップ対象として削除
+        // どちらでもない場合は削除せずローカルに残す。
+        var endFilesToDeleteOnSuccess =
+            _watch.TransferEndFiles || _cleanup.DeleteLocalSkippedEndFiles
+                ? relatedEndFiles
+                : Array.Empty<string>();
+
         _fanout.Register(groupId, file, destinations.Count, (source, results) =>
         {
-            HandleFanoutCompletion(source, results, localEndFilesToDeleteOnSuccess);
+            HandleFanoutCompletion(source, results, endFilesToDeleteOnSuccess);
         });
 
         foreach (var dest in destinations)
         {
             var queueContext = GetQueueContextForDestination(queueContexts, dest);
+            // RelatedEndFilePaths に列挙時に確定した END ファイル(実ファイル名)を載せ、
+            // アップロード経路で再探索せず同じ集合を使う。これにより「転送する END」と
+            // 「成功時に削除する END」が必ず一致し、大小を区別する FS でも不整合が起きない。
             await queueContext.Channel.Writer.WriteAsync(
-                new TransferItem(file, TransferAction.Upload, dest, groupId),
+                new TransferItem(file, TransferAction.Upload, dest, groupId, relatedEndFiles),
                 token).ConfigureAwait(false);
         }
     }
 
-    private IReadOnlyList<string> GetExistingEndFilesForDataFile(string dataFilePath, HashSet<string>? knownEndFiles = null)
+    // データファイルに対応する END ファイルを、列挙時に構築した END ファイル集合から解決する。
+    // 集合は IsEndFile と同じ大小無視で構築され、各要素はディスク上の実ファイル名(大小を保持)を持つ。
+    // そのため設定値 (例 ".END") と実ファイル (例 ".end") の大小が異なっても一致し、実名を返せる。
+    // ファイルシステムを再探索しないので、列挙結果と常に一致する (転送/削除の不整合を防ぐ)。
+    private IReadOnlyList<string> GetExistingEndFilesForDataFile(string dataFilePath, HashSet<string> knownEndFiles)
     {
         if (string.IsNullOrEmpty(dataFilePath) || _watch.EndFileExtensions is null || _watch.EndFileExtensions.Length == 0)
         {
@@ -218,62 +235,17 @@ public class Worker : BackgroundService
                 continue;
             }
 
-            // 設定値から候補名を組み立てるが、実際に転送/削除に使うのは
-            // ディスク (または既知一覧) 上の実ファイル名で、大文字小文字を保持する。
             var normalizedEndExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
             var candidate = Path.Combine(directory, fileName + normalizedEndExt);
 
-            string? actual;
-            if (knownEndFiles is not null)
-            {
-                // 列挙済み END ファイル集合から実名 (格納時の大小) を取り出す
-                actual = knownEndFiles.TryGetValue(candidate, out var stored) ? stored : null;
-            }
-            else
-            {
-                // ディスク上の実名 (大小保持) を解決する。大小を区別しない FS では
-                // candidate が ".END" でも実体が ".end" ならその実名を返す。
-                actual = ResolveActualEndFilePath(directory, fileName + normalizedEndExt);
-            }
-
-            if (actual is not null && seen.Add(actual))
+            // 集合から実名 (格納時の大小) を取り出す。大小無視で一致し、実ファイル名を保持する。
+            if (knownEndFiles.TryGetValue(candidate, out var actual) && seen.Add(actual))
             {
                 matches.Add(actual);
             }
         }
 
         return matches;
-    }
-
-    // ディレクトリ内で、指定ファイル名 (大小無視で一致) のディスク上の実パスを解決する。
-    // 大小を区別しない FS では実体の大小が candidate と異なり得るため、実名を取得して返す。
-    // 存在しない場合は null。取得に失敗した場合は組み立てた候補名にフォールバックする。
-    private static string? ResolveActualEndFilePath(string directory, string fileNameWithExt)
-    {
-        var candidate = Path.Combine(directory, fileNameWithExt);
-        if (!File.Exists(candidate))
-        {
-            return null;
-        }
-
-        try
-        {
-            // Directory.GetFiles はディスク上の実際の大小でファイル名を返す。
-            // 検索パターンのワイルドカード誤一致を避けるため実名で再確認する。
-            foreach (var path in Directory.GetFiles(directory, fileNameWithExt))
-            {
-                if (string.Equals(Path.GetFileName(path), fileNameWithExt, StringComparison.OrdinalIgnoreCase))
-                {
-                    return path;
-                }
-            }
-        }
-        catch (Exception)
-        {
-            // ディレクトリアクセス失敗時は候補名にフォールバック
-        }
-
-        return candidate;
     }
 
     private void HandleFanoutCompletion(string sourcePath, IReadOnlyList<FanoutCoordinator.DestinationResult> results, IReadOnlyList<string> localEndFilesToDeleteOnSuccess)
@@ -449,14 +421,10 @@ public class Worker : BackgroundService
                         dataFiles.Count * destinations.Count);
 
                     // 1. まずデータファイルを全宛先に対してファンアウトしてキューへ投入
+                    //    関連 END ファイル(列挙時に確定した実ファイル名)を渡し、転送・削除で同じ集合を使う
                     foreach (var file in dataFiles)
                     {
-                        var relatedEndFiles = relatedEndFilesByDataFile[file];
-                        var endFilesToDeleteOnSuccess =
-                            _watch.TransferEndFiles || _cleanup.DeleteLocalSkippedEndFiles
-                                ? relatedEndFiles
-                                : Array.Empty<string>();
-                        await EnqueueFanoutAsync(file, destinations, queueContexts, endFilesToDeleteOnSuccess, stoppingToken).ConfigureAwait(false);
+                        await EnqueueFanoutAsync(file, destinations, queueContexts, relatedEndFilesByDataFile[file], stoppingToken).ConfigureAwait(false);
                     }
                 }
                 catch (DirectoryNotFoundException ex)
@@ -840,9 +808,11 @@ public class Worker : BackgroundService
 
         var bytesTransferred = await UploadPathWithHashAsync(client, item.Path, remotePath, destLabel, id, token).ConfigureAwait(false);
 
-        if (!isEndFile && _watch.TransferEndFiles)
+        // 列挙時に確定した関連 END ファイルを転送する (ファイルシステムを再探索しない)。
+        // これにより成功時にローカル削除される END ファイルと完全に一致する。
+        if (!isEndFile && _watch.TransferEndFiles && item.RelatedEndFilePaths is { Count: > 0 })
         {
-            foreach (var endFile in GetExistingEndFilesForDataFile(item.Path))
+            foreach (var endFile in item.RelatedEndFilePaths)
             {
                 var endRemotePath = BuildRemotePath(dest, endFile);
                 bytesTransferred += await UploadPathWithHashAsync(client, endFile, endRemotePath, destLabel, id, token).ConfigureAwait(false);

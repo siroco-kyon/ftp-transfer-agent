@@ -334,6 +334,71 @@ public class EndFileTransferTests
         Directory.Delete(dir, true);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_TransferEndFiles_ConfigCaseDiffersFromDisk_UploadsThenDeletesConsistently()
+    {
+        // レビュー指摘の回帰: 設定は大文字 ".END" のみ、ディスク上は小文字 ".end"、RequireEndFile=false。
+        // 転送する END と「成功時に削除する END」が一致しないと、未転送のまま END マーカーを失う。
+        // 大小を区別する FS (CI の Linux 等) では、修正前は END が転送されず削除だけされていた。
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        var dataFile = Path.Combine(dir, "data.txt");
+        var endFile = Path.Combine(dir, "data.txt.end"); // 小文字で作成
+        await File.WriteAllTextAsync(dataFile, "payload");
+        await File.WriteAllTextAsync(endFile, "end marker");
+        var dataHash = await HashUtil.ComputeHashAsync(dataFile, "SHA256", CancellationToken.None);
+        var endHash = await HashUtil.ComputeHashAsync(endFile, "SHA256", CancellationToken.None);
+
+        var watch = Options.Create(new WatchOptions
+        {
+            Path = dir,
+            RequireEndFile = false,
+            AllowedExtensions = new[] { ".txt" },
+            EndFileExtensions = new[] { ".END" }, // 大文字のみ
+            TransferEndFiles = true
+        });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 1
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
+        var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
+        var cleanup = Options.Create(new CleanupOptions());
+
+        var mock = new Mock<IFileTransferClient>();
+        mock.Setup(c => c.UploadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        mock.Setup(c => c.GetRemoteHashAsync("/remote/data.txt", "SHA256", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(dataHash);
+        mock.Setup(c => c.GetRemoteHashAsync("/remote/data.txt.end", "SHA256", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(endHash);
+        mock.Setup(c => c.Dispose());
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var provider = services.BuildServiceProvider();
+        var logger = provider.GetRequiredService<ILogger<Worker>>();
+
+        using var lifetime = new DummyLifetime();
+        var worker = new TestWorker(watch, transfer, retry, hash, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
+        await worker.RunAsync(CancellationToken.None);
+
+        // END は実ファイルの大小 ".end" のまま転送される（未転送のまま削除されない）
+        mock.Verify(c => c.UploadAsync(endFile, "/remote/data.txt.end", It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(c => c.UploadAsync(It.IsAny<string>(), "/remote/data.txt.END", It.IsAny<CancellationToken>()), Times.Never);
+        // 転送成功後はローカル END が削除され、データファイルは残る（転送と削除が一致）
+        Assert.False(File.Exists(endFile), "END marker should be deleted only after it was transferred");
+        Assert.True(File.Exists(dataFile));
+
+        Directory.Delete(dir, true);
+    }
+
     private class TestWorker : Worker
     {
         private readonly IFileTransferClient _client;
