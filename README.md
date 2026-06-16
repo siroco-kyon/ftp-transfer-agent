@@ -241,8 +241,8 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 
 注意:
 
-- `Enabled: false` のときは `DeleteAfterVerify: true` と組み合わせられません（起動時バリデーションでエラー終了）。
-- `MD5` は無効です（起動時バリデーションでエラー終了）。
+- `Enabled: false` と `DeleteAfterVerify: true` は併用できます。この場合ハッシュ検証は行われず、転送（一時名→本番名へのリネーム）成功後にローカルファイルが削除されます。整合性チェックを伴わない削除になるため、FTP など転送レイヤーで整合性保証のない経路では、ハッシュ検証の有効化または SFTP の利用を推奨します。
+- `MD5` は使用できません。`Hash.Algorithm` は `SHA256` / `SHA512` のみ受け付け、それ以外は起動時バリデーション（DataAnnotations）でエラー終了します。
 - SFTP は転送レイヤーで HMAC による整合性保証があるため、`Enabled: false` にしても実用上の問題は少ないです。
 
 ### 推奨設定テンプレート

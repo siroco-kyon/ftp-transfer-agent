@@ -124,13 +124,17 @@ try
         return; // 到達しないが静的解析のため
     }
 
+    // host.Run() は終了時にホスト (IServiceProvider) を Dispose するため、
+    // 終了コードを保持するシングルトンの参照は Run の前に取得しておく。
+    // Run 後に host.Services を参照すると ObjectDisposedException となる。
+    var exitCodeTracker = host.Services.GetRequiredService<ApplicationExitCode>();
+
     try
     {
         host.Run();
-        var exitCode = host.Services.GetRequiredService<ApplicationExitCode>().Code;
-        if (exitCode != 0)
+        if (exitCodeTracker.Code != 0)
         {
-            Environment.ExitCode = exitCode;
+            Environment.ExitCode = exitCodeTracker.Code;
         }
     }
     finally

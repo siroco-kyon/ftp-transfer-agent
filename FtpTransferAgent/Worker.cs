@@ -193,7 +193,7 @@ public class Worker : BackgroundService
         }
     }
 
-    private IReadOnlyList<string> GetExistingEndFilesForDataFile(string dataFilePath, ISet<string>? knownEndFiles = null)
+    private IReadOnlyList<string> GetExistingEndFilesForDataFile(string dataFilePath, HashSet<string>? knownEndFiles = null)
     {
         if (string.IsNullOrEmpty(dataFilePath) || _watch.EndFileExtensions is null || _watch.EndFileExtensions.Length == 0)
         {
@@ -208,6 +208,8 @@ public class Worker : BackgroundService
         }
 
         var matches = new List<string>();
+        // 解決済みの実ファイルパスで重複排除する。
+        // 設定値の大小違い (".END" と ".end") から同一の実ファイルに辿り着いても二重追加しない。
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var endExt in _watch.EndFileExtensions)
         {
@@ -216,27 +218,62 @@ public class Worker : BackgroundService
                 continue;
             }
 
+            // 設定値から候補名を組み立てるが、実際に転送/削除に使うのは
+            // ディスク (または既知一覧) 上の実ファイル名で、大文字小文字を保持する。
             var normalizedEndExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
             var candidate = Path.Combine(directory, fileName + normalizedEndExt);
-            if (!seen.Add(candidate))
-            {
-                continue;
-            }
 
+            string? actual;
             if (knownEndFiles is not null)
             {
-                if (knownEndFiles.Contains(candidate))
-                {
-                    matches.Add(candidate);
-                }
+                // 列挙済み END ファイル集合から実名 (格納時の大小) を取り出す
+                actual = knownEndFiles.TryGetValue(candidate, out var stored) ? stored : null;
             }
-            else if (File.Exists(candidate))
+            else
             {
-                matches.Add(candidate);
+                // ディスク上の実名 (大小保持) を解決する。大小を区別しない FS では
+                // candidate が ".END" でも実体が ".end" ならその実名を返す。
+                actual = ResolveActualEndFilePath(directory, fileName + normalizedEndExt);
+            }
+
+            if (actual is not null && seen.Add(actual))
+            {
+                matches.Add(actual);
             }
         }
 
         return matches;
+    }
+
+    // ディレクトリ内で、指定ファイル名 (大小無視で一致) のディスク上の実パスを解決する。
+    // 大小を区別しない FS では実体の大小が candidate と異なり得るため、実名を取得して返す。
+    // 存在しない場合は null。取得に失敗した場合は組み立てた候補名にフォールバックする。
+    private static string? ResolveActualEndFilePath(string directory, string fileNameWithExt)
+    {
+        var candidate = Path.Combine(directory, fileNameWithExt);
+        if (!File.Exists(candidate))
+        {
+            return null;
+        }
+
+        try
+        {
+            // Directory.GetFiles はディスク上の実際の大小でファイル名を返す。
+            // 検索パターンのワイルドカード誤一致を避けるため実名で再確認する。
+            foreach (var path in Directory.GetFiles(directory, fileNameWithExt))
+            {
+                if (string.Equals(Path.GetFileName(path), fileNameWithExt, StringComparison.OrdinalIgnoreCase))
+                {
+                    return path;
+                }
+            }
+        }
+        catch (Exception)
+        {
+            // ディレクトリアクセス失敗時は候補名にフォールバック
+        }
+
+        return candidate;
     }
 
     private void HandleFanoutCompletion(string sourcePath, IReadOnlyList<FanoutCoordinator.DestinationResult> results, IReadOnlyList<string> localEndFilesToDeleteOnSuccess)

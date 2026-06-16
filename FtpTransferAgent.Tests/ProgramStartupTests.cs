@@ -14,6 +14,33 @@ public class ProgramStartupTests
         Assert.Contains("Concurrency", result.Output, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public async Task Program_ShouldExitCleanly_WhenTransferCompletesWithNoFiles()
+    {
+        // 転送対象が無い put 実行を最後まで通す。host.Run() がホスト (IServiceProvider) を
+        // Dispose した後に host.Services を参照して ObjectDisposedException で異常終了し、
+        // 終了コードが常に 1 になっていた回帰を防ぐ。
+        var watchDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(watchDir);
+        var lockFile = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName() + ".lock");
+
+        try
+        {
+            var args = $"--Watch:Path=\"{watchDir}\" --App:LockFilePath=\"{lockFile}\" " +
+                       "--Transfer:Direction=put --Logging:RollingFilePath=";
+            var result = await RunProgramAsync(args);
+
+            Assert.Equal(0, result.ExitCode);
+            Assert.DoesNotContain("terminated unexpectedly", result.Output, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("disposed", result.Output, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            try { Directory.Delete(watchDir, true); } catch { /* ベストエフォート */ }
+            try { File.Delete(lockFile); } catch { /* ベストエフォート */ }
+        }
+    }
+
     private static async Task<(int ExitCode, string Output)> RunProgramAsync(string arguments)
     {
         var programDllPath = Path.Combine(AppContext.BaseDirectory, "FtpTransferAgent.dll");
