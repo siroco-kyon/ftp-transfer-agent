@@ -6,3 +6,6 @@ obj/
 *.user
 *.suo
 *.log
+
+# Marp で生成されるスライドHTML（ソースは slides/*.md）
+slides/*.html
