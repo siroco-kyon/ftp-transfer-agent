@@ -43,18 +43,22 @@ public class Worker : BackgroundService
 
     private sealed class QueueContext
     {
-        public QueueContext(DestinationOptions destination, string name, Channel<TransferItem> channel, TransferQueue queue)
+        public QueueContext(DestinationOptions destination, string name, Channel<TransferItem> channel, TransferQueue queue, ClientPool pool)
         {
             Destination = destination;
             Name = name;
             Channel = channel;
             Queue = queue;
+            Pool = pool;
         }
 
         public DestinationOptions Destination { get; }
         public string Name { get; }
         public Channel<TransferItem> Channel { get; }
         public TransferQueue Queue { get; }
+
+        // この宛先への接続をワーカー間で再利用するためのプール
+        public ClientPool Pool { get; }
     }
 
     // 実クライアント生成の共通実装。virtual メソッドから分離して相互再帰を避ける。
@@ -121,7 +125,7 @@ public class Worker : BackgroundService
         var queueLogger = _services.GetRequiredService<ILogger<TransferQueue>>();
         var channel = CreateTransferChannel();
         var queue = new TransferQueue(channel, _retry, queueLogger, concurrency);
-        return new QueueContext(destination, name, channel, queue);
+        return new QueueContext(destination, name, channel, queue, new ClientPool());
     }
 
     private List<QueueContext> CreateQueueContexts()
@@ -322,21 +326,29 @@ public class Worker : BackgroundService
             {
                 // 各転送処理の識別子 (リトライ時も同一 ID でログを通しで追跡できるようアイテム由来の ID を使う)
                 var id = item.Id;
-                long bytesTransferred;
-                if (item.Action == TransferAction.Upload)
+                var isUpload = item.Action == TransferAction.Upload;
+                // Upload は宛先ごと、Download は primary。宛先ごとのプールから接続を借りて再利用する
+                var dest = isUpload ? (item.Destination ?? context.Destination) : context.Destination;
+                var client = context.Pool.Rent(() => isUpload ? CreateClientFor(dest) : CreateClient());
+                // 接続が壊れていなければプールへ返却し、次のアイテム/リトライで再利用する
+                var reusable = true;
+                try
                 {
-                    // Upload は宛先ごとに専用クライアントを生成
-                    var dest = item.Destination ?? context.Destination;
-                    using var perItemClient = CreateClientFor(dest);
-                    bytesTransferred = await ProcessUploadAsync(perItemClient, item, id, token).ConfigureAwait(false);
+                    var bytesTransferred = isUpload
+                        ? await ProcessUploadAsync(client, item, id, token).ConfigureAwait(false)
+                        : await ProcessDownloadAsync(client, item, id, token).ConfigureAwait(false);
+                    context.Queue.RecordBytesTransferred(bytesTransferred);
                 }
-                else
+                catch (Exception ex)
                 {
-                    // Download は primary のみ (Destination 未使用)
-                    using var perItemClient = CreateClient();
-                    bytesTransferred = await ProcessDownloadAsync(perItemClient, item, id, token).ConfigureAwait(false);
+                    // 接続そのものが壊れた場合は再利用せず破棄し、次回 Rent で張り直す
+                    reusable = !RetryableExceptionClassifier.IsConnectionBroken(ex);
+                    throw;
                 }
-                context.Queue.RecordBytesTransferred(bytesTransferred);
+                finally
+                {
+                    context.Pool.Return(client, reusable);
+                }
             },
             onFinalOutcome: (item, ex) =>
             {
@@ -637,6 +649,12 @@ public class Worker : BackgroundService
             catch (TimeoutException)
             {
                 _logger.LogWarning("Performance monitoring task did not complete within timeout");
+            }
+
+            // 全ワーカー終了後、プールが保持する再利用接続をすべて切断する
+            foreach (var context in queueContexts)
+            {
+                context.Pool.Dispose();
             }
         }
 

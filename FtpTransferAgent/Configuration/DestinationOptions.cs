@@ -37,4 +37,11 @@ public class DestinationOptions
 
     [Range(1, 3600)]
     public int TimeoutSeconds { get; set; } = 120;
+
+    /// <summary>
+    /// 接続を再利用する際にアイドルタイムアウトで切断されないよう送る KeepAlive の間隔（秒）。
+    /// 0 で無効。&gt;0 のとき SFTP は KeepAliveInterval、FTP は SocketKeepAlive を有効化する。
+    /// </summary>
+    [Range(0, 3600)]
+    public int KeepAliveSeconds { get; set; }
 }
