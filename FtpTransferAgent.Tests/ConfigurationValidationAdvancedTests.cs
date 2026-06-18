@@ -443,6 +443,36 @@ public class ConfigurationValidationAdvancedTests : IDisposable
     }
 
     [Fact]
+    public void ValidateConfiguration_WithNullAdditionalDestinationAndSubfolders_ShouldNotThrow()
+    {
+        var watch = new WatchOptions
+        {
+            Path = _testDirectory,
+            IncludeSubfolders = true
+        };
+        var transfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "example.com",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            PreserveFolderStructure = true,
+            AdditionalDestinations = new List<DestinationOptions> { null! }
+        };
+        var retry = new RetryOptions();
+        var hash = new HashOptions { Algorithm = "SHA256" };
+        var cleanup = new CleanupOptions();
+
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("[Destination#1] is null"));
+        Assert.DoesNotContain(result.Errors, e => e.Contains("IncludeSubfolders cannot be enabled for upload"));
+    }
+
+    [Fact]
     public void ValidateConfiguration_WithOutOfRangeAdditionalDestinationSettings_ShouldReportErrors()
     {
         // DataAnnotations はネストされた AdditionalDestinations には適用されないため、
