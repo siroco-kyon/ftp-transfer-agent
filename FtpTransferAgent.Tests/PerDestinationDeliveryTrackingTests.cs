@@ -108,6 +108,36 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
         Assert.False(Directory.Exists(_stateDir) && Directory.GetFiles(_stateDir, "*.marker").Length > 0);
     }
 
+    [Fact]
+    public async Task HashSignature_UnreadableFile_DoesNotBlockOtherFiles()
+    {
+        var lockedPath = Path.Combine(_watchDir, "a-locked.txt");
+        var readyPath = Path.Combine(_watchDir, "b-ready.txt");
+        await File.WriteAllTextAsync(lockedPath, "locked");
+        await File.WriteAllTextAsync(readyPath, "ready-payload");
+
+        var (transfer, additional) = BuildOptions();
+        transfer.DeliverySignatureMode = "hash";
+        var primaryStore = new DestinationStore();
+        var backupStore = new DestinationStore();
+        await using var lockedStream = new FileStream(
+            lockedPath,
+            FileMode.Open,
+            FileAccess.ReadWrite,
+            FileShare.None);
+
+        var exitCode = new ApplicationExitCode();
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, exitCode);
+
+        Assert.Equal(1, exitCode.Code);
+        Assert.False(primaryStore.Contains("/primary/a-locked.txt"));
+        Assert.False(backupStore.Contains("/backup/a-locked.txt"));
+        Assert.Equal(1, primaryStore.UploadCount("/primary/b-ready.txt"));
+        Assert.Equal(1, backupStore.UploadCount("/backup/b-ready.txt"));
+        Assert.False(File.Exists(readyPath));
+        Assert.True(File.Exists(lockedPath));
+    }
+
     private (TransferOptions, DestinationOptions) BuildOptions()
     {
         var additional = new DestinationOptions

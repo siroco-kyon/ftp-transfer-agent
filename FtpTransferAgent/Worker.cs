@@ -597,11 +597,26 @@ public class Worker : BackgroundService
                         }
 
                         // トラッキング有効: 既に配信済みの宛先を除いた「未配信先」だけに送る
-                        var relativeKey = ToRelativeKey(file);
-                        var signature = await _deliveryStore.ComputeSignatureAsync(file, stoppingToken).ConfigureAwait(false);
-                        var delivered = new HashSet<string>(
-                            _deliveryStore.GetDeliveredDestinations(relativeKey, signature), StringComparer.Ordinal);
-                        var pending = destinations.Where(d => !delivered.Contains(GetDestinationName(d))).ToList();
+                        string relativeKey;
+                        string signature;
+                        HashSet<string> delivered;
+                        List<DestinationOptions> pending;
+                        try
+                        {
+                            relativeKey = ToRelativeKey(file);
+                            signature = await _deliveryStore.ComputeSignatureAsync(file, stoppingToken).ConfigureAwait(false);
+                            delivered = new HashSet<string>(
+                                _deliveryStore.GetDeliveredDestinations(relativeKey, signature), StringComparer.Ordinal);
+                            pending = destinations.Where(d => !delivered.Contains(GetDestinationName(d))).ToList();
+                        }
+                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                        {
+                            _exitCode?.MarkFailure();
+                            _logger.LogError(ex,
+                                "Skipping file {File} because delivery tracking signature could not be computed: {Error}",
+                                file, ex.Message);
+                            continue;
+                        }
 
                         if (pending.Count == 0)
                         {

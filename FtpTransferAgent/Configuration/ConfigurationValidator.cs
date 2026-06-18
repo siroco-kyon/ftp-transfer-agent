@@ -44,7 +44,7 @@ public class ConfigurationValidator
         ValidateAdditionalDestinations(transfer, result);
 
         // 宛先別配信トラッキングのバリデーション
-        ValidateDeliveryTracking(transfer, result);
+        ValidateDeliveryTracking(watch, transfer, result);
 
         return result;
     }
@@ -53,7 +53,7 @@ public class ConfigurationValidator
     /// 宛先別配信トラッキング有効時の整合性をチェックする。
     /// マーカーは宛先 Name をキーにするため、全宛先で Name が必須かつ一意であること。
     /// </summary>
-    private void ValidateDeliveryTracking(TransferOptions transfer, ConfigurationValidationResult result)
+    private void ValidateDeliveryTracking(WatchOptions watch, TransferOptions transfer, ConfigurationValidationResult result)
     {
         if (!transfer.PerDestinationDeliveryTracking)
         {
@@ -74,6 +74,8 @@ public class ConfigurationValidator
         {
             result.Errors.Add($"DeliverySignatureMode must be 'sizetime' or 'hash' (got '{mode}').");
         }
+
+        ValidateDeliveryStateDirectory(watch, transfer, result);
 
         // 全宛先 (primary + 追加) の Name を収集
         var named = new List<(string Label, string? Name)>
@@ -109,6 +111,37 @@ public class ConfigurationValidator
             result.Errors.Add($"PerDestinationDeliveryTracking requires destination Names to be unique. Duplicate Name(s): {string.Join(", ", duplicates)}.");
         }
     }
+
+    private static void ValidateDeliveryStateDirectory(WatchOptions watch, TransferOptions transfer, ConfigurationValidationResult result)
+    {
+        if (string.IsNullOrWhiteSpace(transfer.StateDirectory))
+        {
+            return;
+        }
+
+        try
+        {
+            var watchPath = NormalizeDirectoryPath(Path.GetFullPath(watch.Path));
+            var statePath = NormalizeDirectoryPath(Path.GetFullPath(transfer.StateDirectory));
+
+            if (string.Equals(statePath, watchPath, StringComparison.OrdinalIgnoreCase)
+                || IsAncestorDirectory(statePath, watchPath))
+            {
+                result.Errors.Add("Transfer.StateDirectory must not be the same as Watch.Path or a parent directory of Watch.Path. Put delivery state in a child folder of Watch.Path or, preferably, outside Watch.Path.");
+            }
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException or SecurityException)
+        {
+            result.Errors.Add($"Transfer.StateDirectory is invalid: {ex.Message}");
+        }
+    }
+
+    private static string NormalizeDirectoryPath(string path) =>
+        path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+    private static bool IsAncestorDirectory(string ancestor, string child) =>
+        child.StartsWith(ancestor + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+        || child.StartsWith(ancestor + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 
     private void ValidateAdditionalDestinations(TransferOptions transfer, ConfigurationValidationResult result)
     {

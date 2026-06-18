@@ -22,7 +22,7 @@ public static class LogEvents
 
     /// <summary>
     /// 指定された EventId が「複数宛先での宛先失敗」を表すか。
-    /// <see cref="SmtpOptions.SuppressMultiDestinationFailureEmails"/> によるメール抑制判定に使う。
+    /// <see cref="SmtpOptions.SuppressPerDestinationFailureDetailEmails"/> によるメール抑制判定に使う。
     /// </summary>
     public static bool IsMultiDestinationFailure(EventId eventId) =>
         eventId.Id == MultiDestinationTransferFailure.Id || eventId.Id == MultiDestinationPartialFailure.Id;

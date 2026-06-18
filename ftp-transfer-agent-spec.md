@@ -211,7 +211,7 @@ dotnet run --project FtpTransferAgent -- --Transfer:Concurrency=4 --Hash:Algorit
 | From | string | Enabled 時必須 | `""` | 送信元メールアドレス |
 | To | string[] | Enabled 時必須 | `[]` | 宛先（1 件以上） |
 | MaxEmailsPerRun | int | - | 100 | 1 回のバッチ実行で送信するエラーメール上限（洪水防止）。0 以下で無制限 |
-| SuppressMultiDestinationFailureEmails | bool | - | false | 複数宛先での「宛先失敗」エラーメールだけを抑制する。ある宛先がメンテ等で継続的に失敗してもその通知を止め、設定不備・認証など他のエラーメールは送信し続ける。ファイルログ・終了コードには影響しない（[5.9](#59-宛先別配信トラッキングput) 参照） |
+| SuppressPerDestinationFailureDetailEmails | bool | - | false | 複数宛先での個別宛先失敗・部分失敗の詳細エラーメールを抑制する。ある宛先がメンテ等で継続的に失敗しても詳細通知を止め、設定不備・認証など他のエラーメールは送信し続ける。ファイルログ・終了コードには影響しない（[5.9](#59-宛先別配信トラッキングput) 参照） |
 
 エラーメールは非同期送信ですが、プロセス終了時に送信中メールの完了を最大 15 秒待機するため、終了直前の通知も失われません。
 
@@ -371,7 +371,7 @@ END ファイルは「データファイル名 + END 拡張子」（例: `data.t
 
 **通知・終了コード**:
 - 宛先失敗は既定どおりエラーとして記録され、エラーメール送信と終了コード `1` の対象になります。
-- ある宛先が継続的に失敗してメールが煩わしい場合は `Smtp.SuppressMultiDestinationFailureEmails: true` で、その「宛先失敗」メールだけを抑制できます。設定不備・認証エラーなど他のエラーメールは送信され続けます。**ファイルログと終了コードには影響しません**（障害は引き続き記録・検知できます）。
+- ある宛先が継続的に失敗してメールが煩わしい場合は `Smtp.SuppressPerDestinationFailureDetailEmails: true` で、個別宛先失敗・部分失敗の詳細メールを抑制できます。設定不備・認証エラーなど他のエラーメールは送信され続けます。**ファイルログと終了コードには影響しません**（障害は引き続き記録・検知できます）。
 
 **注意・既知の限界**:
 - `Cleanup.DeleteAfterVerify: false` の場合、全宛先へ配信済みでもローカルを残すため、マーカーも保持され続けます（その分は再送をスキップします）。
@@ -458,7 +458,7 @@ END ファイルは「データファイル名 + END 拡張子」（例: `data.t
 **バージョン**: 3.1.0
 **主な更新内容 (3.1.0)**:
 - **宛先別配信トラッキング**（[5.9](#59-宛先別配信トラッキングput)）を追加。複数宛先で未配信の宛先だけを再送する任意機能。マーカー方式・指紋による上書き検出・`Name` 必須/一意・`StateDirectory`/`DeliverySignatureMode` 設定を追記
-- `Smtp.SuppressMultiDestinationFailureEmails`（複数宛先の宛先失敗メールの選択的抑制）を追記
+- `Smtp.SuppressPerDestinationFailureDetailEmails`（複数宛先の個別宛先失敗・部分失敗の詳細メール抑制）を追記
 - 設計の詳細・対策・懸念は別冊 [docs/per-destination-delivery-tracking.md](docs/per-destination-delivery-tracking.md) を参照
 
 **主な更新内容 (3.0.0)**:

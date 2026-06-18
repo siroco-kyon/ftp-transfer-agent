@@ -4,7 +4,7 @@
 > 仕様の要約は [ftp-transfer-agent-spec.md 5.9](../ftp-transfer-agent-spec.md) を参照。本書はその背後にある判断と細部を後から読み返せるようにするためのもの。
 
 - 対象バージョン: 3.1.0
-- 関連設定: `Transfer.PerDestinationDeliveryTracking` / `Transfer.StateDirectory` / `Transfer.DeliverySignatureMode` / `Transfer.Name`（各宛先） / `Smtp.SuppressMultiDestinationFailureEmails`
+- 関連設定: `Transfer.PerDestinationDeliveryTracking` / `Transfer.StateDirectory` / `Transfer.DeliverySignatureMode` / `Transfer.Name`（各宛先） / `Smtp.SuppressPerDestinationFailureDetailEmails`
 - 主な実装: [`Services/DeliveryStateStore.cs`](../FtpTransferAgent/Services/DeliveryStateStore.cs) / [`Worker.cs`](../FtpTransferAgent/Worker.cs) / [`Logging/LogEvents.cs`](../FtpTransferAgent/Logging/LogEvents.cs)
 
 ---
@@ -130,7 +130,7 @@ watch/
 ### 3.8 メール通知が鳴り続ける → 「宛先失敗」メールだけ選択的に抑制
 
 - **問題**: 宛先 B が 1 日ダウンしていると、バッチのたびに「転送失敗」エラーログ → メール送信 → 終了コード 1、が繰り返され、アラート疲れを起こす。
-- **対策**: 「複数宛先での宛先失敗」ログに専用の `EventId` を付け、`Smtp.SuppressMultiDestinationFailureEmails: true` のときその EventId のメールだけ抑制する。**設定不備・認証エラーなど他のエラーメールは送信を継続**する。
+- **対策**: 「複数宛先での宛先失敗」ログに専用の `EventId` を付け、`Smtp.SuppressPerDestinationFailureDetailEmails: true` のときその EventId の詳細メールだけ抑制する。**設定不備・認証エラーなど他のエラーメールは送信を継続**する。
   - 失敗ログは 2 か所から出るので**両方**にタグを付けている:
     1. 個々の転送の最終失敗（`TransferQueue`）→ `EventId 1001 MultiDestinationTransferFailure`
     2. ファイル単位の部分失敗サマリ（`Worker`）→ `EventId 1002 MultiDestinationPartialFailure`
@@ -164,7 +164,7 @@ watch/
 | `Transfer.StateDirectory` | `""` | マーカー保存先。空なら `LocalApplicationData/FtpTransferAgent/delivery-state/<hash>`。watch 外推奨。 |
 | `Transfer.DeliverySignatureMode` | `"sizetime"` | 上書き検出の指紋方式。`sizetime`（軽量）/ `hash`（厳密）。 |
 | `Transfer.Name`（各宛先） | `null` | 宛先の安定識別子。トラッキング有効時は全宛先で**必須かつ一意**。 |
-| `Smtp.SuppressMultiDestinationFailureEmails` | `false` | 複数宛先の「宛先失敗」メールだけを抑制。他のエラーメール・終了コードには影響しない。 |
+| `Smtp.SuppressPerDestinationFailureDetailEmails` | `false` | 複数宛先の個別宛先失敗・部分失敗の詳細メールを抑制。他のエラーメール・終了コードには影響しない。 |
 
 ### 設定例
 
@@ -196,7 +196,7 @@ watch/
   },
   "Smtp": {
     "Enabled": true,
-    "SuppressMultiDestinationFailureEmails": true
+    "SuppressPerDestinationFailureDetailEmails": true
   }
 }
 ```
