@@ -154,6 +154,13 @@ internal sealed class ErrorEmailLogger : ILogger
             return;
         }
 
+        // 複数宛先での「宛先失敗」エラーは、設定により通知だけを抑制する
+        // (ファイルログ・終了コードには影響しない)。他種のエラーは通常どおり送信する。
+        if (_options.SuppressMultiDestinationFailureEmails && LogEvents.IsMultiDestinationFailure(eventId))
+        {
+            return;
+        }
+
         var message = formatter(state, exception);
         _dispatcher.Enqueue(_category, message, exception);
     }
