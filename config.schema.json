@@ -33,6 +33,7 @@
         "Concurrency": { "type": "integer", "minimum": 1, "maximum": 16 },
         "PreserveFolderStructure": { "type": "boolean" },
         "TimeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 3600 },
+        "KeepAliveSeconds": { "type": "integer", "minimum": 0, "maximum": 3600 },
         "AdditionalDestinations": {
           "type": "array",
           "items": { "$ref": "#/definitions/Destination" }
@@ -123,7 +124,8 @@
         "RemotePath": { "type": "string" },
         "Concurrency": { "type": "integer", "minimum": 1, "maximum": 16 },
         "PreserveFolderStructure": { "type": "boolean" },
-        "TimeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 3600 }
+        "TimeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 3600 },
+        "KeepAliveSeconds": { "type": "integer", "minimum": 0, "maximum": 3600 }
       },
       "required": ["Mode", "Host", "Username", "RemotePath"]
     }

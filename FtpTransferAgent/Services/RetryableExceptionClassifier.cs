@@ -139,7 +139,9 @@ public static class RetryableExceptionClassifier
 
             // 接続は生きている前提のエラーは接続を維持する
             HashMismatchException => false,
-            IOException => false,
+            // IOException はローカルファイル起因なら接続は生きているが、転送路の切断が
+            // inner の SocketException 等としてラップされることもあるため inner を辿って判定する
+            IOException ioEx => ioEx.InnerException is { } ioInner && IsConnectionBroken(ioInner),
             UnauthorizedAccessException => false,
 
             // その他は内部例外を辿って判定する
