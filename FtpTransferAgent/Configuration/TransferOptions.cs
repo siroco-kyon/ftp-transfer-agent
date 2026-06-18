@@ -38,6 +38,12 @@ public class TransferOptions : DestinationOptions
     public string? StateDirectory { get; set; }
 
     /// <summary>
+    /// 宛先別配信トラッキングで部分失敗したファイルを隔離するリトライディレクトリ。
+    /// 相対パスの場合は Watch.Path 配下として解決する。空または null で移動を無効化する。
+    /// </summary>
+    public string? RetryDirectory { get; set; } = "retry";
+
+    /// <summary>
     /// 配信済み判定に使うファイル指紋の算出方式。
     /// "sizetime" (既定): サイズ + 最終更新時刻。軽量。同サイズかつ mtime 据え置きの上書きは検出できない。
     /// "hash": Hash.Algorithm でファイルハッシュを算出。厳密だが保持ファイルごとに計算コストが掛かる。

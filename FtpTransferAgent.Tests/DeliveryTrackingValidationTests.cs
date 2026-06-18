@@ -123,6 +123,68 @@ public class DeliveryTrackingValidationTests : IDisposable
     }
 
     [Fact]
+    public void RetryDirectory_SameAsWatchPath_ProducesError()
+    {
+        var transfer = ValidPrimary("primary");
+        transfer.AdditionalDestinations = new List<DestinationOptions> { ValidBackup("backup") };
+        transfer.RetryDirectory = _watchDir;
+
+        var result = Validate(transfer);
+
+        Assert.Contains(result.Errors, e => e.Contains("RetryDirectory") && e.Contains("Watch.Path"));
+    }
+
+    [Fact]
+    public void RetryDirectory_ParentOfWatchPath_ProducesError()
+    {
+        var transfer = ValidPrimary("primary");
+        transfer.AdditionalDestinations = new List<DestinationOptions> { ValidBackup("backup") };
+        transfer.RetryDirectory = Path.GetDirectoryName(_watchDir);
+
+        var result = Validate(transfer);
+
+        Assert.Contains(result.Errors, e => e.Contains("RetryDirectory") && e.Contains("parent directory"));
+    }
+
+    [Fact]
+    public void RetryDirectory_ChildOfWatchPath_IsAllowed()
+    {
+        var transfer = ValidPrimary("primary");
+        transfer.AdditionalDestinations = new List<DestinationOptions> { ValidBackup("backup") };
+        transfer.RetryDirectory = "retry";
+
+        var result = Validate(transfer);
+
+        Assert.DoesNotContain(result.Errors, e => e.Contains("RetryDirectory"));
+    }
+
+    [Fact]
+    public void RetryDirectory_SameAsStateDirectory_ProducesError()
+    {
+        var transfer = ValidPrimary("primary");
+        transfer.AdditionalDestinations = new List<DestinationOptions> { ValidBackup("backup") };
+        transfer.StateDirectory = ".delivery-state";
+        transfer.RetryDirectory = ".delivery-state";
+
+        var result = Validate(transfer);
+
+        Assert.Contains(result.Errors, e => e.Contains("RetryDirectory") && e.Contains("StateDirectory"));
+    }
+
+    [Fact]
+    public void RetryDirectory_OverlapsStateDirectory_ProducesError()
+    {
+        var transfer = ValidPrimary("primary");
+        transfer.AdditionalDestinations = new List<DestinationOptions> { ValidBackup("backup") };
+        transfer.StateDirectory = Path.Combine(_watchDir, "retry", ".delivery-state");
+        transfer.RetryDirectory = "retry";
+
+        var result = Validate(transfer);
+
+        Assert.Contains(result.Errors, e => e.Contains("RetryDirectory") && e.Contains("StateDirectory"));
+    }
+
+    [Fact]
     public void TrackingWithGetDirection_ProducesWarning()
     {
         var transfer = ValidPrimary("primary");

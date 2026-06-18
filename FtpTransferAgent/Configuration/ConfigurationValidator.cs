@@ -76,6 +76,7 @@ public class ConfigurationValidator
         }
 
         ValidateDeliveryStateDirectory(watch, transfer, result);
+        ValidateDeliveryRetryDirectory(watch, transfer, result);
 
         // 全宛先 (primary + 追加) の Name を収集
         var named = new List<(string Label, string? Name)>
@@ -122,7 +123,7 @@ public class ConfigurationValidator
         try
         {
             var watchPath = NormalizeDirectoryPath(Path.GetFullPath(watch.Path));
-            var statePath = NormalizeDirectoryPath(Path.GetFullPath(transfer.StateDirectory));
+            var statePath = NormalizeDirectoryPath(ResolveDirectory(transfer.StateDirectory, watch.Path));
 
             if (string.Equals(statePath, watchPath, StringComparison.OrdinalIgnoreCase)
                 || IsAncestorDirectory(statePath, watchPath))
@@ -135,6 +136,46 @@ public class ConfigurationValidator
             result.Errors.Add($"Transfer.StateDirectory is invalid: {ex.Message}");
         }
     }
+
+    private static void ValidateDeliveryRetryDirectory(WatchOptions watch, TransferOptions transfer, ConfigurationValidationResult result)
+    {
+        if (string.IsNullOrWhiteSpace(transfer.RetryDirectory))
+        {
+            return;
+        }
+
+        try
+        {
+            var watchPath = NormalizeDirectoryPath(Path.GetFullPath(watch.Path));
+            var retryPath = NormalizeDirectoryPath(ResolveDirectory(transfer.RetryDirectory, watch.Path));
+
+            if (string.Equals(retryPath, watchPath, StringComparison.OrdinalIgnoreCase)
+                || IsAncestorDirectory(retryPath, watchPath))
+            {
+                result.Errors.Add("Transfer.RetryDirectory must not be the same as Watch.Path or a parent directory of Watch.Path.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(transfer.StateDirectory))
+            {
+                var statePath = NormalizeDirectoryPath(ResolveDirectory(transfer.StateDirectory, watch.Path));
+                if (string.Equals(retryPath, statePath, StringComparison.OrdinalIgnoreCase)
+                    || IsAncestorDirectory(retryPath, statePath)
+                    || IsAncestorDirectory(statePath, retryPath))
+                {
+                    result.Errors.Add("Transfer.RetryDirectory must not be the same as or overlap with Transfer.StateDirectory.");
+                }
+            }
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException or SecurityException)
+        {
+            result.Errors.Add($"Transfer.RetryDirectory is invalid: {ex.Message}");
+        }
+    }
+
+    private static string ResolveDirectory(string configured, string watchPath) =>
+        Path.IsPathRooted(configured)
+            ? Path.GetFullPath(configured)
+            : Path.GetFullPath(Path.Combine(watchPath, configured));
 
     private static string NormalizeDirectoryPath(string path) =>
         path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
