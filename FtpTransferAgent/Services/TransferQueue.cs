@@ -21,6 +21,9 @@ public class TransferQueue
     private readonly AsyncRetryPolicy _policy;
     private readonly ILogger<TransferQueue> _logger;
     private readonly int _concurrency;
+    // アイテムが最終的に失敗した際のエラーログに付与する EventId。
+    // 複数宛先ファンアウトのキューでは宛先失敗を識別できるようにし、メール抑制の対象にできる。
+    private readonly EventId _finalFailureEventId;
     private readonly ConcurrentDictionary<string, bool> _processedItems = new();
     private readonly ConcurrentDictionary<string, DateTime> _activeItems = new();
     private readonly ConcurrentBag<Exception> _criticalExceptions = new();
@@ -29,11 +32,12 @@ public class TransferQueue
     private int _totalFailed = 0;
     private long _totalBytesTransferred = 0;
 
-    public TransferQueue(Channel<TransferItem> channel, RetryOptions options, ILogger<TransferQueue> logger, int concurrency = 1)
+    public TransferQueue(Channel<TransferItem> channel, RetryOptions options, ILogger<TransferQueue> logger, int concurrency = 1, EventId finalFailureEventId = default)
     {
         _reader = channel.Reader;
         _logger = logger;
         _concurrency = Math.Max(1, Math.Min(concurrency, 16)); // 最大16に制限
+        _finalFailureEventId = finalFailureEventId;
         // リトライ可能な例外のみリトライするポリシー
         _policy = Policy
             .Handle<Exception>(ex => RetryableExceptionClassifier.IsRetryable(ex))
@@ -120,11 +124,11 @@ public class TransferQueue
 
                             if (RetryableExceptionClassifier.IsRetryable(ex))
                             {
-                                _logger.LogError(ex, "Worker {WorkerId} failed to process {ItemKey} after all retries (Retryable)", workerId, itemKey);
+                                _logger.LogError(_finalFailureEventId, ex, "Worker {WorkerId} failed to process {ItemKey} after all retries (Retryable)", workerId, itemKey);
                             }
                             else
                             {
-                                _logger.LogError(ex, "Worker {WorkerId} failed to process {ItemKey} - Non-retryable error", workerId, itemKey);
+                                _logger.LogError(_finalFailureEventId, ex, "Worker {WorkerId} failed to process {ItemKey} - Non-retryable error", workerId, itemKey);
                                 // クリティカルエラーは記録するが他のワーカーの処理は継続
                                 _criticalExceptions.Add(ex);
                             }

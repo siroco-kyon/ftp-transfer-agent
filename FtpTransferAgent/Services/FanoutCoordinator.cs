@@ -14,7 +14,9 @@ public sealed class FanoutCoordinator
 {
     private readonly ConcurrentDictionary<string, FanoutState> _groups = new();
 
-    public sealed record DestinationResult(string DestinationLabel, bool Success, Exception? Error);
+    /// <param name="DestinationLabel">ログ表示用の宛先ラベル (mode://host:port/path)</param>
+    /// <param name="DestinationName">宛先の安定識別子 (配信トラッキングのマーカーキー)。設定の Name、未設定時はラベル。</param>
+    public sealed record DestinationResult(string DestinationLabel, string DestinationName, bool Success, Exception? Error);
 
     private sealed class FanoutState
     {

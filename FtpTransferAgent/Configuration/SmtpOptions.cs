@@ -27,6 +27,14 @@ public class SmtpOptions : IValidatableObject
     /// </summary>
     public int MaxEmailsPerRun { get; set; } = 100;
 
+    /// <summary>
+    /// 複数宛先 (AdditionalDestinations あり) で個々の宛先への転送が失敗した際の
+    /// エラーメールを抑制する。true にすると、ある宛先がメンテ等で継続的に失敗しても
+    /// その「宛先失敗」メールだけを止め、設定不備・認証など他のエラーメールは送信し続ける。
+    /// ファイルログ・終了コードには影響しない (障害自体は記録される)。既定 false。
+    /// </summary>
+    public bool SuppressMultiDestinationFailureEmails { get; set; }
+
     public IEnumerable<ValidationResult> Validate(ValidationContext validationContext)
     {
         if (!Enabled)

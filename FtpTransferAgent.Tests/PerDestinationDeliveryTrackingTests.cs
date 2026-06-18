@@ -1,0 +1,283 @@
+using System.Collections.Concurrent;
+using FtpTransferAgent.Configuration;
+using FtpTransferAgent.Services;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace FtpTransferAgent.Tests;
+
+/// <summary>
+/// 宛先別配信トラッキング (PerDestinationDeliveryTracking) のバッチ跨ぎ挙動を検証する。
+/// 1 宛先がメンテ等で落ちた場合、次回バッチでは配信済み宛先へ再送せず未配信先だけに送ることを確認する。
+/// </summary>
+public class PerDestinationDeliveryTrackingTests : IDisposable
+{
+    private readonly string _watchDir;
+    private readonly string _stateDir;
+
+    public PerDestinationDeliveryTrackingTests()
+    {
+        _watchDir = Path.Combine(Path.GetTempPath(), "track-watch-" + Path.GetRandomFileName());
+        _stateDir = Path.Combine(Path.GetTempPath(), "track-state-" + Path.GetRandomFileName());
+        Directory.CreateDirectory(_watchDir);
+    }
+
+    [Fact]
+    public async Task PartialFailureThenRecovery_OnlyResendsToPendingDestination()
+    {
+        var dataPath = Path.Combine(_watchDir, "report.txt");
+        await File.WriteAllTextAsync(dataPath, "the-payload");
+
+        var (transfer, additional) = BuildOptions();
+        var primaryStore = new DestinationStore();
+        var backupStore = new DestinationStore();
+
+        // --- Run 1: backup がメンテで全失敗 ---
+        backupStore.FailUploads = true;
+        var exit1 = new ApplicationExitCode();
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, exit1);
+
+        Assert.True(File.Exists(dataPath), "部分失敗時はローカルを保持する");
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt"));
+        Assert.False(backupStore.Contains("/backup/report.txt"));
+        Assert.Equal(1, exit1.Code); // 失敗ありで終了コード 1
+        Assert.Single(Directory.GetFiles(_stateDir, "*.marker")); // primary の配信マーカー 1 件
+
+        // --- Run 2: backup 復活 ---
+        backupStore.FailUploads = false;
+        var exit2 = new ApplicationExitCode();
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, exit2);
+
+        // primary には再送されない (カウントは 1 のまま)
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt"));
+        // backup には今回送られる
+        Assert.Equal(1, backupStore.UploadCount("/backup/report.txt"));
+        Assert.Equal("the-payload", backupStore.GetText("/backup/report.txt"));
+        // 全宛先完了 → ローカル削除・マーカー掃除
+        Assert.False(File.Exists(dataPath));
+        Assert.Empty(Directory.GetFiles(_stateDir, "*.marker"));
+        Assert.Equal(0, exit2.Code);
+    }
+
+    [Fact]
+    public async Task Overwrite_AfterPartialFailure_ResendsToAllDestinations()
+    {
+        var dataPath = Path.Combine(_watchDir, "report.txt");
+        await File.WriteAllTextAsync(dataPath, "v1");
+
+        var (transfer, additional) = BuildOptions();
+        var primaryStore = new DestinationStore();
+        var backupStore = new DestinationStore();
+
+        // Run 1: backup 失敗 → primary に v1 配信、マーカー記録
+        backupStore.FailUploads = true;
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode());
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt"));
+
+        // 同名で内容を差し替え (上書き)
+        await File.WriteAllTextAsync(dataPath, "v2-completely-different-content");
+
+        // Run 2: backup 復活。指紋が変わったので primary にも再送される
+        backupStore.FailUploads = false;
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode());
+
+        Assert.Equal(2, primaryStore.UploadCount("/primary/report.txt")); // 再送された
+        Assert.Equal("v2-completely-different-content", primaryStore.GetText("/primary/report.txt"));
+        Assert.Equal("v2-completely-different-content", backupStore.GetText("/backup/report.txt"));
+        Assert.False(File.Exists(dataPath));
+    }
+
+    [Fact]
+    public async Task AllSuccessFirstRun_LeavesNoMarkers_AndDeletesLocal()
+    {
+        var dataPath = Path.Combine(_watchDir, "report.txt");
+        await File.WriteAllTextAsync(dataPath, "payload");
+
+        var (transfer, additional) = BuildOptions();
+        var primaryStore = new DestinationStore();
+        var backupStore = new DestinationStore();
+
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode());
+
+        // 全宛先成功 → マーカーは 1 件も作られず、ローカルは削除される
+        Assert.False(File.Exists(dataPath));
+        Assert.True(primaryStore.Contains("/primary/report.txt"));
+        Assert.True(backupStore.Contains("/backup/report.txt"));
+        Assert.False(Directory.Exists(_stateDir) && Directory.GetFiles(_stateDir, "*.marker").Length > 0);
+    }
+
+    private (TransferOptions, DestinationOptions) BuildOptions()
+    {
+        var additional = new DestinationOptions
+        {
+            Name = "backup",
+            Mode = "ftp",
+            Host = "backup-host",
+            Username = "u",
+            Password = "p",
+            RemotePath = "/backup",
+            Concurrency = 1
+        };
+
+        var transfer = new TransferOptions
+        {
+            Name = "primary",
+            Mode = "ftp",
+            Direction = "put",
+            Host = "primary-host",
+            Username = "u",
+            Password = "p",
+            RemotePath = "/primary",
+            Concurrency = 1,
+            PerDestinationDeliveryTracking = true,
+            StateDirectory = _stateDir,
+            DeliverySignatureMode = "sizetime",
+            AdditionalDestinations = new List<DestinationOptions> { additional }
+        };
+
+        return (transfer, additional);
+    }
+
+    private async Task RunWorkerAsync(
+        TransferOptions transfer,
+        DestinationOptions additional,
+        DestinationStore primaryStore,
+        DestinationStore backupStore,
+        ApplicationExitCode exitCode)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        var provider = services.BuildServiceProvider();
+
+        var worker = new RoutingWorker(
+            Options.Create(new WatchOptions { Path = _watchDir, AllowedExtensions = new[] { ".txt" } }),
+            Options.Create(transfer),
+            Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 }),
+            Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" }),
+            Options.Create(new CleanupOptions { DeleteAfterVerify = true }),
+            provider,
+            provider.GetRequiredService<ILogger<Worker>>(),
+            new DummyLifetime(),
+            transfer,
+            additional,
+            primaryStore,
+            backupStore,
+            exitCode);
+
+        await worker.RunAsync(CancellationToken.None);
+    }
+
+    private sealed class RoutingWorker : Worker
+    {
+        private readonly TransferOptions _transferOptions;
+        private readonly DestinationOptions _additional;
+        private readonly DestinationStore _primaryStore;
+        private readonly DestinationStore _backupStore;
+
+        public RoutingWorker(
+            IOptions<WatchOptions> watch, IOptions<TransferOptions> transfer, IOptions<RetryOptions> retry,
+            IOptions<HashOptions> hash, IOptions<CleanupOptions> cleanup, IServiceProvider services,
+            ILogger<Worker> logger, IHostApplicationLifetime lifetime,
+            TransferOptions transferOptions, DestinationOptions additional,
+            DestinationStore primaryStore, DestinationStore backupStore, ApplicationExitCode exitCode)
+            : base(watch, transfer, retry, hash, cleanup, services, logger, lifetime, exitCode)
+        {
+            _transferOptions = transferOptions;
+            _additional = additional;
+            _primaryStore = primaryStore;
+            _backupStore = backupStore;
+        }
+
+        protected override IFileTransferClient CreateClient() => new RecordingClient(_primaryStore);
+
+        protected override IFileTransferClient CreateClientFor(DestinationOptions dest)
+        {
+            if (ReferenceEquals(dest, _transferOptions)) return new RecordingClient(_primaryStore);
+            if (ReferenceEquals(dest, _additional)) return new RecordingClient(_backupStore);
+            throw new InvalidOperationException($"Unexpected destination: {dest.Host}");
+        }
+
+        public async Task RunAsync(CancellationToken token)
+        {
+            using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
+            using var combined = CancellationTokenSource.CreateLinkedTokenSource(token, timeoutCts.Token);
+            await base.ExecuteAsync(combined.Token);
+        }
+    }
+
+    private sealed class DestinationStore
+    {
+        private readonly ConcurrentDictionary<string, byte[]> _files = new(StringComparer.OrdinalIgnoreCase);
+        private readonly ConcurrentDictionary<string, int> _uploadCounts = new(StringComparer.OrdinalIgnoreCase);
+
+        public bool FailUploads { get; set; }
+
+        public void Upload(string remotePath, byte[] bytes)
+        {
+            if (FailUploads)
+            {
+                throw new IOException("simulated destination outage");
+            }
+            var key = Normalize(remotePath);
+            _files[key] = bytes;
+            _uploadCounts.AddOrUpdate(key, 1, (_, c) => c + 1);
+        }
+
+        public bool Contains(string remotePath) => _files.ContainsKey(Normalize(remotePath));
+        public bool TryGet(string remotePath, out byte[]? bytes) => _files.TryGetValue(Normalize(remotePath), out bytes);
+        public string GetText(string remotePath) => System.Text.Encoding.UTF8.GetString(_files[Normalize(remotePath)]);
+        public int UploadCount(string remotePath) => _uploadCounts.TryGetValue(Normalize(remotePath), out var c) ? c : 0;
+        public void Delete(string remotePath) => _files.TryRemove(Normalize(remotePath), out _);
+        private static string Normalize(string path) => path.Replace('\\', '/');
+    }
+
+    private sealed class RecordingClient : IFileTransferClient
+    {
+        private readonly DestinationStore _store;
+        public RecordingClient(DestinationStore store) => _store = store;
+
+        public async Task UploadAsync(string localPath, string remotePath, CancellationToken ct)
+        {
+            var bytes = await File.ReadAllBytesAsync(localPath, ct);
+            _store.Upload(remotePath, bytes);
+        }
+
+        public Task DownloadAsync(string remotePath, string localPath, CancellationToken ct) => throw new NotSupportedException();
+
+        public async Task<string> GetRemoteHashAsync(string remotePath, string algorithm, CancellationToken ct, bool useServerCommand = false)
+        {
+            if (!_store.TryGet(remotePath, out var bytes) || bytes is null)
+            {
+                throw new FileNotFoundException(remotePath);
+            }
+            using var stream = new MemoryStream(bytes, writable: false);
+            return await HashUtil.ComputeHashAsync(stream, algorithm, ct);
+        }
+
+        public Task<IEnumerable<string>> ListFilesAsync(string remotePath, CancellationToken ct, bool includeSubdirectories = false) =>
+            Task.FromResult<IEnumerable<string>>(Array.Empty<string>());
+
+        public Task<bool> ExistsAsync(string remotePath, CancellationToken ct) => Task.FromResult(_store.Contains(remotePath));
+        public Task DeleteAsync(string remotePath, CancellationToken ct) { _store.Delete(remotePath); return Task.CompletedTask; }
+        public void Dispose() { }
+    }
+
+    private sealed class DummyLifetime : IHostApplicationLifetime, IDisposable
+    {
+        private readonly CancellationTokenSource _stopping = new();
+        private readonly CancellationTokenSource _stopped = new();
+        public CancellationToken ApplicationStarted => CancellationToken.None;
+        public CancellationToken ApplicationStopping => _stopping.Token;
+        public CancellationToken ApplicationStopped => _stopped.Token;
+        public void StopApplication() { _stopping.Cancel(); _stopped.Cancel(); }
+        public void Dispose() { _stopping.Dispose(); _stopped.Dispose(); }
+    }
+
+    public void Dispose()
+    {
+        try { if (Directory.Exists(_watchDir)) Directory.Delete(_watchDir, true); } catch { /* ignore */ }
+        try { if (Directory.Exists(_stateDir)) Directory.Delete(_stateDir, true); } catch { /* ignore */ }
+    }
+}

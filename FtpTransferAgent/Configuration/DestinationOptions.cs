@@ -7,6 +7,15 @@ namespace FtpTransferAgent.Configuration;
 /// </summary>
 public class DestinationOptions
 {
+    /// <summary>
+    /// 宛先の安定した識別子。複数宛先の配信トラッキング
+    /// (<see cref="TransferOptions.PerDestinationDeliveryTracking"/>) を有効にした場合、
+    /// 配信済みマーカーの宛先キーとして使用する。ホスト名やパスを後から変更しても
+    /// 同じ宛先と認識し続けられるよう、接続情報とは独立した名前を付ける。
+    /// トラッキング有効時は全宛先 (primary 含む) で必須かつ一意であること。
+    /// </summary>
+    public string? Name { get; set; }
+
     [Required]
     [RegularExpression("^(ftp|sftp)$")]
     public string Mode { get; set; } = "ftp";

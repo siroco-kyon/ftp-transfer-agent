@@ -20,6 +20,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "Name": { "type": "string" },
         "Mode": { "enum": ["ftp", "sftp"] },
         "Direction": { "enum": ["get", "put"] },
         "Host": { "type": "string" },
@@ -34,6 +35,9 @@
         "PreserveFolderStructure": { "type": "boolean" },
         "TimeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 3600 },
         "KeepAliveSeconds": { "type": "integer", "minimum": 0, "maximum": 3600 },
+        "PerDestinationDeliveryTracking": { "type": "boolean" },
+        "StateDirectory": { "type": "string" },
+        "DeliverySignatureMode": { "enum": ["sizetime", "hash"] },
         "AdditionalDestinations": {
           "type": "array",
           "items": { "$ref": "#/definitions/Destination" }
@@ -87,7 +91,9 @@
         "Username": { "type": "string" },
         "Password": { "type": "string" },
         "From": { "type": "string", "format": "email" },
-        "To": { "type": "array", "items": { "type": "string", "format": "email" }, "minItems": 1 }
+        "To": { "type": "array", "items": { "type": "string", "format": "email" }, "minItems": 1 },
+        "MaxEmailsPerRun": { "type": "integer" },
+        "SuppressMultiDestinationFailureEmails": { "type": "boolean" }
       }
     },
     "Logging": {
@@ -113,6 +119,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "Name": { "type": "string" },
         "Mode": { "enum": ["ftp", "sftp"] },
         "Host": { "type": "string" },
         "Port": { "type": "integer", "minimum": 1, "maximum": 65535 },

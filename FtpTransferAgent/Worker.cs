@@ -2,6 +2,7 @@ using System.IO;
 using System.Runtime.ExceptionServices;
 using System.Threading.Channels;
 using FtpTransferAgent.Configuration;
+using FtpTransferAgent.Logging;
 using FtpTransferAgent.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -24,6 +25,9 @@ public class Worker : BackgroundService
     private readonly IHostApplicationLifetime _lifetime;
     private readonly ApplicationExitCode? _exitCode;
     private readonly FanoutCoordinator _fanout = new();
+
+    // 宛先別配信トラッキング有効時のマーカーストア (put 方向のみ)。無効時は null。
+    private DeliveryStateStore? _deliveryStore;
 
     // 転送処理用のチャンネル（容量制限でメモリリーク防止）
 
@@ -120,19 +124,24 @@ public class Worker : BackgroundService
         });
     }
 
-    private QueueContext CreateQueueContext(DestinationOptions destination, string name, int concurrency)
+    private QueueContext CreateQueueContext(DestinationOptions destination, string name, int concurrency, EventId finalFailureEventId)
     {
         var queueLogger = _services.GetRequiredService<ILogger<TransferQueue>>();
         var channel = CreateTransferChannel();
-        var queue = new TransferQueue(channel, _retry, queueLogger, concurrency);
+        var queue = new TransferQueue(channel, _retry, queueLogger, concurrency, finalFailureEventId);
         return new QueueContext(destination, name, channel, queue, new ClientPool());
     }
 
     private List<QueueContext> CreateQueueContexts()
     {
+        // 複数宛先 (ファンアウト) の put では、個々の宛先失敗をメール抑制対象として識別できるよう
+        // 専用 EventId を最終失敗ログに付与する。単一宛先や get では既定 (抑制対象外)。
+        var multiDestination = _transfer.Direction is "put" && _transfer.AdditionalDestinations is { Count: > 0 };
+        var failureEventId = multiDestination ? LogEvents.MultiDestinationTransferFailure : default;
+
         var contexts = new List<QueueContext>
         {
-            CreateQueueContext(_transfer, $"primary {DescribeDestination(_transfer)}", _transfer.Concurrency)
+            CreateQueueContext(_transfer, $"primary {DescribeDestination(_transfer)}", _transfer.Concurrency, failureEventId)
         };
 
         if (_transfer.Direction is not "put")
@@ -148,7 +157,7 @@ public class Worker : BackgroundService
         for (int i = 0; i < _transfer.AdditionalDestinations.Count; i++)
         {
             var destination = _transfer.AdditionalDestinations[i];
-            contexts.Add(CreateQueueContext(destination, $"destination#{i + 1} {DescribeDestination(destination)}", destination.Concurrency));
+            contexts.Add(CreateQueueContext(destination, $"destination#{i + 1} {DescribeDestination(destination)}", destination.Concurrency, failureEventId));
         }
 
         return contexts;
@@ -172,33 +181,28 @@ public class Worker : BackgroundService
         throw new InvalidOperationException($"Queue context not found for destination {DescribeDestination(destination)}");
     }
 
-    // 1 ファイルを全宛先に対してファンアウトしてキューへ投入する。
+    // 1 ファイルを指定宛先群に対してファンアウトしてキューへ投入する。
     // 全宛先完了時に FanoutCoordinator からコールバックされ、
-    // 全成功ならローカル削除・部分失敗ならローカル保持のログを出力する。
+    // HandleFanoutCompletion が削除/保持/マーカー更新を判断する。
+    // トラッキング無効時は destinationsToSend = 全宛先、tracking = null。
+    // トラッキング有効時は destinationsToSend = 未配信の宛先のみ。
     private async Task EnqueueFanoutAsync(
         string file,
-        IReadOnlyList<DestinationOptions> destinations,
+        IReadOnlyList<DestinationOptions> destinationsToSend,
         IReadOnlyList<QueueContext> queueContexts,
         IReadOnlyList<string> relatedEndFiles,
+        DeliveryTrackingContext? tracking,
         CancellationToken token)
     {
         var groupId = Guid.NewGuid().ToString("N");
+        var endFilesToDeleteOnSuccess = EndFilesToDeleteOnSuccess(relatedEndFiles);
 
-        // 全宛先成功時にローカル削除する END ファイル:
-        //   - TransferEndFiles=true: 転送済みなので削除
-        //   - DeleteLocalSkippedEndFiles=true: 未転送だがクリーンアップ対象として削除
-        // どちらでもない場合は削除せずローカルに残す。
-        var endFilesToDeleteOnSuccess =
-            _watch.TransferEndFiles || _cleanup.DeleteLocalSkippedEndFiles
-                ? relatedEndFiles
-                : Array.Empty<string>();
-
-        _fanout.Register(groupId, file, destinations.Count, (source, results) =>
+        _fanout.Register(groupId, file, destinationsToSend.Count, (source, results) =>
         {
-            HandleFanoutCompletion(source, results, endFilesToDeleteOnSuccess);
+            HandleFanoutCompletion(source, results, endFilesToDeleteOnSuccess, tracking);
         });
 
-        foreach (var dest in destinations)
+        foreach (var dest in destinationsToSend)
         {
             var queueContext = GetQueueContextForDestination(queueContexts, dest);
             // RelatedEndFilePaths に列挙時に確定した END ファイル(実ファイル名)を載せ、
@@ -208,6 +212,88 @@ public class Worker : BackgroundService
                 new TransferItem(file, TransferAction.Upload, dest, groupId, relatedEndFiles),
                 token).ConfigureAwait(false);
         }
+    }
+
+    // 全宛先成功時にローカル削除する END ファイル集合を返す:
+    //   - TransferEndFiles=true: 転送済みなので削除
+    //   - DeleteLocalSkippedEndFiles=true: 未転送だがクリーンアップ対象として削除
+    //   - どちらでもない場合は削除せずローカルに残す
+    private IReadOnlyList<string> EndFilesToDeleteOnSuccess(IReadOnlyList<string> relatedEndFiles) =>
+        _watch.TransferEndFiles || _cleanup.DeleteLocalSkippedEndFiles
+            ? relatedEndFiles
+            : Array.Empty<string>();
+
+    // 宛先の安定識別子。トラッキングのマーカーキーに使用。Name 未設定時はラベルで代替する。
+    private string GetDestinationName(DestinationOptions dest) =>
+        !string.IsNullOrWhiteSpace(dest.Name) ? dest.Name! : DescribeDestination(dest);
+
+    // watch ディレクトリ基準の正規化済み相対パス (区切りは '/')。マーカーのファイルキー。
+    private string ToRelativeKey(string file) =>
+        Path.GetRelativePath(_watch.Path, file).Replace('\\', '/');
+
+    // 宛先別配信トラッキングのファイル単位コンテキスト。
+    private sealed record DeliveryTrackingContext(
+        string RelativePath,
+        string Signature,
+        IReadOnlyCollection<string> AllDestinationNames,
+        IReadOnlyCollection<string> AlreadyDelivered);
+
+    // 既に全宛先へ配信済み (マーカーが揃っている) ファイルの後始末。
+    // DeleteAfterVerify=true なら削除しマーカーも掃除。false ならローカルを残し
+    // マーカーも保持して次回も送信をスキップさせる。
+    private void HandleAlreadyDelivered(string sourcePath, IReadOnlyList<string> relatedEndFiles, string relativeKey)
+    {
+        _logger.LogInformation("All destinations already delivered for {File} (per delivery state); skipping send.", sourcePath);
+        var deleted = DeleteLocalAfterSuccess(sourcePath, EndFilesToDeleteOnSuccess(relatedEndFiles));
+        if (deleted)
+        {
+            _deliveryStore?.RemoveAll(relativeKey);
+        }
+    }
+
+    // ローカルのデータファイル/END ファイルを成功後ポリシーに従って削除する。
+    // 戻り値: データファイルを削除した (もう存在しない) 場合 true。
+    private bool DeleteLocalAfterSuccess(string sourcePath, IReadOnlyList<string> localEndFilesToDelete)
+    {
+        bool dataFileDeleted = false;
+        if (_cleanup.DeleteAfterVerify)
+        {
+            try
+            {
+                File.Delete(sourcePath);
+                dataFileDeleted = true;
+                _logger.LogInformation("Deleted local file {File} after all destinations succeeded", sourcePath);
+            }
+            catch (IOException ex)
+            {
+                _logger.LogWarning("Failed to delete local file {File}: {Error}", sourcePath, ex.Message);
+                dataFileDeleted = !File.Exists(sourcePath);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning("Access denied deleting local file {File}: {Error}", sourcePath, ex.Message);
+                dataFileDeleted = !File.Exists(sourcePath);
+            }
+        }
+
+        foreach (var endFile in localEndFilesToDelete.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            try
+            {
+                File.Delete(endFile);
+                _logger.LogInformation("Deleted local END file {File} after data transfer succeeded", endFile);
+            }
+            catch (IOException ex)
+            {
+                _logger.LogWarning("Failed to delete local END file {File}: {Error}", endFile, ex.Message);
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning("Access denied deleting local END file {File}: {Error}", endFile, ex.Message);
+            }
+        }
+
+        return dataFileDeleted;
     }
 
     // データファイルに対応する END ファイルを、列挙時に構築した END ファイル集合から解決する。
@@ -252,13 +338,31 @@ public class Worker : BackgroundService
         return matches;
     }
 
-    private void HandleFanoutCompletion(string sourcePath, IReadOnlyList<FanoutCoordinator.DestinationResult> results, IReadOnlyList<string> localEndFilesToDeleteOnSuccess)
+    private void HandleFanoutCompletion(
+        string sourcePath,
+        IReadOnlyList<FanoutCoordinator.DestinationResult> results,
+        IReadOnlyList<string> localEndFilesToDeleteOnSuccess,
+        DeliveryTrackingContext? tracking)
+    {
+        if (tracking is null || _deliveryStore is null)
+        {
+            HandleFanoutCompletionAllOrNothing(sourcePath, results, localEndFilesToDeleteOnSuccess);
+            return;
+        }
+
+        HandleFanoutCompletionTracked(sourcePath, results, localEndFilesToDeleteOnSuccess, tracking);
+    }
+
+    // 従来の all-or-nothing 動作: 全宛先成功時のみローカル削除、部分失敗はローカル保持。
+    private void HandleFanoutCompletionAllOrNothing(
+        string sourcePath,
+        IReadOnlyList<FanoutCoordinator.DestinationResult> results,
+        IReadOnlyList<string> localEndFilesToDeleteOnSuccess)
     {
         var total = results.Count;
         var succeeded = results.Count(r => r.Success);
-        var allSuccess = succeeded == total;
 
-        if (!allSuccess)
+        if (succeeded != total)
         {
             var failed = results.Where(r => !r.Success).Select(r => r.DestinationLabel);
             _logger.LogError("Partial failure for {File}: {Ok}/{Total} destinations succeeded. Failed: {Failed}. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.",
@@ -267,41 +371,61 @@ public class Worker : BackgroundService
         }
 
         _logger.LogInformation("All {Total} destinations succeeded for {File}", total, sourcePath);
+        DeleteLocalAfterSuccess(sourcePath, localEndFilesToDeleteOnSuccess);
+    }
 
-        // 全宛先成功後にだけ、設定されたローカル削除を実行する
-        if (_cleanup.DeleteAfterVerify)
+    // 宛先別配信トラッキング: 「今回成功 ∪ 既存マーカー」が全宛先を満たせば完了として
+    // ローカル削除＋マーカー掃除。満たさなければ成功宛先のマーカーを記録しローカル保持
+    // (次回は未配信の宛先だけ再送される)。
+    private void HandleFanoutCompletionTracked(
+        string sourcePath,
+        IReadOnlyList<FanoutCoordinator.DestinationResult> results,
+        IReadOnlyList<string> localEndFilesToDeleteOnSuccess,
+        DeliveryTrackingContext tracking)
+    {
+        var succeededNames = results.Where(r => r.Success)
+            .Select(r => r.DestinationName)
+            .ToHashSet(StringComparer.Ordinal);
+
+        var totalDelivered = new HashSet<string>(tracking.AlreadyDelivered, StringComparer.Ordinal);
+        totalDelivered.UnionWith(succeededNames);
+
+        var allDone = tracking.AllDestinationNames.All(totalDelivered.Contains);
+
+        if (allDone)
         {
-            try
+            var deleted = DeleteLocalAfterSuccess(sourcePath, localEndFilesToDeleteOnSuccess);
+            if (deleted)
             {
-                File.Delete(sourcePath);
-                _logger.LogInformation("Deleted local file {File} after all destinations succeeded", sourcePath);
+                // ローカルを削除したのでマーカーは不要 → 掃除する
+                _deliveryStore!.RemoveAll(tracking.RelativePath);
+                _logger.LogInformation("All {Total} destinations delivered for {File}; local file removed and delivery markers cleared.",
+                    tracking.AllDestinationNames.Count, sourcePath);
             }
-            catch (IOException ex)
+            else
             {
-                _logger.LogWarning("Failed to delete local file {File}: {Error}", sourcePath, ex.Message);
+                // ローカルを残す構成 (DeleteAfterVerify=false 等)。
+                // 全宛先分のマーカーを揃えておき、次回バッチで送信をスキップさせる。
+                foreach (var name in succeededNames)
+                {
+                    _deliveryStore!.RecordDelivered(tracking.RelativePath, name, tracking.Signature);
+                }
+                _logger.LogInformation("All {Total} destinations delivered for {File}; local file retained, future runs will skip re-sending.",
+                    tracking.AllDestinationNames.Count, sourcePath);
             }
-            catch (UnauthorizedAccessException ex)
-            {
-                _logger.LogWarning("Access denied deleting local file {File}: {Error}", sourcePath, ex.Message);
-            }
+            return;
         }
 
-        foreach (var endFile in localEndFilesToDeleteOnSuccess.Distinct(StringComparer.OrdinalIgnoreCase))
+        // 部分配信: 今回成功した宛先のマーカーを記録 (既存マーカーはそのまま) してローカル保持
+        foreach (var name in succeededNames)
         {
-            try
-            {
-                File.Delete(endFile);
-                _logger.LogInformation("Deleted local END file {File} after data transfer succeeded", endFile);
-            }
-            catch (IOException ex)
-            {
-                _logger.LogWarning("Failed to delete local END file {File}: {Error}", endFile, ex.Message);
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                _logger.LogWarning("Access denied deleting local END file {File}: {Error}", endFile, ex.Message);
-            }
+            _deliveryStore!.RecordDelivered(tracking.RelativePath, name, tracking.Signature);
         }
+
+        var pendingNames = tracking.AllDestinationNames.Where(n => !totalDelivered.Contains(n));
+        _logger.LogError(LogEvents.MultiDestinationPartialFailure,
+            "Partial delivery for {File}: {Done}/{Total} destination(s) delivered. Pending: {Pending}. Local file retained; only pending destination(s) will be retried on the next run.",
+            sourcePath, totalDelivered.Count, tracking.AllDestinationNames.Count, string.Join(", ", pendingNames));
     }
 
     // バックグラウンド処理の本体
@@ -312,6 +436,19 @@ public class Worker : BackgroundService
         // 再試行付きの転送キューを開始
         var queueContexts = CreateQueueContexts();
         var primaryQueue = GetPrimaryQueueContext(queueContexts);
+
+        // 宛先別配信トラッキング (put 方向のみ)。完了コールバックより前に初期化しておく。
+        var trackingEnabled = _transfer.PerDestinationDeliveryTracking && _transfer.Direction is "put";
+        string? stateDirFullPath = null;
+        if (trackingEnabled)
+        {
+            stateDirFullPath = DeliveryStateStore.ResolveStateDirectory(_transfer.StateDirectory, _watch.Path);
+            var storeLogger = _services.GetRequiredService<ILogger<DeliveryStateStore>>();
+            _deliveryStore = new DeliveryStateStore(stateDirFullPath, _watch.Path, _transfer.DeliverySignatureMode, _hash.Algorithm, storeLogger);
+            _deliveryStore.Initialize();
+            _logger.LogInformation("Per-destination delivery tracking enabled (signature mode: {Mode}). State directory: {Dir}",
+                _transfer.DeliverySignatureMode, _deliveryStore.StateDirectory);
+        }
 
         // パフォーマンス監視用のCancellationTokenSourceを作成
         using var monitorCts = CancellationTokenSource.CreateLinkedTokenSource(stoppingToken);
@@ -360,7 +497,7 @@ public class Worker : BackgroundService
                 var dest = item.Destination ?? context.Destination;
                 var label = DescribeDestination(dest);
                 _fanout.ReportResult(item.GroupId,
-                    new FanoutCoordinator.DestinationResult(label, ex == null, ex));
+                    new FanoutCoordinator.DestinationResult(label, GetDestinationName(dest), ex == null, ex));
             },
             stoppingToken))
             .ToArray();
@@ -378,8 +515,15 @@ public class Worker : BackgroundService
                 var option = _watch.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
                 try
                 {
+                    // 状態ディレクトリが watch 配下に置かれていてもマーカーを転送しないよう除外する
+                    var stateDirPrefix = stateDirFullPath is null
+                        ? null
+                        : Path.GetFullPath(stateDirFullPath) + Path.DirectorySeparatorChar;
+
                     // ファイル順序を安定化するためファイル名でソート (END ファイルの振り分けは後段で行う)
                     var files = Directory.EnumerateFiles(_watch.Path, "*", option)
+                        .Where(f => stateDirPrefix is null ||
+                                    !Path.GetFullPath(f).StartsWith(stateDirPrefix, StringComparison.OrdinalIgnoreCase))
                         .OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
                         .ToList();
 
@@ -426,17 +570,56 @@ public class Worker : BackgroundService
                         StringComparer.Ordinal);
                     var relatedEndFileCount = relatedEndFilesByDataFile.Values.Sum(files => files.Count);
 
-                    _logger.LogInformation("Upload fanout: {DataFileCount} data file(s), {EndFileCount} related END file(s), {DestCount} destination(s), {Total} queued data transfer item(s)",
+                    _logger.LogInformation("Upload fanout: {DataFileCount} data file(s), {EndFileCount} related END file(s), {DestCount} destination(s)",
                         dataFiles.Count,
                         _watch.TransferEndFiles || _cleanup.DeleteLocalSkippedEndFiles ? relatedEndFileCount : 0,
-                        destinations.Count,
-                        dataFiles.Count * destinations.Count);
+                        destinations.Count);
 
-                    // 1. まずデータファイルを全宛先に対してファンアウトしてキューへ投入
+                    // トラッキング有効時に使う全宛先名 (Name)。マーカー突き合わせに使用。
+                    var allDestinationNames = trackingEnabled
+                        ? destinations.Select(GetDestinationName).ToHashSet(StringComparer.Ordinal)
+                        : null;
+
+                    // 1. データファイルを宛先へファンアウトしてキューへ投入
                     //    関連 END ファイル(列挙時に確定した実ファイル名)を渡し、転送・削除で同じ集合を使う
+                    int queuedItems = 0;
+                    int skippedFullyDelivered = 0;
                     foreach (var file in dataFiles)
                     {
-                        await EnqueueFanoutAsync(file, destinations, queueContexts, relatedEndFilesByDataFile[file], stoppingToken).ConfigureAwait(false);
+                        var related = relatedEndFilesByDataFile[file];
+
+                        if (_deliveryStore is null)
+                        {
+                            // トラッキング無効: 従来どおり全宛先へ投入
+                            await EnqueueFanoutAsync(file, destinations, queueContexts, related, null, stoppingToken).ConfigureAwait(false);
+                            queuedItems += destinations.Count;
+                            continue;
+                        }
+
+                        // トラッキング有効: 既に配信済みの宛先を除いた「未配信先」だけに送る
+                        var relativeKey = ToRelativeKey(file);
+                        var signature = await _deliveryStore.ComputeSignatureAsync(file, stoppingToken).ConfigureAwait(false);
+                        var delivered = new HashSet<string>(
+                            _deliveryStore.GetDeliveredDestinations(relativeKey, signature), StringComparer.Ordinal);
+                        var pending = destinations.Where(d => !delivered.Contains(GetDestinationName(d))).ToList();
+
+                        if (pending.Count == 0)
+                        {
+                            // 全宛先へ配信済み (前回までに完了)。残骸の後始末だけ行う。
+                            HandleAlreadyDelivered(file, related, relativeKey);
+                            skippedFullyDelivered++;
+                            continue;
+                        }
+
+                        var tracking = new DeliveryTrackingContext(relativeKey, signature, allDestinationNames!, delivered);
+                        await EnqueueFanoutAsync(file, pending, queueContexts, related, tracking, stoppingToken).ConfigureAwait(false);
+                        queuedItems += pending.Count;
+                    }
+
+                    if (trackingEnabled)
+                    {
+                        _logger.LogInformation("Delivery tracking: {Queued} transfer item(s) queued, {Skipped} file(s) already fully delivered (skipped).",
+                            queuedItems, skippedFullyDelivered);
                     }
                 }
                 catch (DirectoryNotFoundException ex)

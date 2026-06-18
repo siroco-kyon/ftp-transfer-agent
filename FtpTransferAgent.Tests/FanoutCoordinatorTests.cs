@@ -22,9 +22,9 @@ public class FanoutCoordinatorTests
             capturedPath = path;
         });
 
-        coord.ReportResult("g1", new FanoutCoordinator.DestinationResult("d1", true, null));
+        coord.ReportResult("g1", new FanoutCoordinator.DestinationResult("d1", "d1", true, null));
         Assert.Equal(0, callCount);
-        coord.ReportResult("g1", new FanoutCoordinator.DestinationResult("d2", true, null));
+        coord.ReportResult("g1", new FanoutCoordinator.DestinationResult("d2", "d2", true, null));
 
         Assert.Equal(1, callCount);
         Assert.Equal("/src/file.txt", capturedPath);
@@ -41,9 +41,9 @@ public class FanoutCoordinatorTests
 
         coord.Register("g1", "/src/file.txt", 3, (_, r) => captured = r);
 
-        coord.ReportResult("g1", new FanoutCoordinator.DestinationResult("d1", true, null));
-        coord.ReportResult("g1", new FanoutCoordinator.DestinationResult("d2", false, new IOException("boom")));
-        coord.ReportResult("g1", new FanoutCoordinator.DestinationResult("d3", true, null));
+        coord.ReportResult("g1", new FanoutCoordinator.DestinationResult("d1", "d1", true, null));
+        coord.ReportResult("g1", new FanoutCoordinator.DestinationResult("d2", "d2", false, new IOException("boom")));
+        coord.ReportResult("g1", new FanoutCoordinator.DestinationResult("d3", "d3", true, null));
 
         Assert.NotNull(captured);
         Assert.Equal(3, captured!.Count);
@@ -56,7 +56,7 @@ public class FanoutCoordinatorTests
     {
         var coord = new FanoutCoordinator();
         // 例外を出さずに黙って無視される
-        coord.ReportResult("nope", new FanoutCoordinator.DestinationResult("d1", true, null));
+        coord.ReportResult("nope", new FanoutCoordinator.DestinationResult("d1", "d1", true, null));
     }
 
     [Fact]
@@ -85,7 +85,7 @@ public class FanoutCoordinatorTests
         coord.Register("g1", "/src/file.txt", n, (_, _) => Interlocked.Increment(ref callCount));
 
         Parallel.For(0, n, i =>
-            coord.ReportResult("g1", new FanoutCoordinator.DestinationResult("d" + i, true, null)));
+            coord.ReportResult("g1", new FanoutCoordinator.DestinationResult("d" + i, "d" + i, true, null)));
 
         Assert.Equal(1, callCount);
     }

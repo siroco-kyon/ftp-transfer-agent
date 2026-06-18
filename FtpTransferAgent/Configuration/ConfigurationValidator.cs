@@ -43,7 +43,71 @@ public class ConfigurationValidator
         // 追加宛先のバリデーション
         ValidateAdditionalDestinations(transfer, result);
 
+        // 宛先別配信トラッキングのバリデーション
+        ValidateDeliveryTracking(transfer, result);
+
         return result;
+    }
+
+    /// <summary>
+    /// 宛先別配信トラッキング有効時の整合性をチェックする。
+    /// マーカーは宛先 Name をキーにするため、全宛先で Name が必須かつ一意であること。
+    /// </summary>
+    private void ValidateDeliveryTracking(TransferOptions transfer, ConfigurationValidationResult result)
+    {
+        if (!transfer.PerDestinationDeliveryTracking)
+        {
+            return;
+        }
+
+        // put 方向専用。get では無視されることを警告する。
+        if (transfer.Direction is not "put")
+        {
+            result.Warnings.Add($"PerDestinationDeliveryTracking is enabled but Direction is '{transfer.Direction}'. Delivery tracking applies only to uploads (put) and will be ignored.");
+            return;
+        }
+
+        // 署名モードの妥当性
+        var mode = transfer.DeliverySignatureMode;
+        if (!string.Equals(mode, "sizetime", StringComparison.OrdinalIgnoreCase)
+            && !string.Equals(mode, "hash", StringComparison.OrdinalIgnoreCase))
+        {
+            result.Errors.Add($"DeliverySignatureMode must be 'sizetime' or 'hash' (got '{mode}').");
+        }
+
+        // 全宛先 (primary + 追加) の Name を収集
+        var named = new List<(string Label, string? Name)>
+        {
+            ("primary", transfer.Name)
+        };
+        var additional = transfer.AdditionalDestinations ?? new List<DestinationOptions>();
+        for (int i = 0; i < additional.Count; i++)
+        {
+            if (additional[i] is null)
+            {
+                continue;
+            }
+            named.Add(($"destination#{i + 1}", additional[i].Name));
+        }
+
+        // Name 必須チェック
+        var missing = named.Where(n => string.IsNullOrWhiteSpace(n.Name)).Select(n => n.Label).ToList();
+        if (missing.Count > 0)
+        {
+            result.Errors.Add($"PerDestinationDeliveryTracking requires a unique 'Name' for every destination. Missing Name on: {string.Join(", ", missing)}.");
+        }
+
+        // Name 一意チェック (大文字小文字を無視。紛らわしい重複を防ぐ)
+        var duplicates = named
+            .Where(n => !string.IsNullOrWhiteSpace(n.Name))
+            .GroupBy(n => n.Name!.Trim(), StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToList();
+        if (duplicates.Count > 0)
+        {
+            result.Errors.Add($"PerDestinationDeliveryTracking requires destination Names to be unique. Duplicate Name(s): {string.Join(", ", duplicates)}.");
+        }
     }
 
     private void ValidateAdditionalDestinations(TransferOptions transfer, ConfigurationValidationResult result)
