@@ -216,6 +216,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `Concurrency` | int | 任意 | `1` | primary 宛先の並列転送数（1-16）。`get` と primary への `put` に適用。`AdditionalDestinations` は各要素の `Concurrency` を個別に使用 |
 | `PreserveFolderStructure` | bool | 任意 | `false` | サブフォルダ構造を維持して転送 |
 | `TimeoutSeconds` | int | 任意 | `120` | 接続・転送タイムアウト秒（1-3600） |
+| `KeepAliveSeconds` | int | 任意 | `0` | 接続再利用時のアイドル切断防止（秒、0-3600、`0`=無効）。`>0` で SFTP は `KeepAliveInterval`、FTP は NOOP 送信（`NoopInterval`）+ TCP KeepAlive を有効化。`AdditionalDestinations` の各宛先にも個別適用 |
 | `AdditionalDestinations` | object[] | 任意 | `[]` | put 方向の追加送信先。各要素は Transfer と同じ接続系プロパティを持つ（`Direction` / `AdditionalDestinations` を除く）。各宛先の `Concurrency` / `TimeoutSeconds` / 認証設定はその宛先に個別適用される。1 ファイルをメイン + 追加宛先の全てへ同時に送信する。部分失敗時はローカルファイルを保持し、次回実行では成功済み宛先を含めて全宛先へ再送する |
 
 ### App
