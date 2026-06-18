@@ -31,10 +31,12 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
             _client.Config.DataConnectionReadTimeout = options.TimeoutSeconds * 1000;
 
             // 接続をワーカー間で再利用する際、制御接続がアイドルで切断されないようにする。
-            // FTP は NoopInterval で指定間隔ごとに NOOP を送り、アイドル切断を秒数どおり防ぐ。
+            // FTP は NOOP デーモンで指定間隔ごとに NOOP を送り、アイドル切断を秒数どおり防ぐ。
+            // Noop(マスタースイッチ)を有効化しないと NoopInterval だけでは NOOP は送られない。
             // 併せて OS の TCP KeepAlive も有効化する。
             if (options.KeepAliveSeconds > 0)
             {
+                _client.Config.Noop = true;
                 _client.Config.NoopInterval = options.KeepAliveSeconds * 1000;
                 _client.Config.SocketKeepAlive = true;
             }
