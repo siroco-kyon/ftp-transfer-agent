@@ -330,7 +330,7 @@ public class ConfigurationValidator
         {
             if (watch.IncludeSubfolders && !transfer.PreserveFolderStructure)
             {
-                result.Warnings.Add("IncludeSubfolders is enabled for download but PreserveFolderStructure is disabled. Files from subdirectories will be saved to root directory and may overwrite each other.");
+                result.Errors.Add("IncludeSubfolders cannot be enabled for download when PreserveFolderStructure is false. Remote files from different subdirectories may overwrite the same local file.");
             }
 
             if (watch.IncludeSubfolders &&
@@ -357,12 +357,7 @@ public class ConfigurationValidator
         // アップロード方向でのサブディレクトリ設定検証
         if (transfer.Direction is "put")
         {
-            if (watch.IncludeSubfolders && !transfer.PreserveFolderStructure)
-            {
-                result.Warnings.Add("IncludeSubfolders is enabled for upload but PreserveFolderStructure is disabled. All files will be uploaded to remote root directory.");
-            }
-
-            if (watch.IncludeSubfolders && cleanup.DeleteAfterVerify)
+            if (watch.IncludeSubfolders)
             {
                 var unsafeDestinations = new List<string>();
                 if (!transfer.PreserveFolderStructure)
@@ -381,7 +376,7 @@ public class ConfigurationValidator
 
                 if (unsafeDestinations.Count > 0)
                 {
-                    result.Errors.Add($"DeleteAfterVerify cannot be enabled when IncludeSubfolders is true and any upload destination has PreserveFolderStructure=false ({string.Join(", ", unsafeDestinations)}). Local files with the same name in different subdirectories may overwrite each other remotely before the local sources are deleted.");
+                    result.Errors.Add($"IncludeSubfolders cannot be enabled for upload when any destination has PreserveFolderStructure=false ({string.Join(", ", unsafeDestinations)}). Local files with the same name in different subdirectories may overwrite each other remotely.");
                 }
             }
         }

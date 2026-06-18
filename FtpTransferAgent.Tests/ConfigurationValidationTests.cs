@@ -444,7 +444,7 @@ public class ConfigurationValidationTests
     }
 
     [Fact]
-    public void ConfigurationValidator_ShouldRejectDeleteAfterVerify_WhenSubfolderUploadsCanCollide()
+    public void ConfigurationValidator_ShouldRejectSubfolderUploadFlattening()
     {
         var logger = new Mock<ILogger<ConfigurationValidator>>();
         var validator = new ConfigurationValidator(logger.Object);
@@ -468,12 +468,12 @@ public class ConfigurationValidationTests
                 RemotePath = "/remote",
                 PreserveFolderStructure = false
             };
-            var cleanup = new CleanupOptions { DeleteAfterVerify = true };
+            var cleanup = new CleanupOptions();
 
             var result = validator.ValidateConfiguration(watch, transfer, new RetryOptions(), new HashOptions(), cleanup);
 
             Assert.False(result.IsValid);
-            Assert.Contains(result.Errors, e => e.Contains("DeleteAfterVerify cannot be enabled"));
+            Assert.Contains(result.Errors, e => e.Contains("IncludeSubfolders cannot be enabled for upload"));
             Assert.Contains(result.Errors, e => e.Contains("primary"));
         }
         finally
@@ -483,7 +483,7 @@ public class ConfigurationValidationTests
     }
 
     [Fact]
-    public void ConfigurationValidator_ShouldRejectDeleteAfterVerify_WhenAdditionalUploadDestinationCanCollide()
+    public void ConfigurationValidator_ShouldRejectAdditionalUploadDestinationFlattening()
     {
         var logger = new Mock<ILogger<ConfigurationValidator>>();
         var validator = new ConfigurationValidator(logger.Object);
@@ -519,12 +519,12 @@ public class ConfigurationValidationTests
                     }
                 }
             };
-            var cleanup = new CleanupOptions { DeleteAfterVerify = true };
+            var cleanup = new CleanupOptions();
 
             var result = validator.ValidateConfiguration(watch, transfer, new RetryOptions(), new HashOptions(), cleanup);
 
             Assert.False(result.IsValid);
-            Assert.Contains(result.Errors, e => e.Contains("DeleteAfterVerify cannot be enabled"));
+            Assert.Contains(result.Errors, e => e.Contains("IncludeSubfolders cannot be enabled for upload"));
             Assert.Contains(result.Errors, e => e.Contains("destination#1"));
         }
         finally
@@ -564,6 +564,7 @@ public class ConfigurationValidationTests
         var result = validator.ValidateConfiguration(watch, transfer, new RetryOptions(), new HashOptions(), cleanup);
 
         Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("IncludeSubfolders cannot be enabled for download"));
         Assert.Contains(result.Errors, e => e.Contains("DeleteRemoteAfterDownload cannot be enabled"));
         Assert.Contains(result.Errors, e => e.Contains("DeleteRemoteEndFiles cannot be enabled"));
     }
