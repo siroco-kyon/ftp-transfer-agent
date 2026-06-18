@@ -148,7 +148,7 @@ dotnet run --project FtpTransferAgent -- --Transfer:Concurrency=4 --Hash:Algorit
 | TimeoutSeconds | int | - | 120 | 1–3600 | 接続・転送タイムアウト秒 |
 | PerDestinationDeliveryTracking | bool | - | false | - | 複数宛先で「未配信の宛先だけ再送」する宛先別配信トラッキングを有効化（put 方向のみ）。[5.9](#59-宛先別配信トラッキングput) 参照 |
 | StateDirectory | string | - | `""` | - | 配信トラッキングのマーカー保存先。空のとき `LocalApplicationData/FtpTransferAgent/delivery-state/<watch パスのハッシュ>` を使用。`Watch.Path` の外に置くことを推奨 |
-| RetryDirectory | string | - | `"retry"` | - | 配信トラッキングで部分失敗したファイルの移動先。相対パスは `Watch.Path` 配下として解決。空文字または null で移動を無効化 |
+| RetryDirectory | string/null | - | `null` | - | 配信トラッキングで部分失敗したファイルの移動先。未指定/null は `LocalApplicationData/FtpTransferAgent/delivery-retry/<watch パスのハッシュ>` を使用。相対パスを明示した場合は `Watch.Path` 配下として解決。空文字で移動を無効化 |
 | DeliverySignatureMode | string | - | "sizetime" | "sizetime" / "hash" | 配信トラッキングで上書き検出に使う指紋方式。`sizetime`=サイズ+更新時刻（軽量）、`hash`=ファイルハッシュ（厳密だが保持ファイルごとに計算コスト） |
 | AdditionalDestinations | object[] | - | `[]` | - | put 方向の追加送信先（[5.3](#53-複数宛先への同時配信ファンアウト) 参照）。各要素は Transfer と同じ接続系プロパティを持つ（`Direction` / `AdditionalDestinations` を除く）。`Name` / `Concurrency` / `TimeoutSeconds` / 認証はその宛先に個別適用 |
 
@@ -356,7 +356,8 @@ END ファイルは「データファイル名 + END 拡張子」（例: `data.t
 
 **動作原理（マーカー方式）**:
 - バッチはステートレスに毎回ファイルを列挙するため、「どのファイルをどの宛先まで送れたか」を `StateDirectory` 配下の小さな**マーカーファイル**で永続化します。
-- 部分失敗時は成功済み宛先のマーカーを残し、対象ファイルを `RetryDirectory` へ移動します。次回は retry 配下のファイルを元の相対パスとして扱い、未配信宛先だけへ再送します。retry 内のファイルを削除すると、次回起動時に孤児マーカーも掃除されます。
+- 部分失敗時は成功済み宛先のマーカーを残し、対象ファイルを `RetryDirectory` へ移動します。未指定時の retry 先は `Watch.Path` の外です。次回は retry 配下のファイルを元の相対パスとして扱い、未配信宛先だけへ再送します。retry 内のファイルを削除すると、次回起動時に孤児マーカーも掃除されます。
+- retry 移動ではデータファイルと関連 END ファイルの移動先を先に検証します。移動途中で I/O エラー等が起きた場合は、完了済みの移動を逆順で Watch 側へ戻します。
 - マーカーは **部分失敗時にだけ** 作成されます（全宛先成功時は作られないため、通常時の追加コストはありません）。
 - 起動時に状態ディレクトリを 1 回だけ走査してメモリに読み込み、以降はメモリ照合します（ファイルごとのディスク探索は行いません）。
 - 次回バッチでは、各ファイルについて「配信済みの宛先」を除いた**未配信の宛先だけ**へ送信します。

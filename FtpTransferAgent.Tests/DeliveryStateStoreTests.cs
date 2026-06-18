@@ -162,6 +162,22 @@ public class DeliveryStateStoreTests : IDisposable
         Assert.Equal(Path.GetFullPath(_stateDir), resolved);
     }
 
+    [Fact]
+    public void ResolveRetryDirectory_DefaultUsesDirectoryOutsideWatch()
+    {
+        var resolved = DeliveryStateStore.ResolveRetryDirectory(null, _watchDir);
+
+        Assert.NotNull(resolved);
+        Assert.Contains(Path.Combine("FtpTransferAgent", "delivery-retry"), resolved);
+        Assert.False(Path.GetFullPath(resolved!).StartsWith(Path.GetFullPath(_watchDir) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void ResolveRetryDirectory_EmptyStringDisablesMove()
+    {
+        Assert.Null(DeliveryStateStore.ResolveRetryDirectory("", _watchDir));
+    }
+
     public void Dispose()
     {
         try { if (Directory.Exists(_watchDir)) Directory.Delete(_watchDir, true); } catch { /* ignore */ }

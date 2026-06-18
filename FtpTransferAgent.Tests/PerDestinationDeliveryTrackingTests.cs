@@ -144,6 +144,64 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
     }
 
     [Fact]
+    public async Task DefaultRetryDirectory_IsOutsideWatchAndStillRetriesSubfolderFiles()
+    {
+        var subDir = Path.Combine(_watchDir, "sub");
+        Directory.CreateDirectory(subDir);
+        var dataPath = Path.Combine(subDir, "report.txt");
+        await File.WriteAllTextAsync(dataPath, "the-payload");
+
+        var (transfer, additional) = BuildOptions();
+        transfer.RetryDirectory = null;
+        var primaryStore = new DestinationStore();
+        var backupStore = new DestinationStore();
+
+        backupStore.FailUploads = true;
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(), includeSubfolders: true);
+
+        var defaultRetryDir = DeliveryStateStore.ResolveRetryDirectory(null, _watchDir)!;
+        var retryPath = Path.Combine(defaultRetryDir, "sub", "report.txt");
+        Assert.False(File.Exists(dataPath));
+        Assert.True(File.Exists(retryPath));
+        Assert.False(Directory.Exists(Path.Combine(_watchDir, "retry")));
+
+        backupStore.FailUploads = false;
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(), includeSubfolders: true);
+
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt"));
+        Assert.Equal(1, backupStore.UploadCount("/backup/report.txt"));
+        Assert.False(File.Exists(retryPath));
+    }
+
+    [Fact]
+    public async Task PartialFailure_WhenRetryEndTargetExists_RetainsWatchFiles()
+    {
+        var dataPath = Path.Combine(_watchDir, "report.txt");
+        var endPath = Path.Combine(_watchDir, "report.txt.END");
+        await File.WriteAllTextAsync(dataPath, "the-payload");
+        await File.WriteAllTextAsync(endPath, "end");
+
+        Directory.CreateDirectory(_retryDir);
+        var retryEndPath = Path.Combine(_retryDir, "report.txt.END");
+        await File.WriteAllTextAsync(retryEndPath, "existing");
+
+        var (transfer, additional) = BuildOptions();
+        var primaryStore = new DestinationStore();
+        var backupStore = new DestinationStore();
+
+        backupStore.FailUploads = true;
+        var exitCode = new ApplicationExitCode();
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, exitCode);
+
+        Assert.Equal(1, exitCode.Code);
+        Assert.True(File.Exists(dataPath));
+        Assert.True(File.Exists(endPath));
+        Assert.False(File.Exists(Path.Combine(_retryDir, "report.txt")));
+        Assert.Equal("existing", await File.ReadAllTextAsync(retryEndPath));
+        Assert.Single(Directory.GetFiles(_stateDir, "*.marker"));
+    }
+
+    [Fact]
     public async Task HashSignature_UnreadableFile_DoesNotBlockOtherFiles()
     {
         var lockedPath = Path.Combine(_watchDir, "a-locked.txt");
@@ -211,14 +269,15 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
         DestinationOptions additional,
         DestinationStore primaryStore,
         DestinationStore backupStore,
-        ApplicationExitCode exitCode)
+        ApplicationExitCode exitCode,
+        bool includeSubfolders = false)
     {
         var services = new ServiceCollection();
         services.AddLogging();
         var provider = services.BuildServiceProvider();
 
         var worker = new RoutingWorker(
-            Options.Create(new WatchOptions { Path = _watchDir, AllowedExtensions = new[] { ".txt" } }),
+            Options.Create(new WatchOptions { Path = _watchDir, IncludeSubfolders = includeSubfolders, AllowedExtensions = new[] { ".txt" } }),
             Options.Create(transfer),
             Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 }),
             Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" }),
@@ -343,6 +402,8 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
 
     public void Dispose()
     {
+        var defaultRetryDir = DeliveryStateStore.ResolveRetryDirectory(null, _watchDir);
+        try { if (defaultRetryDir is not null && Directory.Exists(defaultRetryDir)) Directory.Delete(defaultRetryDir, true); } catch { /* ignore */ }
         try { if (Directory.Exists(_watchDir)) Directory.Delete(_watchDir, true); } catch { /* ignore */ }
         try { if (Directory.Exists(_stateDir)) Directory.Delete(_stateDir, true); } catch { /* ignore */ }
     }
