@@ -10,18 +10,20 @@ public class DeliveryStateStoreTests : IDisposable
 {
     private readonly string _watchDir;
     private readonly string _stateDir;
+    private readonly string _retryDir;
 
     public DeliveryStateStoreTests()
     {
         _watchDir = Path.Combine(Path.GetTempPath(), "dss-watch-" + Path.GetRandomFileName());
         _stateDir = Path.Combine(Path.GetTempPath(), "dss-state-" + Path.GetRandomFileName());
+        _retryDir = Path.Combine(_watchDir, "retry");
         Directory.CreateDirectory(_watchDir);
         Directory.CreateDirectory(_stateDir);
     }
 
-    private DeliveryStateStore CreateStore(string mode = DeliveryStateStore.SignatureModeSizeTime)
+    private DeliveryStateStore CreateStore(string mode = DeliveryStateStore.SignatureModeSizeTime, string? retryDirectory = null)
     {
-        var store = new DeliveryStateStore(_stateDir, _watchDir, mode, "SHA256", NullLogger.Instance);
+        var store = new DeliveryStateStore(_stateDir, _watchDir, mode, "SHA256", NullLogger.Instance, retryDirectory);
         store.Initialize();
         return store;
     }
@@ -100,6 +102,25 @@ public class DeliveryStateStoreTests : IDisposable
         // 新しいストアで読み直すと孤児は掃除される
         var reloaded = CreateStore();
         Assert.Empty(reloaded.GetMarkedDestinations("ghost.txt"));
+        Assert.Empty(Directory.GetFiles(_stateDir, "*.marker"));
+    }
+
+    [Fact]
+    public void Initialize_KeepsMarker_WhenSourceFileExistsInRetryDirectory()
+    {
+        var store = CreateStore(retryDirectory: _retryDir);
+        var watchFile = CreateFile("a.txt", "hello");
+        store.RecordDelivered("a.txt", "primary", "st:1-2");
+
+        Directory.CreateDirectory(_retryDir);
+        File.Move(watchFile, Path.Combine(_retryDir, "a.txt"));
+
+        var reloaded = CreateStore(retryDirectory: _retryDir);
+        Assert.Contains("primary", reloaded.GetMarkedDestinations("a.txt"));
+
+        File.Delete(Path.Combine(_retryDir, "a.txt"));
+        var reloadedAfterDelete = CreateStore(retryDirectory: _retryDir);
+        Assert.Empty(reloadedAfterDelete.GetMarkedDestinations("a.txt"));
         Assert.Empty(Directory.GetFiles(_stateDir, "*.marker"));
     }
 

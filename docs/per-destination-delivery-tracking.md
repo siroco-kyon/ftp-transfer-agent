@@ -4,7 +4,7 @@
 > 仕様の要約は [ftp-transfer-agent-spec.md 5.9](../ftp-transfer-agent-spec.md) を参照。本書はその背後にある判断と細部を後から読み返せるようにするためのもの。
 
 - 対象バージョン: 3.1.0
-- 関連設定: `Transfer.PerDestinationDeliveryTracking` / `Transfer.StateDirectory` / `Transfer.DeliverySignatureMode` / `Transfer.Name`（各宛先） / `Smtp.SuppressPerDestinationFailureDetailEmails`
+- 関連設定: `Transfer.PerDestinationDeliveryTracking` / `Transfer.StateDirectory` / `Transfer.RetryDirectory` / `Transfer.DeliverySignatureMode` / `Transfer.Name`（各宛先） / `Smtp.SuppressPerDestinationFailureDetailEmails`
 - 主な実装: [`Services/DeliveryStateStore.cs`](../FtpTransferAgent/Services/DeliveryStateStore.cs) / [`Worker.cs`](../FtpTransferAgent/Worker.cs) / [`Logging/LogEvents.cs`](../FtpTransferAgent/Logging/LogEvents.cs)
 
 ---
@@ -85,6 +85,7 @@ watch/
 - **問題**: ファイルごとにディスクを探索したり、毎回マーカーを作ると重い。
 - **対策**:
   - マーカーは **部分失敗時にだけ**作る。全宛先成功（＝通常時）はマーカーを 1 つも作らず、従来どおりローカル削除するだけ。**通常時の追加コストはゼロ**。
+  - 部分失敗したファイルは `RetryDirectory` へ移動する。次回は retry 配下のファイルを元の相対パスとして扱うため、リモートパスやマーカーキーは Watch 配下にあったときと同じ。ユーザーが retry ファイルを削除した場合は、起動時に孤児マーカーも掃除される。
   - 探索は**起動時に状態ディレクトリを 1 回だけ走査**してメモリ（`ConcurrentDictionary`）に載せ、以降はメモリ照合。ファイルごとのディスク探索はしない。マーカーは「詰まったファイル」分しか存在しないため軽量。
   - 仮にマーカー I/O が発生しても、空に近いファイルの作成・削除はメタデータ操作でマイクロ秒オーダー。ネットワーク転送＋ハッシュ（ミリ秒〜秒）に比べれば誤差。
 - **実装**: `DeliveryStateStore.Initialize()`（1 回走査）、`Worker.HandleFanoutCompletionTracked`（全成功時はマーカーを書かない）。
@@ -162,6 +163,7 @@ watch/
 |---|---|---|
 | `Transfer.PerDestinationDeliveryTracking` | `false` | 機能の ON/OFF。OFF なら従来の all-or-nothing。 |
 | `Transfer.StateDirectory` | `""` | マーカー保存先。空なら `LocalApplicationData/FtpTransferAgent/delivery-state/<hash>`。watch 外推奨。 |
+| `Transfer.RetryDirectory` | `"retry"` | 部分失敗したファイルの移動先。相対パスは `Watch.Path` 配下として解決。空文字で移動を無効化。 |
 | `Transfer.DeliverySignatureMode` | `"sizetime"` | 上書き検出の指紋方式。`sizetime`（軽量）/ `hash`（厳密）。 |
 | `Transfer.Name`（各宛先） | `null` | 宛先の安定識別子。トラッキング有効時は全宛先で**必須かつ一意**。 |
 | `Smtp.SuppressPerDestinationFailureDetailEmails` | `false` | 複数宛先の個別宛先失敗・部分失敗の詳細メールを抑制。他のエラーメール・終了コードには影響しない。 |
@@ -181,6 +183,7 @@ watch/
     "RemotePath": "/incoming",
     "PerDestinationDeliveryTracking": true,
     "StateDirectory": "/var/lib/ftp-transfer-agent/state",
+    "RetryDirectory": "retry",
     "DeliverySignatureMode": "sizetime",
     "AdditionalDestinations": [
       {

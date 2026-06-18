@@ -42,6 +42,7 @@ public sealed class DeliveryStateStore
 
     private readonly string _stateDir;
     private readonly string _watchPath;
+    private readonly string? _retryDirectory;
     private readonly string _signatureMode;
     private readonly string _hashAlgorithm;
     private readonly ILogger _logger;
@@ -51,10 +52,11 @@ public sealed class DeliveryStateStore
 
     public string StateDirectory => _stateDir;
 
-    public DeliveryStateStore(string stateDirectory, string watchPath, string signatureMode, string hashAlgorithm, ILogger logger)
+    public DeliveryStateStore(string stateDirectory, string watchPath, string signatureMode, string hashAlgorithm, ILogger logger, string? retryDirectory = null)
     {
         _stateDir = Path.GetFullPath(stateDirectory);
         _watchPath = Path.GetFullPath(watchPath);
+        _retryDirectory = string.IsNullOrWhiteSpace(retryDirectory) ? null : Path.GetFullPath(retryDirectory);
         _signatureMode = string.Equals(signatureMode, SignatureModeHash, StringComparison.OrdinalIgnoreCase)
             ? SignatureModeHash
             : SignatureModeSizeTime;
@@ -92,8 +94,7 @@ public sealed class DeliveryStateStore
             }
 
             // 孤児マーカー (元ファイルが消えている) は掃除する
-            var dataFullPath = Path.GetFullPath(Path.Combine(_watchPath, data.RelativePath));
-            if (!File.Exists(dataFullPath))
+            if (!SourceFileExists(data.RelativePath))
             {
                 TryDeleteFile(path);
                 orphans++;
@@ -263,6 +264,23 @@ public sealed class DeliveryStateStore
         {
             _logger.LogWarning("Failed to delete delivery marker {Path}: {Error}", path, ex.Message);
         }
+    }
+
+    private bool SourceFileExists(string relativePath)
+    {
+        var dataFullPath = Path.GetFullPath(Path.Combine(_watchPath, relativePath));
+        if (File.Exists(dataFullPath))
+        {
+            return true;
+        }
+
+        if (_retryDirectory is null)
+        {
+            return false;
+        }
+
+        var retryFullPath = Path.GetFullPath(Path.Combine(_retryDirectory, relativePath));
+        return File.Exists(retryFullPath);
     }
 
     private sealed record MarkerEntry(string RelativePath, string DestinationName, string Signature, string MarkerFilePath);

@@ -37,6 +37,7 @@
         "KeepAliveSeconds": { "type": "integer", "minimum": 0, "maximum": 3600 },
         "PerDestinationDeliveryTracking": { "type": "boolean" },
         "StateDirectory": { "type": "string" },
+        "RetryDirectory": { "type": "string" },
         "DeliverySignatureMode": { "enum": ["sizetime", "hash"] },
         "AdditionalDestinations": {
           "type": "array",

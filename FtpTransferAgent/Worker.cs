@@ -28,6 +28,7 @@ public class Worker : BackgroundService
 
     // 宛先別配信トラッキング有効時のマーカーストア (put 方向のみ)。無効時は null。
     private DeliveryStateStore? _deliveryStore;
+    private string? _retryDirectoryFullPath;
 
     // 転送処理用のチャンネル（容量制限でメモリリーク防止）
 
@@ -188,9 +189,11 @@ public class Worker : BackgroundService
     // トラッキング有効時は destinationsToSend = 未配信の宛先のみ。
     private async Task EnqueueFanoutAsync(
         string file,
+        string relativePath,
         IReadOnlyList<DestinationOptions> destinationsToSend,
         IReadOnlyList<QueueContext> queueContexts,
         IReadOnlyList<string> relatedEndFiles,
+        IReadOnlyList<string> relatedEndFileRelativePaths,
         DeliveryTrackingContext? tracking,
         CancellationToken token)
     {
@@ -199,7 +202,7 @@ public class Worker : BackgroundService
 
         _fanout.Register(groupId, file, destinationsToSend.Count, (source, results) =>
         {
-            HandleFanoutCompletion(source, results, endFilesToDeleteOnSuccess, tracking);
+            HandleFanoutCompletion(source, results, endFilesToDeleteOnSuccess, relatedEndFiles, relatedEndFileRelativePaths, tracking);
         });
 
         foreach (var dest in destinationsToSend)
@@ -209,7 +212,7 @@ public class Worker : BackgroundService
             // アップロード経路で再探索せず同じ集合を使う。これにより「転送する END」と
             // 「成功時に削除する END」が必ず一致し、大小を区別する FS でも不整合が起きない。
             await queueContext.Channel.Writer.WriteAsync(
-                new TransferItem(file, TransferAction.Upload, dest, groupId, relatedEndFiles),
+                new TransferItem(file, TransferAction.Upload, dest, groupId, relatedEndFiles, relativePath, relatedEndFileRelativePaths),
                 token).ConfigureAwait(false);
         }
     }
@@ -231,12 +234,55 @@ public class Worker : BackgroundService
     private string ToRelativeKey(string file) =>
         Path.GetRelativePath(_watch.Path, file).Replace('\\', '/');
 
+    private string ToRetryRelativeKey(string file) =>
+        _retryDirectoryFullPath is null
+            ? ToRelativeKey(file)
+            : Path.GetRelativePath(_retryDirectoryFullPath, file).Replace('\\', '/');
+
+    private static string? ResolveRetryDirectory(string? configured, string watchPath)
+    {
+        if (string.IsNullOrWhiteSpace(configured))
+        {
+            return null;
+        }
+
+        return Path.IsPathRooted(configured)
+            ? Path.GetFullPath(configured)
+            : Path.GetFullPath(Path.Combine(watchPath, configured));
+    }
+
+    private static string NormalizeDirectoryPath(string path) =>
+        Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+
+    private static string DirectoryPrefix(string path) =>
+        NormalizeDirectoryPath(path) + Path.DirectorySeparatorChar;
+
+    private static bool IsUnderDirectory(string path, string root)
+    {
+        var fullPath = NormalizeDirectoryPath(path);
+        var fullRoot = NormalizeDirectoryPath(root);
+        return string.Equals(fullPath, fullRoot, StringComparison.OrdinalIgnoreCase)
+            || fullPath.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            || fullPath.StartsWith(fullRoot + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsUnderDirectoryPrefix(string path, string? directoryPrefix) =>
+        directoryPrefix is not null
+        && Path.GetFullPath(path).StartsWith(directoryPrefix, StringComparison.OrdinalIgnoreCase);
+
     // 宛先別配信トラッキングのファイル単位コンテキスト。
     private sealed record DeliveryTrackingContext(
         string RelativePath,
         string Signature,
         IReadOnlyCollection<string> AllDestinationNames,
         IReadOnlyCollection<string> AlreadyDelivered);
+
+    private sealed record UploadCandidate(
+        string PhysicalPath,
+        string RelativePath,
+        IReadOnlyList<string> RelatedEndFilePaths,
+        IReadOnlyList<string> RelatedEndFileRelativePaths,
+        bool FromRetryDirectory);
 
     // 既に全宛先へ配信済み (マーカーが揃っている) ファイルの後始末。
     // DeleteAfterVerify=true なら削除しマーカーも掃除。false ならローカルを残し
@@ -338,10 +384,59 @@ public class Worker : BackgroundService
         return matches;
     }
 
+    private IReadOnlyList<UploadCandidate> BuildUploadCandidates(
+        IReadOnlyList<string> files,
+        Func<string, string> relativeKeyFactory,
+        bool fromRetryDirectory)
+    {
+        var patterns = _watch.AllowedExtensions ?? System.Array.Empty<string>();
+        var dataFiles = new List<string>();
+        var endFiles = new List<string>();
+
+        foreach (var file in files)
+        {
+            if (IsEndFile(file))
+            {
+                endFiles.Add(file);
+                continue;
+            }
+
+            if (!FileNameMatcher.IsMatch(Path.GetFileName(file), patterns))
+            {
+                continue;
+            }
+
+            if (_watch.RequireEndFile && !HasEndFile(file))
+            {
+                _logger.LogDebug("Skipping file {File} - no corresponding END file found", file);
+                continue;
+            }
+
+            dataFiles.Add(file);
+        }
+
+        var endFileSet = new HashSet<string>(endFiles, StringComparer.OrdinalIgnoreCase);
+        var candidates = new List<UploadCandidate>(dataFiles.Count);
+        foreach (var file in dataFiles)
+        {
+            var relatedEndFiles = GetExistingEndFilesForDataFile(file, endFileSet);
+            candidates.Add(new UploadCandidate(
+                file,
+                relativeKeyFactory(file),
+                relatedEndFiles,
+                relatedEndFiles.Select(relativeKeyFactory).ToArray(),
+                fromRetryDirectory));
+        }
+
+        return candidates;
+    }
+
     private void HandleFanoutCompletion(
         string sourcePath,
         IReadOnlyList<FanoutCoordinator.DestinationResult> results,
         IReadOnlyList<string> localEndFilesToDeleteOnSuccess,
+        IReadOnlyList<string> relatedEndFiles,
+        IReadOnlyList<string> relatedEndFileRelativePaths,
         DeliveryTrackingContext? tracking)
     {
         if (tracking is null || _deliveryStore is null)
@@ -350,7 +445,7 @@ public class Worker : BackgroundService
             return;
         }
 
-        HandleFanoutCompletionTracked(sourcePath, results, localEndFilesToDeleteOnSuccess, tracking);
+        HandleFanoutCompletionTracked(sourcePath, results, localEndFilesToDeleteOnSuccess, relatedEndFiles, relatedEndFileRelativePaths, tracking);
     }
 
     // 従来の all-or-nothing 動作: 全宛先成功時のみローカル削除、部分失敗はローカル保持。
@@ -381,6 +476,8 @@ public class Worker : BackgroundService
         string sourcePath,
         IReadOnlyList<FanoutCoordinator.DestinationResult> results,
         IReadOnlyList<string> localEndFilesToDeleteOnSuccess,
+        IReadOnlyList<string> relatedEndFiles,
+        IReadOnlyList<string> relatedEndFileRelativePaths,
         DeliveryTrackingContext tracking)
     {
         var succeededNames = results.Where(r => r.Success)
@@ -422,13 +519,114 @@ public class Worker : BackgroundService
             _deliveryStore!.RecordDelivered(tracking.RelativePath, name, tracking.Signature);
         }
 
+        var retryAction = MovePartialFailureToRetryDirectory(sourcePath, tracking.RelativePath, relatedEndFiles, relatedEndFileRelativePaths)
+            ? "Moved to retry directory; only pending destination(s) will be retried on the next run."
+            : "Local file retained; only pending destination(s) will be retried on the next run.";
         var pendingNames = tracking.AllDestinationNames.Where(n => !totalDelivered.Contains(n));
         _logger.LogError(LogEvents.MultiDestinationPartialFailure,
-            "Partial delivery for {File}: {Done}/{Total} destination(s) delivered. Pending: {Pending}. Local file retained; only pending destination(s) will be retried on the next run.",
-            sourcePath, totalDelivered.Count, tracking.AllDestinationNames.Count, string.Join(", ", pendingNames));
+            "Partial delivery for {File}: {Done}/{Total} destination(s) delivered. Pending: {Pending}. {RetryAction}",
+            sourcePath, totalDelivered.Count, tracking.AllDestinationNames.Count, string.Join(", ", pendingNames), retryAction);
     }
 
-    // バックグラウンド処理の本体
+    private bool MovePartialFailureToRetryDirectory(
+        string sourcePath,
+        string relativePath,
+        IReadOnlyList<string> relatedEndFiles,
+        IReadOnlyList<string> relatedEndFileRelativePaths)
+    {
+        if (_retryDirectoryFullPath is null)
+        {
+            return false;
+        }
+
+        var requests = new List<(string Source, string RelativePath, string Kind)>
+        {
+            (sourcePath, relativePath, "file")
+        };
+
+        for (var i = 0; i < relatedEndFiles.Count; i++)
+        {
+            var endFile = relatedEndFiles[i];
+            if (!File.Exists(endFile))
+            {
+                continue;
+            }
+
+            var endRelativePath = i < relatedEndFileRelativePaths.Count
+                ? relatedEndFileRelativePaths[i]
+                : Path.GetFileName(endFile);
+            requests.Add((endFile, endRelativePath, "END file"));
+        }
+
+        var plannedMoves = new List<(string Source, string Target, string Kind)>();
+        foreach (var request in requests)
+        {
+            if (!File.Exists(request.Source))
+            {
+                _logger.LogWarning("Cannot move partial delivery {Kind} {File} to retry directory because it no longer exists.",
+                    request.Kind, request.Source);
+                return false;
+            }
+
+            var target = GetRetryFilePath(request.RelativePath);
+            if (string.Equals(Path.GetFullPath(request.Source), target, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (File.Exists(target))
+            {
+                _exitCode?.MarkFailure();
+                _logger.LogError("Cannot move partial delivery {Kind} {File} to retry directory because target already exists: {Target}",
+                    request.Kind, request.Source, target);
+                return false;
+            }
+
+            plannedMoves.Add((request.Source, target, request.Kind));
+        }
+
+        try
+        {
+            foreach (var move in plannedMoves)
+            {
+                var targetDirectory = Path.GetDirectoryName(move.Target);
+                if (!string.IsNullOrEmpty(targetDirectory))
+                {
+                    Directory.CreateDirectory(targetDirectory);
+                }
+
+                File.Move(move.Source, move.Target);
+                _logger.LogInformation("Moved partial delivery {Kind} {File} to retry directory: {Target}",
+                    move.Kind, move.Source, move.Target);
+            }
+
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _exitCode?.MarkFailure();
+            _logger.LogError(ex, "Failed to move partial delivery file(s) to retry directory: {Error}", ex.Message);
+            return false;
+        }
+    }
+
+    private string GetRetryFilePath(string relativePath)
+    {
+        if (_retryDirectoryFullPath is null)
+        {
+            throw new InvalidOperationException("Retry directory is not configured.");
+        }
+
+        var target = Path.GetFullPath(Path.Combine(_retryDirectoryFullPath, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+        if (!IsUnderDirectory(target, _retryDirectoryFullPath))
+        {
+            throw new InvalidOperationException($"Retry target path is outside the retry directory: {target}");
+        }
+
+        return target;
+    }
+
+    // Main background processing loop.
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         // クライアントは各転送タスク毎に作成するため、ここでは共通インスタンスを生成しない
@@ -443,11 +641,12 @@ public class Worker : BackgroundService
         if (trackingEnabled)
         {
             stateDirFullPath = DeliveryStateStore.ResolveStateDirectory(_transfer.StateDirectory, _watch.Path);
+            _retryDirectoryFullPath = ResolveRetryDirectory(_transfer.RetryDirectory, _watch.Path);
             var storeLogger = _services.GetRequiredService<ILogger<DeliveryStateStore>>();
-            _deliveryStore = new DeliveryStateStore(stateDirFullPath, _watch.Path, _transfer.DeliverySignatureMode, _hash.Algorithm, storeLogger);
+            _deliveryStore = new DeliveryStateStore(stateDirFullPath, _watch.Path, _transfer.DeliverySignatureMode, _hash.Algorithm, storeLogger, _retryDirectoryFullPath);
             _deliveryStore.Initialize();
-            _logger.LogInformation("Per-destination delivery tracking enabled (signature mode: {Mode}). State directory: {Dir}",
-                _transfer.DeliverySignatureMode, _deliveryStore.StateDirectory);
+            _logger.LogInformation("Per-destination delivery tracking enabled (signature mode: {Mode}). State directory: {Dir}. Retry directory: {RetryDir}",
+                _transfer.DeliverySignatureMode, _deliveryStore.StateDirectory, _retryDirectoryFullPath ?? "(disabled)");
         }
 
         // パフォーマンス監視用のCancellationTokenSourceを作成
@@ -518,12 +717,15 @@ public class Worker : BackgroundService
                     // 状態ディレクトリが watch 配下に置かれていてもマーカーを転送しないよう除外する
                     var stateDirPrefix = stateDirFullPath is null
                         ? null
-                        : Path.GetFullPath(stateDirFullPath) + Path.DirectorySeparatorChar;
+                        : DirectoryPrefix(stateDirFullPath);
+                    var retryDirPrefix = _retryDirectoryFullPath is null
+                        ? null
+                        : DirectoryPrefix(_retryDirectoryFullPath);
 
                     // ファイル順序を安定化するためファイル名でソート (END ファイルの振り分けは後段で行う)
                     var files = Directory.EnumerateFiles(_watch.Path, "*", option)
-                        .Where(f => stateDirPrefix is null ||
-                                    !Path.GetFullPath(f).StartsWith(stateDirPrefix, StringComparison.OrdinalIgnoreCase))
+                        .Where(f => !IsUnderDirectoryPrefix(f, stateDirPrefix)
+                                    && !IsUnderDirectoryPrefix(f, retryDirPrefix))
                         .OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
                         .ToList();
 
@@ -568,12 +770,52 @@ public class Worker : BackgroundService
                         file => file,
                         file => GetExistingEndFilesForDataFile(file, endFileSet),
                         StringComparer.Ordinal);
-                    var relatedEndFileCount = relatedEndFilesByDataFile.Values.Sum(files => files.Count);
+                    var watchCandidates = dataFiles
+                        .Select(file =>
+                        {
+                            var related = relatedEndFilesByDataFile[file];
+                            return new UploadCandidate(
+                                file,
+                                ToRelativeKey(file),
+                                related,
+                                related.Select(ToRelativeKey).ToArray(),
+                                FromRetryDirectory: false);
+                        })
+                        .ToList();
 
-                    _logger.LogInformation("Upload fanout: {DataFileCount} data file(s), {EndFileCount} related END file(s), {DestCount} destination(s)",
-                        dataFiles.Count,
+                    var retryCandidates = new List<UploadCandidate>();
+                    if (_deliveryStore is not null
+                        && _retryDirectoryFullPath is not null
+                        && Directory.Exists(_retryDirectoryFullPath))
+                    {
+                        var retryFiles = Directory.EnumerateFiles(_retryDirectoryFullPath, "*", SearchOption.AllDirectories)
+                            .OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
+                            .ToList();
+                        retryCandidates.AddRange(BuildUploadCandidates(retryFiles, ToRetryRelativeKey, fromRetryDirectory: true));
+                    }
+
+                    var retryRelativePaths = retryCandidates.Select(c => c.RelativePath).ToHashSet(StringComparer.Ordinal);
+                    var shadowedWatchCandidates = watchCandidates
+                        .Where(c => retryRelativePaths.Contains(c.RelativePath))
+                        .ToList();
+                    if (shadowedWatchCandidates.Count > 0)
+                    {
+                        _logger.LogWarning("Retry directory contains {Count} file(s) with the same relative path as files in Watch.Path. Watch files are deferred until retry files finish: {Files}",
+                            shadowedWatchCandidates.Count,
+                            string.Join(", ", shadowedWatchCandidates.Select(c => c.RelativePath)));
+                    }
+
+                    var candidates = watchCandidates
+                        .Where(c => !retryRelativePaths.Contains(c.RelativePath))
+                        .Concat(retryCandidates)
+                        .ToList();
+                    var relatedEndFileCount = candidates.Sum(c => c.RelatedEndFilePaths.Count);
+
+                    _logger.LogInformation("Upload fanout: {DataFileCount} data file(s), {EndFileCount} related END file(s), {DestCount} destination(s), {RetryFileCount} from retry directory",
+                        candidates.Count,
                         _watch.TransferEndFiles || _cleanup.DeleteLocalSkippedEndFiles ? relatedEndFileCount : 0,
-                        destinations.Count);
+                        destinations.Count,
+                        retryCandidates.Count);
 
                     // トラッキング有効時に使う全宛先名 (Name)。マーカー突き合わせに使用。
                     var allDestinationNames = trackingEnabled
@@ -584,26 +826,27 @@ public class Worker : BackgroundService
                     //    関連 END ファイル(列挙時に確定した実ファイル名)を渡し、転送・削除で同じ集合を使う
                     int queuedItems = 0;
                     int skippedFullyDelivered = 0;
-                    foreach (var file in dataFiles)
+                    foreach (var candidate in candidates)
                     {
-                        var related = relatedEndFilesByDataFile[file];
+                        var file = candidate.PhysicalPath;
+                        var relativeKey = candidate.RelativePath;
+                        var related = candidate.RelatedEndFilePaths;
+                        var relatedRelativePaths = candidate.RelatedEndFileRelativePaths;
 
                         if (_deliveryStore is null)
                         {
                             // トラッキング無効: 従来どおり全宛先へ投入
-                            await EnqueueFanoutAsync(file, destinations, queueContexts, related, null, stoppingToken).ConfigureAwait(false);
+                            await EnqueueFanoutAsync(file, relativeKey, destinations, queueContexts, related, relatedRelativePaths, null, stoppingToken).ConfigureAwait(false);
                             queuedItems += destinations.Count;
                             continue;
                         }
 
                         // トラッキング有効: 既に配信済みの宛先を除いた「未配信先」だけに送る
-                        string relativeKey;
                         string signature;
                         HashSet<string> delivered;
                         List<DestinationOptions> pending;
                         try
                         {
-                            relativeKey = ToRelativeKey(file);
                             signature = await _deliveryStore.ComputeSignatureAsync(file, stoppingToken).ConfigureAwait(false);
                             delivered = new HashSet<string>(
                                 _deliveryStore.GetDeliveredDestinations(relativeKey, signature), StringComparer.Ordinal);
@@ -627,7 +870,7 @@ public class Worker : BackgroundService
                         }
 
                         var tracking = new DeliveryTrackingContext(relativeKey, signature, allDestinationNames!, delivered);
-                        await EnqueueFanoutAsync(file, pending, queueContexts, related, tracking, stoppingToken).ConfigureAwait(false);
+                        await EnqueueFanoutAsync(file, relativeKey, pending, queueContexts, related, relatedRelativePaths, tracking, stoppingToken).ConfigureAwait(false);
                         queuedItems += pending.Count;
                     }
 
@@ -931,11 +1174,11 @@ public class Worker : BackgroundService
         return $"{bytes:N0} B";
     }
 
-    private string BuildRemotePath(DestinationOptions dest, string localPath)
+    private string BuildRemotePath(DestinationOptions dest, string localPath, string? originalRelativePath = null)
     {
         var name = dest.PreserveFolderStructure
-            ? Path.GetRelativePath(_watch.Path, localPath)
-            : Path.GetFileName(localPath);
+            ? originalRelativePath ?? Path.GetRelativePath(_watch.Path, localPath)
+            : Path.GetFileName((originalRelativePath ?? localPath).Replace('/', Path.DirectorySeparatorChar));
         var rawBase = dest.RemotePath ?? string.Empty;
         var remoteBase = rawBase == "/" ? "/" : rawBase.TrimEnd('/', '\\');
         var remoteName = name.Replace('\\', '/');
@@ -1019,7 +1262,7 @@ public class Worker : BackgroundService
     {
         var dest = item.Destination ?? _transfer;
         var destLabel = DescribeDestination(dest);
-        var remotePath = BuildRemotePath(dest, item.Path);
+        var remotePath = BuildRemotePath(dest, item.Path, item.OriginalRelativePath);
         var isEndFile = IsEndFile(item.Path);
 
         var bytesTransferred = await UploadPathWithHashAsync(client, item.Path, remotePath, destLabel, id, token).ConfigureAwait(false);
@@ -1028,9 +1271,14 @@ public class Worker : BackgroundService
         // これにより成功時にローカル削除される END ファイルと完全に一致する。
         if (!isEndFile && _watch.TransferEndFiles && item.RelatedEndFilePaths is { Count: > 0 })
         {
-            foreach (var endFile in item.RelatedEndFilePaths)
+            for (var i = 0; i < item.RelatedEndFilePaths.Count; i++)
             {
-                var endRemotePath = BuildRemotePath(dest, endFile);
+                var endFile = item.RelatedEndFilePaths[i];
+                var endOriginalRelativePath = item.RelatedEndFileOriginalRelativePaths is { Count: > 0 } relatedOriginals
+                    && i < relatedOriginals.Count
+                        ? relatedOriginals[i]
+                        : null;
+                var endRemotePath = BuildRemotePath(dest, endFile, endOriginalRelativePath);
                 bytesTransferred += await UploadPathWithHashAsync(client, endFile, endRemotePath, destLabel, id, token).ConfigureAwait(false);
                 await TryDeleteRemoteEndFileAsync(client, endRemotePath, destLabel, id, token).ConfigureAwait(false);
             }

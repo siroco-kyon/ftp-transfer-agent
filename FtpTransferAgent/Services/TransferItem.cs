@@ -23,7 +23,9 @@ public record TransferItem(
     TransferAction Action,
     DestinationOptions? Destination = null,
     string? GroupId = null,
-    IReadOnlyList<string>? RelatedEndFilePaths = null)
+    IReadOnlyList<string>? RelatedEndFilePaths = null,
+    string? OriginalRelativePath = null,
+    IReadOnlyList<string>? RelatedEndFileOriginalRelativePaths = null)
 {
     /// <summary>
     /// ログ追跡用の転送 ID。リトライ時もアイテム単位で同じ ID を保ち、
@@ -56,8 +58,10 @@ public record TransferItem(
         && Action == other.Action
         && Equals(Destination, other.Destination)
         && GroupId == other.GroupId
-        && Equals(RelatedEndFilePaths, other.RelatedEndFilePaths);
+        && Equals(RelatedEndFilePaths, other.RelatedEndFilePaths)
+        && OriginalRelativePath == other.OriginalRelativePath
+        && Equals(RelatedEndFileOriginalRelativePaths, other.RelatedEndFileOriginalRelativePaths);
 
     public override int GetHashCode() =>
-        HashCode.Combine(Path, Action, Destination, GroupId, RelatedEndFilePaths);
+        HashCode.Combine(Path, Action, Destination, GroupId, RelatedEndFilePaths, OriginalRelativePath, RelatedEndFileOriginalRelativePaths);
 }

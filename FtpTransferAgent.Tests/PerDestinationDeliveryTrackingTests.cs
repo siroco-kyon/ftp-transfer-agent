@@ -16,11 +16,13 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
 {
     private readonly string _watchDir;
     private readonly string _stateDir;
+    private readonly string _retryDir;
 
     public PerDestinationDeliveryTrackingTests()
     {
         _watchDir = Path.Combine(Path.GetTempPath(), "track-watch-" + Path.GetRandomFileName());
         _stateDir = Path.Combine(Path.GetTempPath(), "track-state-" + Path.GetRandomFileName());
+        _retryDir = Path.Combine(_watchDir, "retry");
         Directory.CreateDirectory(_watchDir);
     }
 
@@ -39,7 +41,9 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
         var exit1 = new ApplicationExitCode();
         await RunWorkerAsync(transfer, additional, primaryStore, backupStore, exit1);
 
-        Assert.True(File.Exists(dataPath), "部分失敗時はローカルを保持する");
+        var retryPath = Path.Combine(_retryDir, "report.txt");
+        Assert.False(File.Exists(dataPath));
+        Assert.True(File.Exists(retryPath), "部分失敗時は未完了ファイルを retry ディレクトリへ移動する");
         Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt"));
         Assert.False(backupStore.Contains("/backup/report.txt"));
         Assert.Equal(1, exit1.Code); // 失敗ありで終了コード 1
@@ -57,6 +61,7 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
         Assert.Equal("the-payload", backupStore.GetText("/backup/report.txt"));
         // 全宛先完了 → ローカル削除・マーカー掃除
         Assert.False(File.Exists(dataPath));
+        Assert.False(File.Exists(retryPath));
         Assert.Empty(Directory.GetFiles(_stateDir, "*.marker"));
         Assert.Equal(0, exit2.Code);
     }
@@ -75,9 +80,11 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
         backupStore.FailUploads = true;
         await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode());
         Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt"));
+        var retryPath = Path.Combine(_retryDir, "report.txt");
+        Assert.True(File.Exists(retryPath));
 
         // 同名で内容を差し替え (上書き)
-        await File.WriteAllTextAsync(dataPath, "v2-completely-different-content");
+        await File.WriteAllTextAsync(retryPath, "v2-completely-different-content");
 
         // Run 2: backup 復活。指紋が変わったので primary にも再送される
         backupStore.FailUploads = false;
@@ -87,6 +94,7 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
         Assert.Equal("v2-completely-different-content", primaryStore.GetText("/primary/report.txt"));
         Assert.Equal("v2-completely-different-content", backupStore.GetText("/backup/report.txt"));
         Assert.False(File.Exists(dataPath));
+        Assert.False(File.Exists(retryPath));
     }
 
     [Fact]
@@ -105,7 +113,34 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
         Assert.False(File.Exists(dataPath));
         Assert.True(primaryStore.Contains("/primary/report.txt"));
         Assert.True(backupStore.Contains("/backup/report.txt"));
+        Assert.False(Directory.Exists(_retryDir) && Directory.GetFiles(_retryDir, "*", SearchOption.AllDirectories).Length > 0);
         Assert.False(Directory.Exists(_stateDir) && Directory.GetFiles(_stateDir, "*.marker").Length > 0);
+    }
+
+    [Fact]
+    public async Task DeletingRetryFile_RemovesOrphanMarkerAndStopsPendingRetry()
+    {
+        var dataPath = Path.Combine(_watchDir, "report.txt");
+        await File.WriteAllTextAsync(dataPath, "the-payload");
+
+        var (transfer, additional) = BuildOptions();
+        var primaryStore = new DestinationStore();
+        var backupStore = new DestinationStore();
+
+        backupStore.FailUploads = true;
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode());
+
+        var retryPath = Path.Combine(_retryDir, "report.txt");
+        Assert.True(File.Exists(retryPath));
+        Assert.Single(Directory.GetFiles(_stateDir, "*.marker"));
+
+        File.Delete(retryPath);
+        backupStore.FailUploads = false;
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode());
+
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt"));
+        Assert.False(backupStore.Contains("/backup/report.txt"));
+        Assert.Empty(Directory.GetFiles(_stateDir, "*.marker"));
     }
 
     [Fact]
@@ -163,6 +198,7 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
             Concurrency = 1,
             PerDestinationDeliveryTracking = true,
             StateDirectory = _stateDir,
+            RetryDirectory = _retryDir,
             DeliverySignatureMode = "sizetime",
             AdditionalDestinations = new List<DestinationOptions> { additional }
         };
