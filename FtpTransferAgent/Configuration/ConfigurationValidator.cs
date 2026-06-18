@@ -113,6 +113,10 @@ public class ConfigurationValidator
             {
                 result.Errors.Add($"{label} TimeoutSeconds must be between 1 and 3600 (got {d.TimeoutSeconds})");
             }
+            if (d.KeepAliveSeconds < 0 || d.KeepAliveSeconds > 3600)
+            {
+                result.Errors.Add($"{label} KeepAliveSeconds must be between 0 and 3600 (got {d.KeepAliveSeconds})");
+            }
         }
     }
 

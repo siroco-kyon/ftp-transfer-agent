@@ -29,6 +29,13 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
             _client.Config.ReadTimeout = options.TimeoutSeconds * 1000;
             _client.Config.DataConnectionConnectTimeout = options.TimeoutSeconds * 1000;
             _client.Config.DataConnectionReadTimeout = options.TimeoutSeconds * 1000;
+
+            // 接続をワーカー間で再利用する際、アイドルで切断されないよう TCP KeepAlive を有効化する。
+            // SocketKeepAlive は OS の TCP KeepAlive を使うため、間隔は OS 設定に従う（>0 で有効化のみ判定）。
+            if (options.KeepAliveSeconds > 0)
+            {
+                _client.Config.SocketKeepAlive = true;
+            }
         }
     }
 

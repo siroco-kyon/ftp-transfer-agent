@@ -93,6 +93,20 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
             AttachHostKeyValidation();
             _client.OperationTimeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         }
+
+        // 接続をワーカー間で再利用する際、アイドルタイムアウトでサーバに切断されないよう
+        // 定期的に KeepAlive を送る（0 で無効）。
+        if (options.KeepAliveSeconds > 0)
+        {
+            try
+            {
+                _client.KeepAliveInterval = TimeSpan.FromSeconds(options.KeepAliveSeconds);
+            }
+            catch
+            {
+                // KeepAliveInterval が設定できない場合は無視する
+            }
+        }
     }
 
     // 接続されていなければ接続を確立

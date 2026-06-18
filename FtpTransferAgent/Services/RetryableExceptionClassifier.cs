@@ -117,4 +117,47 @@ public static class RetryableExceptionClassifier
 
         return IsRetryable(innerException);
     }
+
+    /// <summary>
+    /// 例外が「接続そのものが壊れた」ことを示すかを判定する。
+    /// true の場合、その接続は再利用せず破棄して張り直すべき。
+    /// ハッシュ不一致やローカルファイル系エラーは接続が生きているため false。
+    /// </summary>
+    /// <param name="exception">判定対象の例外</param>
+    /// <returns>接続を破棄すべき場合 true</returns>
+    public static bool IsConnectionBroken(Exception exception)
+    {
+        return exception switch
+        {
+            // ネットワーク/セッションが切れたことを示す例外
+            SocketException => true,
+            SshConnectionException => true,
+            SshOperationTimeoutException => true,
+            TimeoutException => true,
+            ObjectDisposedException => true,
+            FtpException ftpEx => IsConnectionRelatedFtpException(ftpEx),
+
+            // 接続は生きている前提のエラーは接続を維持する
+            HashMismatchException => false,
+            IOException => false,
+            UnauthorizedAccessException => false,
+
+            // その他は内部例外を辿って判定する
+            _ => exception.InnerException is { } inner && IsConnectionBroken(inner)
+        };
+    }
+
+    /// <summary>
+    /// FTP 例外が接続断に起因するかをメッセージから判定する
+    /// </summary>
+    private static bool IsConnectionRelatedFtpException(FtpException ftpException)
+    {
+        var message = ftpException.Message;
+        return message.Contains("timeout", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("connection", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("network", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("broken", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("closed", StringComparison.OrdinalIgnoreCase) ||
+               message.Contains("reset", StringComparison.OrdinalIgnoreCase);
+    }
 }
