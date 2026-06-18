@@ -368,7 +368,13 @@ public class ConfigurationValidator
                 var additionalDestinations = transfer.AdditionalDestinations ?? new List<DestinationOptions>();
                 for (int i = 0; i < additionalDestinations.Count; i++)
                 {
-                    if (!additionalDestinations[i].PreserveFolderStructure)
+                    var destination = additionalDestinations[i];
+                    if (destination is null)
+                    {
+                        continue;
+                    }
+
+                    if (!destination.PreserveFolderStructure)
                     {
                         unsafeDestinations.Add($"destination#{i + 1}");
                     }
