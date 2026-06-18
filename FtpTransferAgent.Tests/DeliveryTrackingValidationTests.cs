@@ -87,6 +87,42 @@ public class DeliveryTrackingValidationTests : IDisposable
     }
 
     [Fact]
+    public void StateDirectory_SameAsWatchPath_ProducesError()
+    {
+        var transfer = ValidPrimary("primary");
+        transfer.AdditionalDestinations = new List<DestinationOptions> { ValidBackup("backup") };
+        transfer.StateDirectory = _watchDir;
+
+        var result = Validate(transfer);
+
+        Assert.Contains(result.Errors, e => e.Contains("StateDirectory") && e.Contains("Watch.Path"));
+    }
+
+    [Fact]
+    public void StateDirectory_ParentOfWatchPath_ProducesError()
+    {
+        var transfer = ValidPrimary("primary");
+        transfer.AdditionalDestinations = new List<DestinationOptions> { ValidBackup("backup") };
+        transfer.StateDirectory = Path.GetDirectoryName(_watchDir);
+
+        var result = Validate(transfer);
+
+        Assert.Contains(result.Errors, e => e.Contains("StateDirectory") && e.Contains("parent directory"));
+    }
+
+    [Fact]
+    public void StateDirectory_ChildOfWatchPath_IsAllowed()
+    {
+        var transfer = ValidPrimary("primary");
+        transfer.AdditionalDestinations = new List<DestinationOptions> { ValidBackup("backup") };
+        transfer.StateDirectory = Path.Combine(_watchDir, ".delivery-state");
+
+        var result = Validate(transfer);
+
+        Assert.DoesNotContain(result.Errors, e => e.Contains("StateDirectory"));
+    }
+
+    [Fact]
     public void TrackingWithGetDirection_ProducesWarning()
     {
         var transfer = ValidPrimary("primary");
@@ -132,9 +168,9 @@ public class DeliveryTrackingValidationTests : IDisposable
     }
 
     [Fact]
-    public void SuppressMultiDestinationFailureEmails_DefaultsFalse()
+    public void SuppressPerDestinationFailureDetailEmails_DefaultsFalse()
     {
-        Assert.False(new SmtpOptions().SuppressMultiDestinationFailureEmails);
+        Assert.False(new SmtpOptions().SuppressPerDestinationFailureDetailEmails);
     }
 
     public void Dispose()

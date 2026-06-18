@@ -93,7 +93,7 @@
         "From": { "type": "string", "format": "email" },
         "To": { "type": "array", "items": { "type": "string", "format": "email" }, "minItems": 1 },
         "MaxEmailsPerRun": { "type": "integer" },
-        "SuppressMultiDestinationFailureEmails": { "type": "boolean" }
+        "SuppressPerDestinationFailureDetailEmails": { "type": "boolean" }
       }
     },
     "Logging": {
