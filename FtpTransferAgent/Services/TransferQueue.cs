@@ -98,7 +98,11 @@ public class TransferQueue
                             Interlocked.Increment(ref _totalFailed);
                             _logger.LogWarning(duplicateException, "Item {ItemKey} already processed, reporting duplicate as failed", itemKey);
                             try { onFinalOutcome?.Invoke(item, duplicateException); }
-                            catch (Exception cbEx) { _logger.LogWarning(cbEx, "onFinalOutcome callback threw for duplicate {ItemKey}", itemKey); }
+                            catch (Exception cbEx)
+                            {
+                                _criticalExceptions.Add(cbEx);
+                                _logger.LogError(cbEx, "onFinalOutcome callback threw for duplicate {ItemKey}", itemKey);
+                            }
                             continue;
                         }
 
@@ -120,7 +124,11 @@ public class TransferQueue
                             Interlocked.Increment(ref _totalCompleted);
 
                             try { onFinalOutcome?.Invoke(item, null); }
-                            catch (Exception cbEx) { _logger.LogWarning(cbEx, "onFinalOutcome callback threw for {ItemKey}", itemKey); }
+                            catch (Exception cbEx)
+                            {
+                                _criticalExceptions.Add(cbEx);
+                                _logger.LogError(cbEx, "onFinalOutcome callback threw for {ItemKey}", itemKey);
+                            }
                         }
                         catch (Exception ex)
                         {
@@ -139,7 +147,11 @@ public class TransferQueue
                             }
 
                             try { onFinalOutcome?.Invoke(item, ex); }
-                            catch (Exception cbEx) { _logger.LogWarning(cbEx, "onFinalOutcome callback threw for {ItemKey}", itemKey); }
+                            catch (Exception cbEx)
+                            {
+                                _criticalExceptions.Add(cbEx);
+                                _logger.LogError(cbEx, "onFinalOutcome callback threw for {ItemKey}", itemKey);
+                            }
 
                             // 例外を再スローせず、他のワーカーの処理を継続させる
                             // 失敗したアイテムは処理済みとして保持（無限リトライ防止）

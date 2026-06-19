@@ -42,10 +42,22 @@ public class DeliveryStateStoreTests : IDisposable
         var path = CreateFile("a.txt", "hello");
         var sig = await store.ComputeSignatureAsync(path, CancellationToken.None);
 
-        store.RecordDelivered("a.txt", "primary", sig);
+        Assert.True(store.RecordDelivered("a.txt", "primary", sig));
 
         var delivered = store.GetDeliveredDestinations("a.txt", sig);
         Assert.Contains("primary", delivered);
+    }
+
+    [Fact]
+    public void RecordDelivered_WhenStatePathIsAFile_ReturnsFalse()
+    {
+        var invalidStatePath = Path.Combine(_watchDir, "state-as-file");
+        File.WriteAllText(invalidStatePath, "not a directory");
+        var store = new DeliveryStateStore(invalidStatePath, _watchDir, DeliveryStateStore.SignatureModeSizeTime, "SHA256", NullLogger.Instance);
+
+        var recorded = store.RecordDelivered("a.txt", "primary", "st:1-2");
+
+        Assert.False(recorded);
     }
 
     [Fact]

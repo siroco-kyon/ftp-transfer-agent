@@ -158,6 +158,182 @@ public class WorkerFanoutSafetyTests
         }
     }
 
+    [Fact]
+    public async Task ExecuteAsync_FanoutUpload_UsesSnapshotAndRetainsSourceWhenFileChangesDuringTransfer()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+
+        try
+        {
+            var dataPath = Path.Combine(dir, "sample.txt");
+            var endPath = Path.Combine(dir, "sample.txt.END");
+            await File.WriteAllTextAsync(dataPath, "initial payload");
+            await File.WriteAllTextAsync(endPath, "end marker");
+
+            var additionalDestination = new DestinationOptions
+            {
+                Mode = "ftp",
+                Host = "backup",
+                Username = "backup-user",
+                Password = "backup-pass",
+                RemotePath = "/backup",
+                Concurrency = 1
+            };
+
+            var transferOptions = new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "put",
+                Host = "primary",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/primary",
+                Concurrency = 1,
+                AdditionalDestinations = new List<DestinationOptions> { additionalDestination }
+            };
+
+            using var sourceChanged = new ManualResetEventSlim(initialState: false);
+            var primaryStore = new DestinationStore
+            {
+                AfterUpload = remotePath =>
+                {
+                    if (remotePath.EndsWith("/sample.txt", StringComparison.OrdinalIgnoreCase))
+                    {
+                        File.WriteAllText(dataPath, "mutated payload with new bytes");
+                        sourceChanged.Set();
+                    }
+                }
+            };
+            var backupStore = new DestinationStore
+            {
+                BeforeUpload = remotePath =>
+                {
+                    if (remotePath.EndsWith("/sample.txt", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Assert.True(sourceChanged.Wait(TimeSpan.FromSeconds(5)), "primary upload should mutate the source before backup reads");
+                    }
+                }
+            };
+            var exitCode = new ApplicationExitCode();
+
+            var worker = CreateWorker(
+                dir,
+                transferOptions,
+                additionalDestination,
+                primaryStore,
+                backupStore,
+                new CleanupOptions { DeleteAfterVerify = true },
+                new HashOptions { Enabled = false, Algorithm = "SHA256" },
+                exitCode);
+
+            await worker.RunAsync(CancellationToken.None);
+
+            Assert.Equal("initial payload", System.Text.Encoding.UTF8.GetString(primaryStore.Get("/primary/sample.txt")));
+            Assert.Equal("initial payload", System.Text.Encoding.UTF8.GetString(backupStore.Get("/backup/sample.txt")));
+            Assert.True(File.Exists(dataPath));
+            Assert.True(File.Exists(endPath));
+            Assert.Equal("mutated payload with new bytes", await File.ReadAllTextAsync(dataPath));
+            Assert.Equal(1, exitCode.Code);
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FanoutUpload_UsesSnapshotAndRetainsSourceWhenRelatedEndFileChangesDuringTransfer()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+
+        try
+        {
+            var dataPath = Path.Combine(dir, "sample.txt");
+            var endPath = Path.Combine(dir, "sample.txt.END");
+            await File.WriteAllTextAsync(dataPath, "initial payload");
+            await File.WriteAllTextAsync(endPath, "initial end marker");
+
+            var additionalDestination = new DestinationOptions
+            {
+                Mode = "ftp",
+                Host = "backup",
+                Username = "backup-user",
+                Password = "backup-pass",
+                RemotePath = "/backup",
+                Concurrency = 1
+            };
+
+            var transferOptions = new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "put",
+                Host = "primary",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/primary",
+                Concurrency = 1,
+                AdditionalDestinations = new List<DestinationOptions> { additionalDestination }
+            };
+
+            using var endChanged = new ManualResetEventSlim(initialState: false);
+            var primaryStore = new DestinationStore
+            {
+                AfterUpload = remotePath =>
+                {
+                    if (remotePath.EndsWith("/sample.txt.END", StringComparison.OrdinalIgnoreCase))
+                    {
+                        File.WriteAllText(endPath, "mutated end marker");
+                        endChanged.Set();
+                    }
+                }
+            };
+            var backupStore = new DestinationStore
+            {
+                BeforeUpload = remotePath =>
+                {
+                    if (remotePath.EndsWith("/sample.txt.END", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Assert.True(endChanged.Wait(TimeSpan.FromSeconds(5)), "primary upload should mutate the END file before backup reads");
+                    }
+                }
+            };
+            var exitCode = new ApplicationExitCode();
+
+            var worker = CreateWorker(
+                dir,
+                transferOptions,
+                additionalDestination,
+                primaryStore,
+                backupStore,
+                new CleanupOptions { DeleteAfterVerify = true },
+                new HashOptions { Enabled = false, Algorithm = "SHA256" },
+                exitCode);
+
+            await worker.RunAsync(CancellationToken.None);
+
+            Assert.Equal("initial payload", System.Text.Encoding.UTF8.GetString(primaryStore.Get("/primary/sample.txt")));
+            Assert.Equal("initial payload", System.Text.Encoding.UTF8.GetString(backupStore.Get("/backup/sample.txt")));
+            Assert.Equal("initial end marker", System.Text.Encoding.UTF8.GetString(primaryStore.Get("/primary/sample.txt.END")));
+            Assert.Equal("initial end marker", System.Text.Encoding.UTF8.GetString(backupStore.Get("/backup/sample.txt.END")));
+            Assert.True(File.Exists(dataPath));
+            Assert.True(File.Exists(endPath));
+            Assert.Equal("mutated end marker", await File.ReadAllTextAsync(endPath));
+            Assert.Equal(1, exitCode.Code);
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
     private static RoutingWorker CreateWorker(
         string dir,
         TransferOptions transferOptions,
@@ -283,6 +459,9 @@ public class WorkerFanoutSafetyTests
         private readonly bool _failEndUploads;
         private int _sequence;
 
+        public Action<string>? BeforeUpload { get; init; }
+        public Action<string>? AfterUpload { get; init; }
+
         public DestinationStore(bool failEndUploads = false)
         {
             _failEndUploads = failEndUploads;
@@ -295,13 +474,17 @@ public class WorkerFanoutSafetyTests
                 throw new IOException("simulated END upload failure");
             }
 
+            BeforeUpload?.Invoke(remotePath);
             var bytes = await File.ReadAllBytesAsync(localPath, ct);
             var normalized = Normalize(remotePath);
             _files[normalized] = bytes;
             _uploadIndexes[normalized] = Interlocked.Increment(ref _sequence);
+            AfterUpload?.Invoke(normalized);
         }
 
         public bool Contains(string remotePath) => _files.ContainsKey(Normalize(remotePath));
+
+        public byte[] Get(string remotePath) => _files[Normalize(remotePath)];
 
         public bool TryGet(string remotePath, out byte[]? bytes) => _files.TryGetValue(Normalize(remotePath), out bytes);
 

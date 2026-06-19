@@ -75,6 +75,32 @@ public class DeliveryTrackingValidationTests : IDisposable
     }
 
     [Fact]
+    public void DuplicateRemoteDestinationTargets_ProducesWarning()
+    {
+        var transfer = ValidPrimary("primary");
+        transfer.Host = "same-host";
+        transfer.Port = 21;
+        transfer.RemotePath = "/drop/";
+        transfer.AdditionalDestinations = new List<DestinationOptions>
+        {
+            new()
+            {
+                Name = "backup",
+                Mode = "ftp",
+                Host = "SAME-HOST",
+                Port = 21,
+                Username = "u",
+                Password = "p",
+                RemotePath = "/drop"
+            }
+        };
+
+        var result = Validate(transfer);
+
+        Assert.Contains(result.Warnings, w => w.Contains("same remote location"));
+    }
+
+    [Fact]
     public void InvalidSignatureMode_ProducesError()
     {
         var transfer = ValidPrimary("primary");

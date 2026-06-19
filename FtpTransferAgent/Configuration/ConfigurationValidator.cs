@@ -266,6 +266,54 @@ public class ConfigurationValidator
                 result.Errors.Add($"{label} KeepAliveSeconds must be between 0 and 3600 (got {d.KeepAliveSeconds})");
             }
         }
+
+        ValidateDuplicateDestinationTargets(transfer, result);
+    }
+
+    private static void ValidateDuplicateDestinationTargets(TransferOptions transfer, ConfigurationValidationResult result)
+    {
+        if (transfer.Direction is not "put")
+        {
+            return;
+        }
+
+        var destinations = new List<(string Label, DestinationOptions Destination)>
+        {
+            ("primary", transfer)
+        };
+
+        if (transfer.AdditionalDestinations is not null)
+        {
+            for (var i = 0; i < transfer.AdditionalDestinations.Count; i++)
+            {
+                var destination = transfer.AdditionalDestinations[i];
+                if (destination is not null)
+                {
+                    destinations.Add(($"destination#{i + 1}", destination));
+                }
+            }
+        }
+
+        var duplicateTargets = destinations
+            .GroupBy(d => DestinationTargetKey(d.Destination), StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .Select(g => string.Join(", ", g.Select(d => d.Label)))
+            .ToList();
+
+        foreach (var labels in duplicateTargets)
+        {
+            result.Warnings.Add($"Multiple destinations appear to target the same remote location ({labels}). This can cause concurrent overwrites or duplicate END-file delivery.");
+        }
+    }
+
+    private static string DestinationTargetKey(DestinationOptions destination)
+    {
+        var mode = destination.Mode?.Trim().ToLowerInvariant() ?? string.Empty;
+        var host = destination.Host?.Trim().ToLowerInvariant() ?? string.Empty;
+        var remotePath = (destination.RemotePath ?? string.Empty)
+            .Replace('\\', '/')
+            .TrimEnd('/');
+        return $"{mode}|{host}|{destination.Port}|{remotePath}";
     }
 
     private void ValidateBasicConfiguration(WatchOptions watch, TransferOptions transfer, ConfigurationValidationResult result)

@@ -25,7 +25,9 @@ public record TransferItem(
     string? GroupId = null,
     IReadOnlyList<string>? RelatedEndFilePaths = null,
     string? OriginalRelativePath = null,
-    IReadOnlyList<string>? RelatedEndFileOriginalRelativePaths = null)
+    IReadOnlyList<string>? RelatedEndFileOriginalRelativePaths = null,
+    string? LocalPathOverride = null,
+    IReadOnlyList<string>? RelatedEndFileLocalPathOverrides = null)
 {
     /// <summary>
     /// ログ追跡用の転送 ID。リトライ時もアイテム単位で同じ ID を保ち、
@@ -60,8 +62,22 @@ public record TransferItem(
         && GroupId == other.GroupId
         && Equals(RelatedEndFilePaths, other.RelatedEndFilePaths)
         && OriginalRelativePath == other.OriginalRelativePath
-        && Equals(RelatedEndFileOriginalRelativePaths, other.RelatedEndFileOriginalRelativePaths);
+        && Equals(RelatedEndFileOriginalRelativePaths, other.RelatedEndFileOriginalRelativePaths)
+        && LocalPathOverride == other.LocalPathOverride
+        && Equals(RelatedEndFileLocalPathOverrides, other.RelatedEndFileLocalPathOverrides);
 
-    public override int GetHashCode() =>
-        HashCode.Combine(Path, Action, Destination, GroupId, RelatedEndFilePaths, OriginalRelativePath, RelatedEndFileOriginalRelativePaths);
+    public override int GetHashCode()
+    {
+        var hash = new HashCode();
+        hash.Add(Path);
+        hash.Add(Action);
+        hash.Add(Destination);
+        hash.Add(GroupId);
+        hash.Add(RelatedEndFilePaths);
+        hash.Add(OriginalRelativePath);
+        hash.Add(RelatedEndFileOriginalRelativePaths);
+        hash.Add(LocalPathOverride);
+        hash.Add(RelatedEndFileLocalPathOverrides);
+        return hash.ToHashCode();
+    }
 }

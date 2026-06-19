@@ -67,8 +67,8 @@ watch/
 処理の流れ:
 
 1. **起動時**: 状態ディレクトリを 1 回走査してマーカーをメモリへ読み込む（孤児・破損は掃除）。
-2. **列挙時**: 各データファイルについて現在の指紋を計算し、「指紋が一致するマーカーを持つ宛先」を配信済みとみなす。**未配信の宛先だけ**をキューへ投入する。全宛先配信済みなら送信自体をスキップする。
-3. **完了時**: 「今回成功した宛先 ∪ 既存マーカーの宛先」が全宛先を満たせば完了。`DeleteAfterVerify: true`（既定）ならローカルファイル・マーカーを削除し、`false` なら退避していたファイルを `Watch.Path` へ復元してマーカーを保持する。満たさなければ、今回成功した宛先のマーカーを書き、対象ファイルを `RetryDirectory` へ退避する（次回は未配信の宛先だけ再送）。
+2. **列挙時**: 各データファイルについて現在の指紋を計算し、「指紋が一致するマーカーを持つ宛先」を配信済みとみなす。関連 END ファイルがある場合は、データ指紋と END 指紋を合成した値で判定する。**未配信の宛先だけ**をキューへ投入する。全宛先配信済みなら送信自体をスキップする。複数宛先では投入前に一時スナップショットを作成し、全宛先が同じファイル内容を読む。
+3. **完了時**: 「今回成功した宛先 ∪ 既存マーカーの宛先」が全宛先を満たせば完了。`DeleteAfterVerify: true`（既定）ならローカルファイル・マーカーを削除し、`false` なら退避していたファイルを `Watch.Path` へ復元してマーカーを保持する。満たさなければ、今回成功した宛先のマーカーを書き、対象ファイルを `RetryDirectory` へ退避する（次回は未配信の宛先だけ再送）。ただし完了処理前に元ファイルまたは関連 END ファイルの指紋が変わった場合は、ローカル削除・retry 退避を行わず次回実行に持ち越す。
 
 ---
 
@@ -100,10 +100,11 @@ watch/
 ### 3.4 同名ファイルの上書き → 指紋（シグネチャ）ガード
 
 - **問題**: 配信途中（A 済み・B 未）のファイルが、別内容で同名上書きされた場合、「A のマーカーがある → A をスキップ」とすると **A には古い内容しか届かず、新内容が永遠に届かない**（静かなデータ欠落）。
-- **対策**: マーカーに送信時のファイル**指紋**を記録し、現在の指紋と一致する宛先だけを「配信済み」と判断する。指紋が違えば（＝内容が差し替わった）配信済み扱いにせず**全宛先へ再送**し、古いマーカーは破棄する。
+- **対策**: マーカーに送信時のファイル**指紋**を記録し、現在の指紋と一致する宛先だけを「配信済み」と判断する。関連 END ファイルがある場合はデータファイル指紋と END ファイル指紋を合成して記録する。指紋が違えば（＝内容が差し替わった）配信済み扱いにせず**全宛先へ再送**し、古いマーカーは破棄する。
   - `sizetime`（既定）: サイズ + 最終更新時刻（UTC ticks）。軽量。
   - `hash`: `Hash.Algorithm` でファイルハッシュを算出。厳密。
-- **実装**: `DeliveryStateStore.ComputeSignatureAsync` / `GetDeliveredDestinations`（指紋不一致のマーカーをその場で削除）。
+- **追加対策**: 複数宛先では、キュー投入前にデータファイルと関連 END ファイルを一時ディレクトリへコピーし、全宛先がそのスナップショットを送る。コピー後に元ファイルまたは関連 END ファイルの指紋が変わっていた場合は、その実行では投入しない。投入後に元ファイルや関連 END ファイルが変わった場合も、完了時の削除・retry 退避は行わず次回へ持ち越す。
+- **実装**: `DeliveryStateStore.ComputeSignatureAsync` / `GetDeliveredDestinations`（指紋不一致のマーカーをその場で削除）、`Worker.TryCreateUploadSnapshotAsync` / `IsSourceStillPlannedVersion`。
 
 ### 3.5 完了判定（次回はキューに未送先しか入らない）→ 「今回成功 ∪ 既存マーカー」で判定
 
@@ -117,6 +118,7 @@ watch/
 - **対策**:
   - マーカーは一時ファイルへ書いてから本番名へ **`File.Move(overwrite)` でリネーム**（アトミック）。書きかけが読まれない。
   - マーカーは**検証成功（＝その宛先への配信成功）後にだけ**書く。逆（配信前にマーカー）は起こさない。
+  - マーカー書き込みに失敗した場合は成功扱いにせず、終了コード `1` の対象にする。次回は未記録の宛先へ再送される。
   - 「配信完了したがマーカー記録前にクラッシュ」した場合は、次回その宛先へ**再送**される。一時名→本番名のアトミック転送なので“上書き”で済み、安全側に倒れる（重複はするが破損しない）。
 - **実装**: `DeliveryStateStore.RecordDelivered`（temp→Move）。
 
@@ -225,11 +227,13 @@ watch/
 
 ## 6. 既知の限界・残る懸念
 
-1. **`sizetime` の取りこぼし**: サイズが同一かつ最終更新時刻も据え置きで上書きされると、指紋が変わらず「配信済み」と誤判定し得る（静かな欠落）。タイムスタンプを保持してコピーするツール等で発生し得る。厳密さが要る場合は `DeliverySignatureMode: "hash"`。なお `RetryDirectory` への退避自体は最終更新時刻を保持するため、退避が原因で全再送になることはない。
-2. **クラッシュ時の重複再送**: 「配信完了 → マーカー記録前」にクラッシュすると、その宛先へ次回再送される。アトミック転送のため上書きで済むが、受信側が重複に弱い運用では留意。
-3. **`DeleteAfterVerify: false` + トラッキング**: 完了してもローカルとマーカーが残り続ける（再送はしない）。退避していたファイルは `Watch.Path` へ復元される。状態ディレクトリのサイズは保持ファイル数に比例する。
-4. **`hash` モードのコスト**: 保持（詰まった）ファイルごとにハッシュ計算が必要。ファイル数・サイズが大きいと相応の負荷。
-5. **状態ディレクトリの可搬性**: マーカーは相対パス + `Name` をキーにする。`Watch.Path` を変えたり `Name` を付け替えると、過去のマーカーは孤児化し（または別宛先扱いになり）、再送が発生し得る。
+1. **`sizetime` の取りこぼし**: サイズが同一かつ最終更新時刻も据え置きで上書きされると、指紋が変わらず「配信済み」と誤判定し得る（静かな欠落）。関連 END ファイルも同じ制限を受ける。タイムスタンプを保持してコピーするツール等で発生し得る。厳密さが要る場合は `DeliverySignatureMode: "hash"`。なお `RetryDirectory` への退避自体は最終更新時刻を保持するため、退避が原因で全再送になることはない。
+2. **転送中の元ファイル/関連 END ファイル変更は次回へ持ち越し**: スナップショットにより宛先間の内容差異は防ぐが、元ファイルや関連 END ファイルの指紋が変わった実行では cleanup/retry を確定しない。次回バッチで新しい指紋として再評価する。
+3. **クラッシュ時の重複再送**: 「配信完了 → マーカー記録前」にクラッシュすると、その宛先へ次回再送される。アトミック転送のため上書きで済むが、受信側が重複に弱い運用では留意。
+4. **`DeleteAfterVerify: false` + トラッキング**: 完了してもローカルとマーカーが残り続ける（再送はしない）。退避していたファイルは `Watch.Path` へ復元される。状態ディレクトリのサイズは保持ファイル数に比例する。
+5. **`hash` モードのコスト**: 保持（詰まった）ファイルごとにハッシュ計算が必要。ファイル数・サイズが大きいと相応の負荷。
+6. **状態ディレクトリの可搬性**: マーカーは相対パス + `Name` をキーにする。`Watch.Path` を変えたり `Name` を付け替えると、過去のマーカーは孤児化し（または別宛先扱いになり）、再送が発生し得る。
+7. **重複リモート宛先は警告のみ**: `Name` が一意でも、同一 mode/host/port/remote path を複数宛先に設定すると同時上書きや END ファイル重複配信が起こり得る。起動時に警告するが、意図的な同一送信先を完全には禁止しない。
 
 ---
 
@@ -238,18 +242,20 @@ watch/
 | 関心事 | 場所 |
 |---|---|
 | マーカーのロード／指紋／配信済み判定／記録／削除／掃除 | [`Services/DeliveryStateStore.cs`](../FtpTransferAgent/Services/DeliveryStateStore.cs) |
-| 列挙で未送先のみ投入・完了判定・削除・トラッキング初期化 | [`Worker.cs`](../FtpTransferAgent/Worker.cs)（`HandleFanoutCompletionTracked` / `HandleAlreadyDelivered` / `DeleteLocalAfterSuccess` / `DeliveryTrackingContext`） |
+| 列挙で未送先のみ投入・スナップショット作成・完了判定・削除・トラッキング初期化 | [`Worker.cs`](../FtpTransferAgent/Worker.cs)（`TryCreateUploadSnapshotAsync` / `HandleFanoutCompletionTracked` / `HandleAlreadyDelivered` / `DeleteLocalAfterSuccess` / `DeliveryTrackingContext`） |
 | 宛先結果に Name を載せる | [`Services/FanoutCoordinator.cs`](../FtpTransferAgent/Services/FanoutCoordinator.cs)（`DestinationResult.DestinationName`） |
 | 最終失敗ログへの EventId 付与 | [`Services/TransferQueue.cs`](../FtpTransferAgent/Services/TransferQueue.cs)（`finalFailureEventId`） |
 | EventId 定義・抑制判定述語 | [`Logging/LogEvents.cs`](../FtpTransferAgent/Logging/LogEvents.cs) |
 | メール抑制 | [`Logging/ErrorEmailLogger.cs`](../FtpTransferAgent/Logging/ErrorEmailLogger.cs) |
 | 設定モデル | `Configuration/DestinationOptions.cs` / `TransferOptions.cs` / `SmtpOptions.cs` |
-| バリデーション | [`Configuration/ConfigurationValidator.cs`](../FtpTransferAgent/Configuration/ConfigurationValidator.cs)（`ValidateDeliveryTracking`） |
+| バリデーション | [`Configuration/ConfigurationValidator.cs`](../FtpTransferAgent/Configuration/ConfigurationValidator.cs)（`ValidateDeliveryTracking` / `ValidateDuplicateDestinationTargets`） |
 
 ## 8. テスト
 
 | テスト | 内容 |
 |---|---|
-| `DeliveryStateStoreTests` | 指紋計算（sizetime/hash）、配信済み判定、指紋不一致での陳腐化削除、孤児掃除、永続化、`RemoveAll` |
+| `DeliveryStateStoreTests` | 指紋計算（sizetime/hash）、配信済み判定、指紋不一致での陳腐化削除、孤児掃除、永続化、`RemoveAll`、マーカー書き込み失敗時の失敗返却 |
 | `PerDestinationDeliveryTrackingTests` | バッチ 2 回実行で「未送先だけ再送」「配信済みへ再送しない」、上書き時の全宛先再送、全成功時にマーカーが作られずローカル削除 |
-| `DeliveryTrackingValidationTests` | `Name` 必須・一意・署名モード・get 方向警告のバリデーション、`LogEvents.IsMultiDestinationFailure` の判定 |
+| `WorkerFanoutSafetyTests` | 複数宛先転送中に元ファイルが変更されても全宛先が同じスナップショットを受け取り、ローカル削除・retry 退避を行わない |
+| `ParallelTransferQueueTests` | 完了コールバック例外を critical error として集計する |
+| `DeliveryTrackingValidationTests` | `Name` 必須・一意・署名モード・get 方向警告・重複リモート宛先警告のバリデーション、`LogEvents.IsMultiDestinationFailure` の判定 |
