@@ -772,6 +772,37 @@ public class ConfigurationValidationTests
     }
 
     [Fact]
+    public void ConfigurationValidator_ShouldDetectMaliciousEndFileExtensions_WhenTransferEndFilesDoesNotRequireEndFile()
+    {
+        var logger = new Mock<ILogger<ConfigurationValidator>>();
+        var validator = new ConfigurationValidator(logger.Object);
+
+        var maliciousWatch = new WatchOptions
+        {
+            Path = Path.GetTempPath(),
+            RequireEndFile = false,
+            TransferEndFiles = true,
+            EndFileExtensions = new[] { ".END", "../.end" }
+        };
+        var validTransfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "test.com",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote"
+        };
+        var retry = new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 };
+        var hash = new HashOptions { Algorithm = "SHA256" };
+        var cleanup = new CleanupOptions();
+
+        var result = validator.ValidateConfiguration(maliciousWatch, validTransfer, retry, hash, cleanup);
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("Invalid END file extensions"));
+    }
+
+    [Fact]
     public void ConfigurationValidator_ShouldDetectDuplicateEndFileExtensions()
     {
         var logger = new Mock<ILogger<ConfigurationValidator>>();

@@ -494,7 +494,7 @@ public class EndFileFeatureTests
         // リモートファイル一覧（対応するENDファイルあり）
         mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(new[] { "/remote/test.txt", "/remote/test.txt.END" });
-        mock.Setup(c => c.DownloadAsync("/remote/test.txt", localTestFile, It.IsAny<CancellationToken>()))
+        mock.Setup(c => c.DownloadAsync("/remote/test.txt", It.Is<string>(p => p.StartsWith(localTestFile + ".verify.", StringComparison.Ordinal)), It.IsAny<CancellationToken>()))
             .Callback<string, string, CancellationToken>((_, lp, _) => File.WriteAllText(lp, testData))
             .Returns(Task.CompletedTask).Verifiable();
         mock.Setup(c => c.GetRemoteHashAsync("/remote/test.txt", "SHA256", It.IsAny<CancellationToken>(), false))
@@ -564,10 +564,10 @@ public class EndFileFeatureTests
         // リモートファイル一覧（データファイルとENDファイル両方）
         mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(new[] { "/remote/test.txt", "/remote/test.txt.END" });
-        mock.Setup(c => c.DownloadAsync("/remote/test.txt", localTestFile, It.IsAny<CancellationToken>()))
+        mock.Setup(c => c.DownloadAsync("/remote/test.txt", It.Is<string>(p => p.StartsWith(localTestFile + ".verify.", StringComparison.Ordinal)), It.IsAny<CancellationToken>()))
             .Callback<string, string, CancellationToken>((_, lp, _) => File.WriteAllText(lp, testData))
             .Returns(Task.CompletedTask).Verifiable();
-        mock.Setup(c => c.DownloadAsync("/remote/test.txt.END", localEndFile, It.IsAny<CancellationToken>()))
+        mock.Setup(c => c.DownloadAsync("/remote/test.txt.END", It.Is<string>(p => p.StartsWith(localEndFile + ".verify.", StringComparison.Ordinal)), It.IsAny<CancellationToken>()))
             .Callback<string, string, CancellationToken>((_, lp, _) => File.WriteAllText(lp, endData))
             .Returns(Task.CompletedTask).Verifiable();
         mock.Setup(c => c.GetRemoteHashAsync("/remote/test.txt", "SHA256", It.IsAny<CancellationToken>(), false))

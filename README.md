@@ -413,10 +413,10 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 - `put`: どちらも `/remote/result.csv`
 - `get`: どちらも `watch/result.csv`
 
-起動時の設定警告にも次が出ます。
+起動時の設定エラーとして次が出ます。
 
-- `IncludeSubfolders is enabled for upload but PreserveFolderStructure is disabled. All files will be uploaded to remote root directory.`
-- `IncludeSubfolders is enabled for download but PreserveFolderStructure is disabled. Files from subdirectories will be saved to root directory and may overwrite each other.`
+- `IncludeSubfolders cannot be enabled for upload when any destination has PreserveFolderStructure=false (...). Local files with the same name in different subdirectories may overwrite each other remotely.`
+- `IncludeSubfolders cannot be enabled for download when PreserveFolderStructure is false. Remote files from different subdirectories may overwrite the same local file.`
 
 推奨:
 

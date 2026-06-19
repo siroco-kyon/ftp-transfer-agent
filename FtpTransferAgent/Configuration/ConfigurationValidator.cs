@@ -30,7 +30,7 @@ public class ConfigurationValidator
         var result = new ConfigurationValidationResult();
 
         // 基本的な設定チェック
-        ValidateBasicConfiguration(watch, transfer, result);
+        ValidateBasicConfiguration(watch, transfer, cleanup, result);
 
         // パフォーマンス関連の設定チェック
         ValidatePerformanceConfiguration(transfer, retry, result);
@@ -316,7 +316,7 @@ public class ConfigurationValidator
         return $"{mode}|{host}|{destination.Port}|{remotePath}";
     }
 
-    private void ValidateBasicConfiguration(WatchOptions watch, TransferOptions transfer, ConfigurationValidationResult result)
+    private void ValidateBasicConfiguration(WatchOptions watch, TransferOptions transfer, CleanupOptions cleanup, ConfigurationValidationResult result)
     {
         if (transfer.Direction is not "put" and not "get")
         {
@@ -366,6 +366,11 @@ public class ConfigurationValidator
             }
         }
 
+        var usesEndFileExtensions = watch.RequireEndFile ||
+                                    watch.TransferEndFiles ||
+                                    cleanup.DeleteLocalSkippedEndFiles ||
+                                    cleanup.DeleteRemoteEndFiles;
+
         // ENDファイル設定の有効性チェック
         if (watch.RequireEndFile)
         {
@@ -373,38 +378,40 @@ public class ConfigurationValidator
             {
                 result.Errors.Add("END file extensions must be specified when RequireEndFile is enabled");
             }
-            else
+
+        }
+
+        var endFileExtensions = watch.EndFileExtensions;
+        if (usesEndFileExtensions && endFileExtensions is { Length: > 0 })
+        {
+            var invalidEndExtensions = endFileExtensions
+                .Where(ext => string.IsNullOrWhiteSpace(ext) ||
+                              ext.Contains(' ') ||
+                              ext.Contains("..") ||
+                              ext.Contains('/') ||
+                              ext.Contains('\\') ||
+                              ext.Length > 50)
+                .Select(ext => ext ?? "<null>")
+                .ToList();
+
+            if (invalidEndExtensions.Any())
             {
-                var invalidEndExtensions = watch.EndFileExtensions
-                    .Where(ext => string.IsNullOrWhiteSpace(ext) ||
-                                  ext.Contains(' ') ||
-                                  ext.Contains("..") ||
-                                  ext.Contains('/') ||
-                                  ext.Contains('\\') ||
-                                  ext.Length > 50) // 異常に長い拡張子を防ぐ
-                    .Select(ext => ext ?? "<null>") // null値を安全に表示
-                    .ToList();
-
-                if (invalidEndExtensions.Any())
-                {
-                    result.Errors.Add($"Invalid END file extensions: {string.Join(", ", invalidEndExtensions)}");
-                }
-
-                // 重複チェック (完全一致のみ)。大文字小文字違い (".END" と ".end" 等) は
-                // 大文字小文字を区別するファイルシステムでは別ファイルを指すため重複とみなさない
-                var duplicateExtensions = watch.EndFileExtensions
-                    .Where(ext => !string.IsNullOrWhiteSpace(ext))
-                    .GroupBy(ext => ext, StringComparer.Ordinal)
-                    .Where(g => g.Count() > 1)
-                    .Select(g => g.Key)
-                    .ToList();
-
-                if (duplicateExtensions.Any())
-                {
-                    result.Warnings.Add($"Duplicate END file extensions found: {string.Join(", ", duplicateExtensions)}");
-                }
+                result.Errors.Add($"Invalid END file extensions: {string.Join(", ", invalidEndExtensions)}");
             }
 
+            // 重複チェック (完全一致のみ)。大文字小文字違い (".END" と ".end" 等) は
+            // 大文字小文字を区別するファイルシステムでは別ファイルを指すため重複とみなさない
+            var duplicateExtensions = endFileExtensions
+                .Where(ext => !string.IsNullOrWhiteSpace(ext))
+                .GroupBy(ext => ext, StringComparer.Ordinal)
+                .Where(g => g.Count() > 1)
+                .Select(g => g.Key)
+                .ToList();
+
+            if (duplicateExtensions.Any())
+            {
+                result.Warnings.Add($"Duplicate END file extensions found: {string.Join(", ", duplicateExtensions)}");
+            }
         }
 
         // TransferEndFiles の設定検証（RequireEndFileに関係なく独立してチェック）
