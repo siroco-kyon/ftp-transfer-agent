@@ -5,7 +5,12 @@ namespace FtpTransferAgent.Configuration;
 /// </summary>
 public class CleanupOptions
 {
-    public bool DeleteAfterVerify { get; set; }
+    /// <summary>
+    /// put 方向で、全宛先への配信＋ハッシュ検証が成功した後にローカルの元ファイルを削除するか。
+    /// 既定 true (アウトボックス運用: 送信が確認できたファイルは残さない)。
+    /// false にすると元ファイルを残す (複数宛先トラッキング時は配信マーカーで再送をスキップする)。
+    /// </summary>
+    public bool DeleteAfterVerify { get; set; } = true;
     public bool DeleteRemoteAfterDownload { get; set; }
 
     /// <summary>

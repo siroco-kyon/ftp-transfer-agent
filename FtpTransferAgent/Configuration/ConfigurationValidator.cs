@@ -45,26 +45,31 @@ public class ConfigurationValidator
         ValidateAdditionalDestinations(transfer, result);
 
         // 宛先別配信トラッキングのバリデーション
-        ValidateDeliveryTracking(watch, transfer, result);
+        ValidateDeliveryTracking(watch, transfer, cleanup, result);
 
         return result;
     }
 
     /// <summary>
     /// 宛先別配信トラッキング有効時の整合性をチェックする。
-    /// マーカーは宛先 Name をキーにするため、全宛先で Name が必須かつ一意であること。
+    /// 複数宛先 (ファンアウト) の put では常時有効。マーカーは宛先 Name をキーにするため、
+    /// 全宛先で Name が必須かつ一意であること。単一宛先では PerDestinationDeliveryTracking
+    /// フラグで明示的に有効化したときのみ適用する。
     /// </summary>
-    private void ValidateDeliveryTracking(WatchOptions watch, TransferOptions transfer, ConfigurationValidationResult result)
+    private void ValidateDeliveryTracking(WatchOptions watch, TransferOptions transfer, CleanupOptions cleanup, ConfigurationValidationResult result)
     {
-        if (!transfer.PerDestinationDeliveryTracking)
-        {
-            return;
-        }
+        var additionalCount = transfer.AdditionalDestinations?.Count ?? 0;
+        var multiDestination = transfer.Direction is "put" && additionalCount > 0;
+        var trackingActive = transfer.Direction is "put" && (multiDestination || transfer.PerDestinationDeliveryTracking);
 
-        // put 方向専用。get では無視されることを警告する。
-        if (transfer.Direction is not "put")
+        // put 以外でフラグだけ立っている場合は無視されることを警告する。
+        if (transfer.PerDestinationDeliveryTracking && transfer.Direction is not "put")
         {
             result.Warnings.Add($"PerDestinationDeliveryTracking is enabled but Direction is '{transfer.Direction}'. Delivery tracking applies only to uploads (put) and will be ignored.");
+        }
+
+        if (!trackingActive)
+        {
             return;
         }
 
@@ -94,11 +99,11 @@ public class ConfigurationValidator
             named.Add(($"destination#{i + 1}", additional[i].Name));
         }
 
-        // Name 必須チェック
+        // Name 必須チェック (複数宛先の put は配信トラッキングが常時有効のため Name が必須)
         var missing = named.Where(n => string.IsNullOrWhiteSpace(n.Name)).Select(n => n.Label).ToList();
         if (missing.Count > 0)
         {
-            result.Errors.Add($"PerDestinationDeliveryTracking requires a unique 'Name' for every destination. Missing Name on: {string.Join(", ", missing)}.");
+            result.Errors.Add($"Delivery tracking requires a unique 'Name' for every destination (multiple destinations enable tracking by default). Missing Name on: {string.Join(", ", missing)}.");
         }
 
         // Name 一意チェック (大文字小文字を無視。紛らわしい重複を防ぐ)
@@ -110,7 +115,18 @@ public class ConfigurationValidator
             .ToList();
         if (duplicates.Count > 0)
         {
-            result.Errors.Add($"PerDestinationDeliveryTracking requires destination Names to be unique. Duplicate Name(s): {string.Join(", ", duplicates)}.");
+            result.Errors.Add($"Delivery tracking requires destination Names to be unique. Duplicate Name(s): {string.Join(", ", duplicates)}.");
+        }
+
+        // DeleteAfterVerify=false のとき、部分失敗ファイルがリトライディレクトリへ退避される旨を周知する。
+        // (全宛先配信完了時には watch.Path へ復元されるが、利用者が場所を把握できるよう警告する)
+        if (!cleanup.DeleteAfterVerify)
+        {
+            var resolvedRetry = DeliveryStateStore.ResolveRetryDirectory(transfer.RetryDirectory, watch.Path);
+            if (resolvedRetry is not null)
+            {
+                result.Warnings.Add($"DeleteAfterVerify is false with delivery tracking: partially-delivered files are moved to the retry directory ({resolvedRetry}) and restored to Watch.Path once every destination succeeds. Set Transfer.RetryDirectory to \"\" to keep partial-failure files in Watch.Path instead.");
+            }
         }
     }
 

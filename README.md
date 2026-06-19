@@ -115,7 +115,7 @@ dotnet publish -c Release -r osx-x64 --self-contained /p:PublishSingleFile=true
     "UseServerCommand": false
   },
   "Cleanup": {
-    "DeleteAfterVerify": false,
+    "DeleteAfterVerify": true,
     "DeleteRemoteAfterDownload": false,
     "DeleteRemoteEndFiles": false
   },
@@ -217,19 +217,20 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `PreserveFolderStructure` | bool | 任意 | `false` | サブフォルダ構造を維持して転送 |
 | `TimeoutSeconds` | int | 任意 | `120` | 接続・転送タイムアウト秒（1-3600） |
 | `KeepAliveSeconds` | int | 任意 | `0` | 接続再利用時のアイドル切断防止（秒、0-3600、`0`=無効）。`>0` で SFTP は `KeepAliveInterval`、FTP は NOOP 送信（`NoopInterval`）+ TCP KeepAlive を有効化。`AdditionalDestinations` の各宛先にも個別適用 |
-| `AdditionalDestinations` | object[] | 任意 | `[]` | put 方向の追加送信先。各要素は Transfer と同じ接続系プロパティを持つ（`Direction` / `AdditionalDestinations` を除く）。各宛先の `Concurrency` / `TimeoutSeconds` / 認証設定はその宛先に個別適用される。1 ファイルをメイン + 追加宛先の全てへ同時に送信する。部分失敗時はローカルファイルを保持し、次回実行では成功済み宛先を含めて全宛先へ再送する |
-| `PerDestinationDeliveryTracking` | bool | 任意 | `false` | 複数宛先で配信済み宛先を記録し、次回は未配信宛先だけへ再送する（put 方向のみ） |
+| `Name` | string | 複数宛先で必須 | `null` | 宛先の安定識別子。**複数宛先（ファンアウト）の put では primary・追加宛先すべてで必須かつ一意**（配信トラッキングのマーカーキー）。接続情報と独立した名前にする |
+| `AdditionalDestinations` | object[] | 任意 | `[]` | put 方向の追加送信先。各要素は Transfer と同じ接続系プロパティを持つ（`Direction` / `AdditionalDestinations` を除く）。各宛先の `Name` / `Concurrency` / `TimeoutSeconds` / 認証設定はその宛先に個別適用される。1 ファイルをメイン + 追加宛先の全てへ同時に送信する。**複数宛先では配信トラッキングが常時有効**で、部分失敗時は成功済み宛先を記録し、次回は未配信の宛先だけへ再送する（成功済み宛先への一括再送はしない） |
+| `PerDestinationDeliveryTracking` | bool | 任意 | `false` | **単一宛先**で配信トラッキングを明示的に有効化する場合に使用。複数宛先では常時有効のためこのフラグに関わらずトラッキングされる（put 方向のみ） |
 | `StateDirectory` | string | 任意 | `""` | 配信トラッキングのマーカー保存先。空なら `LocalApplicationData/FtpTransferAgent/delivery-state/<hash>` を使用 |
 | `RetryDirectory` | string/null | 任意 | `null` | 配信トラッキングで部分失敗したファイルの移動先。未指定/null は `LocalApplicationData/FtpTransferAgent/delivery-retry/<watch hash>` を使う。相対パスを明示した場合は `Watch.Path` 配下として解決し、空文字で移動を無効化する |
-| `DeliverySignatureMode` | string | 任意 | `"sizetime"` | 配信トラッキングの上書き検出方式。`sizetime` または `hash` |
+| `DeliverySignatureMode` | string | 任意 | `"sizetime"` | 配信トラッキングの上書き検出方式。`sizetime`（サイズ+更新時刻）または `hash`（ファイルハッシュ、厳密） |
 
-`PerDestinationDeliveryTracking` 有効時に一部宛先だけ失敗した場合、成功済み宛先のマーカーを残したうえで対象ファイルを `RetryDirectory` へ移動します。関連 END ファイルも同時に扱い、移動途中で失敗した場合は完了済みの移動を Watch 側へ戻します。
+複数宛先の put、または単一宛先で `PerDestinationDeliveryTracking: true` のとき、一部宛先だけ失敗すると成功済み宛先のマーカーを残したうえで対象ファイルを `RetryDirectory` へ退避します。関連 END ファイルも同時に扱い、移動途中で失敗した場合は完了済みの移動を Watch 側へ戻します。全宛先への配信が完了したら、`DeleteAfterVerify: true`（既定）ではファイルを削除し、`false` では `Watch.Path` の元の位置へ復元します（隠しフォルダに取り残しません）。`sizetime` 署名は移動でファイルの更新時刻が変わらないよう、退避時に元の更新時刻を保持します。
 
 ### App
 
 | 項目 | 型 | 必須 | 既定値 | 説明 |
 |---|---|---|---|---|
-| `LockFilePath` | string | 任意 | `""` | 二重起動防止用のロックファイルパス。空の場合は `LocalApplicationData/FtpTransferAgent/ftp-transfer-agent.lock`（取得できない環境ではテンポラリ配下）を使用する |
+| `LockFilePath` | string | 任意 | `""` | 二重起動防止用のロックファイルパス。空の場合は `Watch.Path` ごとに分離した既定パス（`LocalApplicationData/FtpTransferAgent/locks/<watch パスのハッシュ>/ftp-transfer-agent.lock`、取得できない環境ではテンポラリ配下）を使用する。異なる監視フォルダを別スケジュールで並走させても相互ブロックしない |
 
 ### Retry
 
@@ -321,6 +322,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 ```json
 {
   "Transfer": {
+    "Name": "primary",
     "Mode": "sftp",
     "Direction": "put",
     "Host": "primary.example.com",
@@ -330,6 +332,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
     "RemotePath": "/in",
     "AdditionalDestinations": [
       {
+        "Name": "backup",
         "Mode": "ftp",
         "Host": "backup.example.com",
         "Port": 21,
@@ -345,16 +348,17 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 ```
 
 - メイン + 追加宛先の**全宛先**へ同時に送信
-- **全宛先成功時のみ**ローカルファイルを削除（`Cleanup.DeleteAfterVerify: true` 時）
-- 1 つでも失敗した場合はローカル保持 + ERROR ログ出力 → 次回起動で再送
-- 部分失敗時の再実行は all-or-nothing で、失敗宛先だけでなく成功済み宛先にも再送する
+- **複数宛先では宛先別配信トラッキングが常時有効**: 各宛先に**一意な `Name` が必須**で、配信済みの宛先を記録し、次回バッチでは**未配信の宛先だけ**へ再送する（成功済み宛先への一括再送はしない）
+- **全宛先成功時に**ローカルファイルを削除（`Cleanup.DeleteAfterVerify: true`、既定）。`false` の場合は元ファイルを保持
+- 一部宛先だけ失敗した場合、対象ファイルは `RetryDirectory` へ退避し、未配信宛先へ再送し続ける。全宛先完了後、`DeleteAfterVerify: false` なら `Watch.Path` の元の位置へ戻す
 - `Direction: get` では追加宛先は使用されず、警告が表示される
+- 詳細は [宛先別配信トラッキングのドキュメント](docs/per-destination-delivery-tracking.md) を参照
 
 ### Cleanup
 
 | 項目 | 型 | 必須 | 既定値 | 説明 |
 |---|---|---|---|---|
-| `DeleteAfterVerify` | bool | 任意 | `false` | `put` 成功後、ローカルファイルを削除 |
+| `DeleteAfterVerify` | bool | 任意 | `true` | `put` 成功後（複数宛先では全宛先成功後）、ローカルファイルを削除。`false` で元ファイルを保持 |
 | `DeleteRemoteAfterDownload` | bool | 任意 | `false` | `get` 成功後、リモートファイルを削除 |
 | `DeleteRemoteEndFiles` | bool | 任意 | `false` | END ファイル成功時のリモート END ファイル削除 |
 | `DeleteLocalSkippedEndFiles` | bool | 任意 | `false` | `put` で `TransferEndFiles=false` のとき、転送成功したデータに対応する未転送 END ファイルをローカルから削除する |
@@ -444,7 +448,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 
 タスクスケジューラから短い間隔で実行する場合、前回実行分と重ならないよう PID ロックファイルで二重起動を防止します。
 
-- 起動時に `App.LockFilePath`（未指定なら `LocalApplicationData/FtpTransferAgent/ftp-transfer-agent.lock`、取得できない環境ではテンポラリ配下）を確認
+- 起動時に `App.LockFilePath`（未指定なら `Watch.Path` ごとに分離した既定パス `LocalApplicationData/FtpTransferAgent/locks/<watch ハッシュ>/ftp-transfer-agent.lock`、取得できない環境ではテンポラリ配下）を確認
 - 既存ロックがあり、書かれている PID のプロセスが**生存中**なら終了コード `2` で即終了
 - 死んだ PID のロックは自動的に上書きして起動を継続
 - 正常終了・異常終了のいずれでも `Dispose` でロックファイルは削除される

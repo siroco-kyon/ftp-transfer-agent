@@ -26,9 +26,15 @@ public sealed class ProcessLock : IDisposable
     /// ロックを取得する。既存ロックがあり、該当 PID が生存している場合は
     /// <see cref="InvalidOperationException"/> をスローする。
     /// </summary>
-    public static ProcessLock Acquire(string? lockFilePath)
+    /// <param name="lockFilePath">明示パス。null/空なら既定パスを使用する。</param>
+    /// <param name="watchPath">
+    /// 監視フォルダのパス。<paramref name="lockFilePath"/> 未指定時の既定ロックパスを
+    /// この値由来のサブフォルダへ分離し、異なる構成 (別 watch フォルダ) の同時実行が
+    /// 互いをブロックしないようにする。null/空なら従来の単一既定パスを使う。
+    /// </param>
+    public static ProcessLock Acquire(string? lockFilePath, string? watchPath = null)
     {
-        var path = ResolveLockFilePath(lockFilePath);
+        var path = ResolveLockFilePath(lockFilePath, watchPath);
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
         {
@@ -88,7 +94,7 @@ public sealed class ProcessLock : IDisposable
         return new ProcessLock(path, fs);
     }
 
-    private static string ResolveLockFilePath(string? configured)
+    private static string ResolveLockFilePath(string? configured, string? watchPath)
     {
         if (!string.IsNullOrWhiteSpace(configured))
         {
@@ -101,7 +107,24 @@ public sealed class ProcessLock : IDisposable
             baseDir = Path.GetTempPath();
         }
 
+        // watch パスが指定されていれば、構成ごとに既定ロックを分離する。
+        // (異なる watch フォルダを別スケジュールで並走させても相互ブロックしないようにする)
+        if (!string.IsNullOrWhiteSpace(watchPath))
+        {
+            var sub = WatchSubdirectory(watchPath);
+            return Path.Combine(baseDir, "FtpTransferAgent", "locks", sub, "ftp-transfer-agent.lock");
+        }
+
         return Path.Combine(baseDir, "FtpTransferAgent", "ftp-transfer-agent.lock");
+    }
+
+    // watch フルパス (大小無視) の安定したハッシュ先頭 16 桁。状態/リトライディレクトリの
+    // 既定解決 (DeliveryStateStore) と同じ手口で、構成ごとに衝突しないサブフォルダ名を作る。
+    private static string WatchSubdirectory(string watchPath)
+    {
+        var full = Path.GetFullPath(watchPath).ToLowerInvariant();
+        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(full));
+        return Convert.ToHexString(hash).ToLowerInvariant()[..16];
     }
 
     private static string GetCurrentProcessName()

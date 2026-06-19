@@ -28,9 +28,11 @@ public class SmtpOptions : IValidatableObject
     public int MaxEmailsPerRun { get; set; } = 100;
 
     /// <summary>
-    /// 複数宛先 (AdditionalDestinations あり) で個々の宛先への転送失敗や部分失敗の
-    /// 詳細エラーメールを抑制する。true にすると、ある宛先がメンテ等で継続的に失敗しても
+    /// 複数宛先 (AdditionalDestinations あり) で個々の宛先への転送失敗 (per-destination の詳細)
+    /// エラーメールを抑制する。true にすると、ある宛先がメンテ等で継続的に失敗しても
     /// その詳細通知だけを止め、設定不備・認証など他のエラーメールは送信し続ける。
+    /// ファイル単位の「部分配信サマリ」通知は抑制対象外なので、どのファイルがどの宛先へ
+    /// 未配信かは引き続きメールで把握できる (送信過多は Smtp.MaxEmailsPerRun で抑制)。
     /// ファイルログ・終了コードには影響しない (障害自体は記録される)。既定 false。
     /// </summary>
     public bool SuppressPerDestinationFailureDetailEmails { get; set; }

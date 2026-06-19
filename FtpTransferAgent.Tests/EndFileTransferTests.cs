@@ -369,7 +369,8 @@ public class EndFileTransferTests
         });
         var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
         var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
-        var cleanup = Options.Create(new CleanupOptions());
+        // データファイルの保持を検証するため、既定 true の DeleteAfterVerify を明示的に false にする。
+        var cleanup = Options.Create(new CleanupOptions { DeleteAfterVerify = false });
 
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.UploadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))

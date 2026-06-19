@@ -190,7 +190,6 @@ public class NetworkFailureSimulationTests
         Assert.True(RetryableExceptionClassifier.IsRetryable(new SocketException()));
         Assert.True(RetryableExceptionClassifier.IsRetryable(new TimeoutException()));
         Assert.True(RetryableExceptionClassifier.IsRetryable(new HttpRequestException()));
-        Assert.True(RetryableExceptionClassifier.IsRetryable(new UnauthorizedAccessException()));
         // ハッシュ不一致は転送中の一過性破損で起き得るため再転送で回復し得る
         Assert.True(RetryableExceptionClassifier.IsRetryable(new HashMismatchException("hash mismatch")));
 
@@ -199,6 +198,9 @@ public class NetworkFailureSimulationTests
         Assert.False(RetryableExceptionClassifier.IsRetryable(new ArgumentNullException()));
         Assert.False(RetryableExceptionClassifier.IsRetryable(new InvalidOperationException()));
         Assert.False(RetryableExceptionClassifier.IsRetryable(new DirectoryNotFoundException()));
+        // UnauthorizedAccessException は恒久的な ACL 拒否等が主因のため非リトライ
+        // (一時的なファイルロックは IOException(共有違反) として別途リトライされる)
+        Assert.False(RetryableExceptionClassifier.IsRetryable(new UnauthorizedAccessException()));
 
         // 内部例外のチェック
         var wrapperException = new Exception("Wrapper", new SocketException());

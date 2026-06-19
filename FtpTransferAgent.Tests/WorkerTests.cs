@@ -278,7 +278,8 @@ public class WorkerTests
         });
         var retry = Options.Create(new RetryOptions { MaxAttempts = 1, DelaySeconds = 0 });
         var hash = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
-        var cleanup = Options.Create(new CleanupOptions());
+        // このテストはファイル保持を検証する。DeleteAfterVerify の既定は true なので明示的に false にする。
+        var cleanup = Options.Create(new CleanupOptions { DeleteAfterVerify = false });
 
         var remotePath = "/remote/sample.txt";
         var mock = new Mock<IFileTransferClient>();
