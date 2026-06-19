@@ -386,6 +386,79 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
         Assert.True(File.Exists(dataPath));
     }
 
+    [Fact]
+    public async Task EmptyRetryDirectory_PartialFailure_KeepsFileInWatchInsteadOfMoving()
+    {
+        // RetryDirectory="" は退避を無効化する。部分失敗時もファイルは Watch.Path にそのまま残り、
+        // 隠しフォルダへ移動されないこと（移動無効の Worker レベル挙動）を検証する。
+        var dataPath = Path.Combine(_watchDir, "report.txt");
+        await File.WriteAllTextAsync(dataPath, "the-payload");
+
+        var (transfer, additional) = BuildOptions();
+        transfer.RetryDirectory = ""; // 退避を無効化
+        var primaryStore = new DestinationStore();
+        var backupStore = new DestinationStore();
+
+        // --- Run 1: backup 失敗 → 退避無効なのでファイルは watch に残る ---
+        backupStore.FailUploads = true;
+        var exit1 = new ApplicationExitCode();
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, exit1);
+
+        Assert.Equal(1, exit1.Code);
+        Assert.True(File.Exists(dataPath), "RetryDirectory=\"\" のとき部分失敗ファイルは watch に残る");
+        Assert.False(Directory.Exists(_retryDir), "退避ディレクトリは作られない");
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt"));
+        Assert.Single(Directory.GetFiles(_stateDir, "*.marker")); // primary のマーカー
+
+        // --- Run 2: backup 復活 → 未配信の backup だけ再送、完了でローカル削除 ---
+        backupStore.FailUploads = false;
+        var exit2 = new ApplicationExitCode();
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, exit2);
+
+        Assert.Equal(0, exit2.Code);
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt")); // 再送しない
+        Assert.Equal(1, backupStore.UploadCount("/backup/report.txt"));
+        Assert.False(File.Exists(dataPath));
+        Assert.Empty(Directory.GetFiles(_stateDir, "*.marker"));
+    }
+
+    [Fact]
+    public async Task HashSignatureMode_SameSizeSameMtimeOverwrite_ResendsToAllDestinations()
+    {
+        // hash モードは、サイズも更新時刻も据え置きで内容だけ差し替えた上書き（sizetime では
+        // 検出できないケース）でも内容変更を検出し、全宛先へ再送することを検証する。
+        var dataPath = Path.Combine(_watchDir, "report.txt");
+        await File.WriteAllTextAsync(dataPath, "AAAAAAAAAA"); // 10 バイト
+
+        var (transfer, additional) = BuildOptions();
+        transfer.DeliverySignatureMode = "hash";
+        var primaryStore = new DestinationStore();
+        var backupStore = new DestinationStore();
+
+        // --- Run 1: backup 失敗 → primary に v1 配信、retry へ退避 ---
+        backupStore.FailUploads = true;
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode());
+
+        var retryPath = Path.Combine(_retryDir, "report.txt");
+        Assert.True(File.Exists(retryPath));
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt"));
+
+        // 同じサイズ(10バイト)・同じ更新時刻のまま内容だけ差し替える（sizetime では区別不能）
+        var originalMtime = File.GetLastWriteTimeUtc(retryPath);
+        await File.WriteAllTextAsync(retryPath, "BBBBBBBBBB"); // 同じ 10 バイト
+        File.SetLastWriteTimeUtc(retryPath, originalMtime);
+
+        // --- Run 2: backup 復活。hash 指紋が変わるので primary にも再送される ---
+        backupStore.FailUploads = false;
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode());
+
+        Assert.Equal(2, primaryStore.UploadCount("/primary/report.txt")); // hash 検出で再送された
+        Assert.Equal("BBBBBBBBBB", primaryStore.GetText("/primary/report.txt"));
+        Assert.Equal("BBBBBBBBBB", backupStore.GetText("/backup/report.txt"));
+        Assert.False(File.Exists(dataPath));
+        Assert.False(File.Exists(retryPath));
+    }
+
     private (TransferOptions, DestinationOptions) BuildOptions()
     {
         var additional = new DestinationOptions
