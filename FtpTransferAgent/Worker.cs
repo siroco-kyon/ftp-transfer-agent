@@ -245,6 +245,18 @@ public class Worker : BackgroundService
             ? relatedEndFiles
             : Array.Empty<string>();
 
+    // 全宛先配信完了でローカルファイルを残す (DeleteAfterVerify=false) 場合に、配信済みマーカーへ
+    // 記録する指紋を決める。マーカー指紋は「次回バッチの列挙時に再計算される指紋」と一致しないと、
+    // 配信済みでも不一致とみなされて誤って全宛先へ再送される。
+    // 成功後に END ファイルを削除する構成 (TransferEndFiles / DeleteLocalSkippedEndFiles) では、
+    // 次回列挙時に関連 END ファイルが存在しないため指紋は END を含まないデータ単体になる。よって
+    // フル指紋 (データ+END) ではなくデータ単体の指紋で記録し、END 削除後の指紋と一致させる。
+    // END ファイルを残す構成では従来どおりフル指紋 (END 変更による上書き検出を維持)。
+    private static string PersistedDeliverySignature(
+        DeliveryTrackingContext tracking,
+        IReadOnlyList<string> endFilesToDeleteOnSuccess) =>
+        endFilesToDeleteOnSuccess.Count > 0 ? tracking.DataSignature : tracking.TrackingSignature;
+
     // 宛先の安定識別子。トラッキングのマーカーキーに使用。Name 未設定時はラベルで代替する。
     private string GetDestinationName(DestinationOptions dest) =>
         !string.IsNullOrWhiteSpace(dest.Name) ? dest.Name! : DescribeDestination(dest);
@@ -786,9 +798,14 @@ public class Worker : BackgroundService
                 RestoreFromRetryDirectoryIfNeeded(sourcePath, tracking.RelativePath, relatedEndFiles, relatedEndFileRelativePaths);
 
                 // 全宛先分のマーカーを揃えておき、次回バッチで送信をスキップさせる。
-                foreach (var name in succeededNames)
+                // 過去の部分失敗で先に配信済みになった宛先のマーカーも含め、全宛先を同じ
+                // 「保持状態に一致する指紋」で記録し直す (PersistedDeliverySignature 参照)。
+                // これにより、部分失敗時にフル指紋で記録された既存マーカーと、END 削除後の
+                // データ単体指紋が混在して片方だけ陳腐化扱いされる事態を防ぐ。
+                var persistedSignature = PersistedDeliverySignature(tracking, localEndFilesToDeleteOnSuccess);
+                foreach (var name in tracking.AllDestinationNames)
                 {
-                    RecordDeliveredOrMarkFailure(tracking.RelativePath, name, tracking.TrackingSignature);
+                    RecordDeliveredOrMarkFailure(tracking.RelativePath, name, persistedSignature);
                 }
                 _logger.LogInformation("All {Total} destinations delivered for {File}; local file retained, future runs will skip re-sending.",
                     tracking.AllDestinationNames.Count, sourcePath);
@@ -1053,7 +1070,21 @@ public class Worker : BackgroundService
                     Directory.CreateDirectory(targetDirectory);
                 }
 
+                // sizetime 署名 (サイズ + 最終更新時刻) を復元後も安定させる。退避 (Move) と対称に、
+                // 既定リトライディレクトリは別ボリューム (LocalApplicationData) になり得るため、
+                // クロスボリュームの copy+delete で更新時刻が変わって全再送にならないよう明示的に保持する。
+                DateTime? originalWriteTimeUtc = null;
+                try { originalWriteTimeUtc = File.GetLastWriteTimeUtc(move.Source); }
+                catch (Exception ex) when (IsRetryFileSystemException(ex)) { /* best-effort */ }
+
                 File.Move(move.Source, move.Target);
+
+                if (originalWriteTimeUtc is { } writeTimeUtc)
+                {
+                    try { File.SetLastWriteTimeUtc(move.Target, writeTimeUtc); }
+                    catch (Exception ex) when (IsRetryFileSystemException(ex)) { /* best-effort */ }
+                }
+
                 _logger.LogInformation("Restored {Kind} {File} from retry directory to watch directory: {Target}",
                     move.Kind, move.Source, move.Target);
             }
