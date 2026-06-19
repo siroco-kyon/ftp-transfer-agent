@@ -79,6 +79,27 @@ public class ParallelTransferQueueTests
     }
 
     [Fact]
+    public async Task TransferQueue_FinalOutcomeCallbackFailure_IsCountedAsCritical()
+    {
+        var options = new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 };
+        var channel = Channel.CreateUnbounded<TransferItem>();
+        var mockLogger = new Mock<ILogger<TransferQueue>>();
+        var queue = new TransferQueue(channel, options, mockLogger.Object, 1);
+
+        channel.Writer.TryWrite(new TransferItem("test.txt", TransferAction.Upload));
+        channel.Writer.Complete();
+
+        await queue.StartAsync(
+            (_, _) => Task.CompletedTask,
+            (_, _) => throw new IOException("marker update failed"),
+            CancellationToken.None);
+
+        var stats = queue.GetStatistics();
+        Assert.Equal(1, stats.TotalCompleted);
+        Assert.Equal(1, stats.CriticalErrorCount);
+    }
+
+    [Fact]
     public async Task TransferQueue_RetriesOnFailure()
     {
         // Arrange

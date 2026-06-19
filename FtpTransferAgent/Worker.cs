@@ -1,5 +1,7 @@
 using System.IO;
 using System.Runtime.ExceptionServices;
+using System.Security.Cryptography;
+using System.Text;
 using System.Threading.Channels;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Logging;
@@ -174,9 +176,11 @@ public class Worker : BackgroundService
     private sealed record FanoutPlan(
         string GroupId,
         string File,
+        string TransferFile,
         string RelativeKey,
         IReadOnlyList<DestinationOptions> Pending,
         IReadOnlyList<string> RelatedEndFiles,
+        IReadOnlyList<string> TransferRelatedEndFiles,
         IReadOnlyList<string> RelatedEndFileRelativePaths);
 
     // 計画済みのファンアウトを宛先ごとの独立プロデューサで投入する。
@@ -207,7 +211,16 @@ public class Worker : BackgroundService
                         // アップロード経路で再探索せず同じ集合を使う。これにより「転送する END」と
                         // 「成功時に削除する END」が必ず一致し、大小を区別する FS でも不整合が起きない。
                         await context.Channel.Writer.WriteAsync(
-                            new TransferItem(plan.File, TransferAction.Upload, context.Destination, plan.GroupId, plan.RelatedEndFiles, plan.RelativeKey, plan.RelatedEndFileRelativePaths),
+                            new TransferItem(
+                                plan.File,
+                                TransferAction.Upload,
+                                context.Destination,
+                                plan.GroupId,
+                                plan.RelatedEndFiles,
+                                plan.RelativeKey,
+                                plan.RelatedEndFileRelativePaths,
+                                plan.TransferFile,
+                                plan.TransferRelatedEndFiles),
                             token).ConfigureAwait(false);
                     }
                 }
@@ -267,7 +280,9 @@ public class Worker : BackgroundService
     // 宛先別配信トラッキングのファイル単位コンテキスト。
     private sealed record DeliveryTrackingContext(
         string RelativePath,
-        string Signature,
+        string DataSignature,
+        string TrackingSignature,
+        IReadOnlyList<string> RelatedEndFileSignatures,
         IReadOnlyCollection<string> AllDestinationNames,
         IReadOnlyCollection<string> AlreadyDelivered);
 
@@ -277,6 +292,248 @@ public class Worker : BackgroundService
         IReadOnlyList<string> RelatedEndFilePaths,
         IReadOnlyList<string> RelatedEndFileRelativePaths,
         bool FromRetryDirectory);
+
+    private sealed record UploadSnapshot(
+        string DataPath,
+        IReadOnlyList<string> RelatedEndFilePaths);
+
+    private async Task<IReadOnlyList<string>?> TryComputeRelatedEndFileSignaturesAsync(
+        UploadCandidate candidate,
+        CancellationToken token)
+    {
+        if (_deliveryStore is null || candidate.RelatedEndFilePaths.Count == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var signatures = new List<string>(candidate.RelatedEndFilePaths.Count);
+        try
+        {
+            foreach (var endFile in candidate.RelatedEndFilePaths)
+            {
+                signatures.Add(await _deliveryStore.ComputeSignatureAsync(endFile, token).ConfigureAwait(false));
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _exitCode?.MarkFailure();
+            _logger.LogError(ex,
+                "Skipping file {File} because a related END-file signature could not be computed: {Error}",
+                candidate.PhysicalPath, ex.Message);
+            return null;
+        }
+
+        return signatures;
+    }
+
+    private static string BuildTrackingSignature(
+        string dataSignature,
+        IReadOnlyList<string> relatedEndFileRelativePaths,
+        IReadOnlyList<string> relatedEndFileSignatures)
+    {
+        if (relatedEndFileSignatures.Count == 0)
+        {
+            return dataSignature;
+        }
+
+        var builder = new StringBuilder();
+        AppendLengthPrefixed(builder, dataSignature);
+        for (var i = 0; i < relatedEndFileSignatures.Count; i++)
+        {
+            var relativePath = i < relatedEndFileRelativePaths.Count
+                ? relatedEndFileRelativePaths[i]
+                : i.ToString(System.Globalization.CultureInfo.InvariantCulture);
+            AppendLengthPrefixed(builder, relativePath);
+            AppendLengthPrefixed(builder, relatedEndFileSignatures[i]);
+        }
+
+        var digest = SHA256.HashData(Encoding.UTF8.GetBytes(builder.ToString()));
+        return dataSignature + "|end:" + Convert.ToHexString(digest).ToLowerInvariant();
+    }
+
+    private static void AppendLengthPrefixed(StringBuilder builder, string value)
+    {
+        builder.Append(value.Length);
+        builder.Append(':');
+        builder.Append(value);
+        builder.Append(';');
+    }
+
+    private async Task<UploadSnapshot?> TryCreateUploadSnapshotAsync(
+        UploadCandidate candidate,
+        string expectedDataSignature,
+        IReadOnlyList<string> expectedRelatedEndFileSignatures,
+        ICollection<string> snapshotDirectories,
+        CancellationToken token)
+    {
+        if (_deliveryStore is null)
+        {
+            return new UploadSnapshot(candidate.PhysicalPath, candidate.RelatedEndFilePaths);
+        }
+
+        var snapshotRoot = Path.Combine(Path.GetTempPath(), "FtpTransferAgent", "upload-snapshots", Guid.NewGuid().ToString("N"));
+        try
+        {
+            var dataSnapshot = Path.Combine(snapshotRoot, "data", Path.GetFileName(candidate.PhysicalPath));
+            CopyFilePreservingWriteTime(candidate.PhysicalPath, dataSnapshot);
+
+            var endSnapshots = new List<string>(candidate.RelatedEndFilePaths.Count);
+            for (var i = 0; i < candidate.RelatedEndFilePaths.Count; i++)
+            {
+                var endFile = candidate.RelatedEndFilePaths[i];
+                var endSnapshot = Path.Combine(snapshotRoot, "end", i.ToString("D4"), Path.GetFileName(endFile));
+                CopyFilePreservingWriteTime(endFile, endSnapshot);
+                endSnapshots.Add(endSnapshot);
+            }
+
+            var currentSignature = await _deliveryStore.ComputeSignatureAsync(candidate.PhysicalPath, token).ConfigureAwait(false);
+            if (!string.Equals(currentSignature, expectedDataSignature, StringComparison.Ordinal))
+            {
+                _exitCode?.MarkFailure();
+                _logger.LogWarning(
+                    "Skipping file {File} because it changed while creating an upload snapshot. It will be retried on the next run.",
+                    candidate.PhysicalPath);
+                TryDeleteDirectory(snapshotRoot);
+                return null;
+            }
+
+            for (var i = 0; i < candidate.RelatedEndFilePaths.Count; i++)
+            {
+                if (i >= expectedRelatedEndFileSignatures.Count)
+                {
+                    _exitCode?.MarkFailure();
+                    _logger.LogWarning(
+                        "Skipping file {File} because related END-file snapshot metadata was incomplete. It will be retried on the next run.",
+                        candidate.PhysicalPath);
+                    TryDeleteDirectory(snapshotRoot);
+                    return null;
+                }
+
+                var endFile = candidate.RelatedEndFilePaths[i];
+                var currentEndSignature = await _deliveryStore.ComputeSignatureAsync(endFile, token).ConfigureAwait(false);
+                if (!string.Equals(currentEndSignature, expectedRelatedEndFileSignatures[i], StringComparison.Ordinal))
+                {
+                    _exitCode?.MarkFailure();
+                    _logger.LogWarning(
+                        "Skipping file {File} because related END file {EndFile} changed while creating an upload snapshot. It will be retried on the next run.",
+                        candidate.PhysicalPath, endFile);
+                    TryDeleteDirectory(snapshotRoot);
+                    return null;
+                }
+            }
+
+            snapshotDirectories.Add(snapshotRoot);
+            return new UploadSnapshot(dataSnapshot, endSnapshots);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _exitCode?.MarkFailure();
+            _logger.LogError(ex,
+                "Skipping file {File} because an upload snapshot could not be created: {Error}",
+                candidate.PhysicalPath, ex.Message);
+            TryDeleteDirectory(snapshotRoot);
+            return null;
+        }
+    }
+
+    private static void CopyFilePreservingWriteTime(string source, string target)
+    {
+        var targetDirectory = Path.GetDirectoryName(target);
+        if (!string.IsNullOrEmpty(targetDirectory))
+        {
+            Directory.CreateDirectory(targetDirectory);
+        }
+
+        var lastWriteTimeUtc = File.GetLastWriteTimeUtc(source);
+        File.Copy(source, target, overwrite: false);
+        File.SetLastWriteTimeUtc(target, lastWriteTimeUtc);
+    }
+
+    private void TryDeleteDirectory(string directory)
+    {
+        try
+        {
+            if (Directory.Exists(directory))
+            {
+                Directory.Delete(directory, recursive: true);
+            }
+        }
+        catch (Exception ex) when (IsRetryFileSystemException(ex))
+        {
+            _logger.LogWarning(ex, "Failed to delete temporary upload snapshot directory {Directory}: {Error}", directory, ex.Message);
+        }
+    }
+
+    private bool AreLocalFilesStillPlannedVersion(
+        string sourcePath,
+        IReadOnlyList<string> relatedEndFiles,
+        DeliveryTrackingContext tracking)
+    {
+        if (!IsLocalFileStillExpectedVersion(sourcePath, tracking.DataSignature, "source file"))
+        {
+            return false;
+        }
+
+        if (relatedEndFiles.Count > tracking.RelatedEndFileSignatures.Count)
+        {
+            _exitCode?.MarkFailure();
+            _logger.LogWarning(
+                "Could not verify all related END files for {File} after transfer. Local cleanup and retry-directory moves are skipped.",
+                sourcePath);
+            return false;
+        }
+
+        for (var i = 0; i < relatedEndFiles.Count; i++)
+        {
+            if (!IsLocalFileStillExpectedVersion(relatedEndFiles[i], tracking.RelatedEndFileSignatures[i], "related END file"))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private bool IsLocalFileStillExpectedVersion(string path, string expectedSignature, string description)
+    {
+        if (_deliveryStore is null || !File.Exists(path))
+        {
+            return true;
+        }
+
+        try
+        {
+            var currentSignature = _deliveryStore.ComputeSignatureAsync(path, CancellationToken.None)
+                .GetAwaiter()
+                .GetResult();
+            if (string.Equals(currentSignature, expectedSignature, StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            _exitCode?.MarkFailure();
+            _logger.LogWarning(
+                "{Description} {File} changed after it was queued for transfer. Local cleanup and retry-directory moves are skipped so the new content can be sent on the next run.",
+                description, path);
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _exitCode?.MarkFailure();
+            _logger.LogWarning(ex,
+                "Could not verify whether {Description} {File} changed after transfer. Local cleanup and retry-directory moves are skipped: {Error}",
+                description, path, ex.Message);
+            return false;
+        }
+    }
+
+    private void RecordDeliveredOrMarkFailure(string relativePath, string destinationName, string signature)
+    {
+        if (_deliveryStore is not null && !_deliveryStore.RecordDelivered(relativePath, destinationName, signature))
+        {
+            _exitCode?.MarkFailure();
+        }
+    }
 
     // 既に全宛先へ配信済み (マーカーが揃っている) ファイルの後始末。
     // DeleteAfterVerify=true なら削除しマーカーも掃除。false ならローカルを残し
@@ -482,9 +739,23 @@ public class Worker : BackgroundService
         totalDelivered.UnionWith(succeededNames);
 
         var allDone = tracking.AllDestinationNames.All(totalDelivered.Contains);
+        var sourceStillPlannedVersion = AreLocalFilesStillPlannedVersion(sourcePath, relatedEndFiles, tracking);
 
         if (allDone)
         {
+            if (!sourceStillPlannedVersion)
+            {
+                foreach (var name in succeededNames)
+                {
+                    RecordDeliveredOrMarkFailure(tracking.RelativePath, name, tracking.TrackingSignature);
+                }
+
+                _logger.LogWarning(
+                    "All destinations delivered snapshot content for {File}, but the source changed before cleanup. Local file was retained for the next run.",
+                    sourcePath);
+                return;
+            }
+
             var deleted = DeleteLocalAfterSuccess(sourcePath, localEndFilesToDeleteOnSuccess);
             if (deleted)
             {
@@ -503,7 +774,7 @@ public class Worker : BackgroundService
                 // 全宛先分のマーカーを揃えておき、次回バッチで送信をスキップさせる。
                 foreach (var name in succeededNames)
                 {
-                    _deliveryStore!.RecordDelivered(tracking.RelativePath, name, tracking.Signature);
+                    RecordDeliveredOrMarkFailure(tracking.RelativePath, name, tracking.TrackingSignature);
                 }
                 _logger.LogInformation("All {Total} destinations delivered for {File}; local file retained, future runs will skip re-sending.",
                     tracking.AllDestinationNames.Count, sourcePath);
@@ -514,7 +785,16 @@ public class Worker : BackgroundService
         // 部分配信: 今回成功した宛先のマーカーを記録 (既存マーカーはそのまま) してローカル保持
         foreach (var name in succeededNames)
         {
-            _deliveryStore!.RecordDelivered(tracking.RelativePath, name, tracking.Signature);
+            RecordDeliveredOrMarkFailure(tracking.RelativePath, name, tracking.TrackingSignature);
+        }
+
+        if (!sourceStillPlannedVersion)
+        {
+            var pendingChanged = tracking.AllDestinationNames.Where(n => !totalDelivered.Contains(n));
+            _logger.LogError(LogEvents.MultiDestinationPartialFailure,
+                "Partial delivery for {File}: {Done}/{Total} destination(s) delivered. Pending: {Pending}. Local file changed after queuing; it was retained and will be re-evaluated on the next run.",
+                sourcePath, totalDelivered.Count, tracking.AllDestinationNames.Count, string.Join(", ", pendingChanged));
+            return;
         }
 
         var retryAction = MovePartialFailureToRetryDirectory(sourcePath, tracking.RelativePath, relatedEndFiles, relatedEndFileRelativePaths)
@@ -850,6 +1130,7 @@ public class Worker : BackgroundService
             .ToArray();
 
         Exception? enumerationException = null;
+        var uploadSnapshotDirectories = new List<string>();
 
         // ファイル列挙フェーズ：例外発生時も必ず Channel を完了してワーカーを解放する
         try
@@ -995,13 +1276,23 @@ public class Worker : BackgroundService
                         else
                         {
                             // トラッキング有効: 既に配信済みの宛先を除いた「未配信先」だけに送る
-                            string signature;
+                            string dataSignature;
+                            IReadOnlyList<string> relatedEndFileSignatures;
+                            string trackingSignature;
                             HashSet<string> delivered;
                             try
                             {
-                                signature = await _deliveryStore.ComputeSignatureAsync(file, stoppingToken).ConfigureAwait(false);
+                                dataSignature = await _deliveryStore.ComputeSignatureAsync(file, stoppingToken).ConfigureAwait(false);
+                                var computedRelatedEndFileSignatures = await TryComputeRelatedEndFileSignaturesAsync(candidate, stoppingToken).ConfigureAwait(false);
+                                if (computedRelatedEndFileSignatures is null)
+                                {
+                                    continue;
+                                }
+
+                                relatedEndFileSignatures = computedRelatedEndFileSignatures;
+                                trackingSignature = BuildTrackingSignature(dataSignature, relatedRelativePaths, relatedEndFileSignatures);
                                 delivered = new HashSet<string>(
-                                    _deliveryStore.GetDeliveredDestinations(relativeKey, signature), StringComparer.Ordinal);
+                                    _deliveryStore.GetDeliveredDestinations(relativeKey, trackingSignature), StringComparer.Ordinal);
                             }
                             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                             {
@@ -1022,17 +1313,43 @@ public class Worker : BackgroundService
                             }
 
                             pending = pendingList;
-                            tracking = new DeliveryTrackingContext(relativeKey, signature, allDestinationNames!, delivered);
+                            tracking = new DeliveryTrackingContext(
+                                relativeKey,
+                                dataSignature,
+                                trackingSignature,
+                                relatedEndFileSignatures,
+                                allDestinationNames!,
+                                delivered);
                         }
 
                         // 全宛先完了時に削除/復元/マーカー更新を判断するコールバックを登録する
+                        UploadSnapshot snapshot;
+                        if (tracking is not null)
+                        {
+                            var createdSnapshot = await TryCreateUploadSnapshotAsync(
+                                candidate,
+                                tracking.DataSignature,
+                                tracking.RelatedEndFileSignatures,
+                                uploadSnapshotDirectories,
+                                stoppingToken).ConfigureAwait(false);
+                            if (createdSnapshot is null)
+                            {
+                                continue;
+                            }
+                            snapshot = createdSnapshot;
+                        }
+                        else
+                        {
+                            snapshot = new UploadSnapshot(file, related);
+                        }
+
                         var groupId = Guid.NewGuid().ToString("N");
                         var endFilesToDeleteOnSuccess = EndFilesToDeleteOnSuccess(related);
                         _fanout.Register(groupId, file, pending.Count, (source, results) =>
                         {
                             HandleFanoutCompletion(source, results, endFilesToDeleteOnSuccess, related, relatedRelativePaths, tracking);
                         });
-                        plans.Add(new FanoutPlan(groupId, file, relativeKey, pending, related, relatedRelativePaths));
+                        plans.Add(new FanoutPlan(groupId, file, snapshot.DataPath, relativeKey, pending, related, snapshot.RelatedEndFilePaths, relatedRelativePaths));
                         queuedItems += pending.Count;
                     }
 
@@ -1264,6 +1581,11 @@ public class Worker : BackgroundService
             {
                 context.Pool.Dispose();
             }
+
+            foreach (var snapshotDirectory in uploadSnapshotDirectories)
+            {
+                TryDeleteDirectory(snapshotDirectory);
+            }
         }
 
         // 最終統計情報をログ出力
@@ -1431,8 +1753,9 @@ public class Worker : BackgroundService
         var destLabel = DescribeDestination(dest);
         var remotePath = BuildRemotePath(dest, item.Path, item.OriginalRelativePath);
         var isEndFile = IsEndFile(item.Path);
+        var uploadLocalPath = item.LocalPathOverride ?? item.Path;
 
-        var bytesTransferred = await UploadPathWithHashAsync(client, item.Path, remotePath, destLabel, id, token).ConfigureAwait(false);
+        var bytesTransferred = await UploadPathWithHashAsync(client, uploadLocalPath, remotePath, destLabel, id, token).ConfigureAwait(false);
 
         // 列挙時に確定した関連 END ファイルを転送する (ファイルシステムを再探索しない)。
         // これにより成功時にローカル削除される END ファイルと完全に一致する。
@@ -1441,12 +1764,16 @@ public class Worker : BackgroundService
             for (var i = 0; i < item.RelatedEndFilePaths.Count; i++)
             {
                 var endFile = item.RelatedEndFilePaths[i];
+                var endLocalPath = item.RelatedEndFileLocalPathOverrides is { Count: > 0 } relatedLocalPaths
+                    && i < relatedLocalPaths.Count
+                        ? relatedLocalPaths[i]
+                        : endFile;
                 var endOriginalRelativePath = item.RelatedEndFileOriginalRelativePaths is { Count: > 0 } relatedOriginals
                     && i < relatedOriginals.Count
                         ? relatedOriginals[i]
                         : null;
                 var endRemotePath = BuildRemotePath(dest, endFile, endOriginalRelativePath);
-                bytesTransferred += await UploadPathWithHashAsync(client, endFile, endRemotePath, destLabel, id, token).ConfigureAwait(false);
+                bytesTransferred += await UploadPathWithHashAsync(client, endLocalPath, endRemotePath, destLabel, id, token).ConfigureAwait(false);
                 await TryDeleteRemoteEndFileAsync(client, endRemotePath, destLabel, id, token).ConfigureAwait(false);
             }
         }

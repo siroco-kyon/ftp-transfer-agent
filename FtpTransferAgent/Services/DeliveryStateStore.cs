@@ -24,7 +24,7 @@ namespace FtpTransferAgent.Services;
 /// - マーカーは <b>部分失敗時にだけ</b> 作成される (全宛先成功時は作らない → 通常時の追加コストはゼロ)。
 /// - 起動時に状態ディレクトリを 1 回だけ走査してメモリ (<see cref="_markers"/>) に載せ、以降はメモリ照合。
 ///   ファイルごとのディスク探索は行わない。マーカーは詰まったファイル分しか存在しないため軽量。
-/// - マーカーには送信時のファイル<b>指紋</b> (サイズ+mtime もしくはハッシュ) を記録し、
+/// - マーカーには送信時の指紋 (サイズ+mtime もしくはハッシュ。関連 END がある場合は合成値) を記録し、
 ///   同名で内容が差し替わった場合 (上書き) は指紋不一致として「未配信」とみなし全宛先へ再送する。
 /// - 対応する元ファイルが消えたマーカー (孤児) は起動時に掃除する。
 ///
@@ -169,7 +169,7 @@ public sealed class DeliveryStateStore
     /// <summary>
     /// 1 宛先への配信成功を記録する (アトミック書き込み)。
     /// </summary>
-    public void RecordDelivered(string relativePath, string destinationName, string signature)
+    public bool RecordDelivered(string relativePath, string destinationName, string signature)
     {
         var markerPath = MarkerFilePath(relativePath, destinationName);
         var data = new MarkerData
@@ -190,12 +190,14 @@ public sealed class DeliveryStateStore
             File.Move(tempPath, markerPath, overwrite: true);
             _markers[Key(relativePath, destinationName)] =
                 new MarkerEntry(relativePath, destinationName, signature, markerPath);
+            return true;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // マーカー書き込み失敗は致命的ではない (次回その宛先へ再送されるだけ)。警告に留める。
+            // ストア内では例外化せず、呼び出し側が終了コード失敗として扱えるよう false を返す。
             _logger.LogWarning("Failed to write delivery marker for {File} -> {Dest}: {Error}",
                 relativePath, destinationName, ex.Message);
+            return false;
         }
     }
 
