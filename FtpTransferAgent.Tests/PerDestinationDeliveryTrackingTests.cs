@@ -202,6 +202,44 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
     }
 
     [Fact]
+    public async Task PartialFailure_WhenRelatedEndFileDisappears_RetainsWatchDataFile()
+    {
+        var dataPath = Path.Combine(_watchDir, "report.txt");
+        var endPath = Path.Combine(_watchDir, "report.txt.END");
+        await File.WriteAllTextAsync(dataPath, "the-payload");
+        await File.WriteAllTextAsync(endPath, "end");
+
+        var (transfer, additional) = BuildOptions();
+        var primaryStore = new DestinationStore
+        {
+            AfterUpload = remotePath =>
+            {
+                if (remotePath.EndsWith("/report.txt", StringComparison.OrdinalIgnoreCase)
+                    && File.Exists(endPath))
+                {
+                    File.Delete(endPath);
+                }
+            }
+        };
+        var backupStore = new DestinationStore { FailUploads = true };
+
+        var exitCode = new ApplicationExitCode();
+        await RunWorkerAsync(
+            transfer,
+            additional,
+            primaryStore,
+            backupStore,
+            exitCode,
+            requireEndFile: true);
+
+        Assert.Equal(1, exitCode.Code);
+        Assert.True(File.Exists(dataPath));
+        Assert.False(File.Exists(Path.Combine(_retryDir, "report.txt")));
+        Assert.False(File.Exists(Path.Combine(_retryDir, "report.txt.END")));
+        Assert.Single(Directory.GetFiles(_stateDir, "*.marker"));
+    }
+
+    [Fact]
     public async Task HashSignature_UnreadableFile_DoesNotBlockOtherFiles()
     {
         var lockedPath = Path.Combine(_watchDir, "a-locked.txt");
@@ -270,14 +308,24 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
         DestinationStore primaryStore,
         DestinationStore backupStore,
         ApplicationExitCode exitCode,
-        bool includeSubfolders = false)
+        bool includeSubfolders = false,
+        bool requireEndFile = false,
+        bool transferEndFiles = false)
     {
         var services = new ServiceCollection();
         services.AddLogging();
         var provider = services.BuildServiceProvider();
 
         var worker = new RoutingWorker(
-            Options.Create(new WatchOptions { Path = _watchDir, IncludeSubfolders = includeSubfolders, AllowedExtensions = new[] { ".txt" } }),
+            Options.Create(new WatchOptions
+            {
+                Path = _watchDir,
+                IncludeSubfolders = includeSubfolders,
+                AllowedExtensions = new[] { ".txt" },
+                RequireEndFile = requireEndFile,
+                TransferEndFiles = transferEndFiles,
+                EndFileExtensions = new[] { ".END" }
+            }),
             Options.Create(transfer),
             Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 }),
             Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" }),
@@ -338,6 +386,7 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
         private readonly ConcurrentDictionary<string, int> _uploadCounts = new(StringComparer.OrdinalIgnoreCase);
 
         public bool FailUploads { get; set; }
+        public Action<string>? AfterUpload { get; set; }
 
         public void Upload(string remotePath, byte[] bytes)
         {
@@ -348,6 +397,7 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
             var key = Normalize(remotePath);
             _files[key] = bytes;
             _uploadCounts.AddOrUpdate(key, 1, (_, c) => c + 1);
+            AfterUpload?.Invoke(key);
         }
 
         public bool Contains(string remotePath) => _files.ContainsKey(Normalize(remotePath));

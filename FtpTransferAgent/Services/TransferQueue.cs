@@ -60,7 +60,8 @@ public class TransferQueue
 
     /// <summary>
     /// キューの読み取りを開始する。<paramref name="onFinalOutcome"/> は Polly の再試行が
-    /// すべて完了した後に 1 アイテムにつき 1 回だけ呼び出される。成功時は null、失敗時は例外を渡す。
+    /// すべて完了した後に 1 キュー要素につき 1 回だけ呼び出される。成功時は null、失敗時は例外を渡す。
+    /// 重複抑止で処理をスキップした要素も失敗 outcome として通知する。
     /// ファンアウト時に宛先ごとの最終結果を 1 回だけ集約するために使用する。
     /// </summary>
     public Task StartAsync(
@@ -90,16 +91,20 @@ public class TransferQueue
                     {
                         // 重複処理を防ぐ（アトミックな処理保証）
                         var itemKey = item.DedupKey;
+                        Interlocked.Increment(ref _totalEnqueued);
                         if (!_processedItems.TryAdd(itemKey, true))
                         {
-                            _logger.LogDebug("Item {ItemKey} already processed, skipping", itemKey);
+                            var duplicateException = new InvalidOperationException($"Duplicate transfer item skipped: {itemKey}");
+                            Interlocked.Increment(ref _totalFailed);
+                            _logger.LogWarning(duplicateException, "Item {ItemKey} already processed, reporting duplicate as failed", itemKey);
+                            try { onFinalOutcome?.Invoke(item, duplicateException); }
+                            catch (Exception cbEx) { _logger.LogWarning(cbEx, "onFinalOutcome callback threw for duplicate {ItemKey}", itemKey); }
                             continue;
                         }
 
                         // アクティブアイテムとして追跡開始（処理済み登録後に確実に実行）
                         var startTime = DateTime.UtcNow;
                         _activeItems.TryAdd(itemKey, startTime);
-                        var enqueuedCount = Interlocked.Increment(ref _totalEnqueued);
 
                         var context = new Context(itemKey) { ["ItemPath"] = item.Path };
                         try

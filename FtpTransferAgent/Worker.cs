@@ -534,7 +534,10 @@ public class Worker : BackgroundService
             var endFile = relatedEndFiles[i];
             if (!File.Exists(endFile))
             {
-                continue;
+                _exitCode?.MarkFailure();
+                _logger.LogWarning("Cannot move partial delivery END file {File} to retry directory because it no longer exists. The data file will remain in place.",
+                    endFile);
+                return false;
             }
 
             var endRelativePath = i < relatedEndFileRelativePaths.Count
@@ -553,6 +556,7 @@ public class Worker : BackgroundService
             {
                 if (!File.Exists(request.Source))
                 {
+                    _exitCode?.MarkFailure();
                     _logger.LogWarning("Cannot move partial delivery {Kind} {File} to retry directory because it no longer exists.",
                         request.Kind, request.Source);
                     return false;
@@ -575,7 +579,7 @@ public class Worker : BackgroundService
                 plannedMoves.Add((request.Source, target, request.Kind));
             }
         }
-        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException or InvalidOperationException)
+        catch (Exception ex) when (IsRetryFileSystemException(ex) || ex is InvalidOperationException)
         {
             _exitCode?.MarkFailure();
             _logger.LogError(ex, "Cannot plan retry directory move: {Error}", ex.Message);
@@ -601,7 +605,7 @@ public class Worker : BackgroundService
 
             return true;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (IsRetryFileSystemException(ex))
         {
             _exitCode?.MarkFailure();
             _logger.LogError(ex, "Failed to move partial delivery file(s) to retry directory: {Error}", ex.Message);
@@ -639,7 +643,7 @@ public class Worker : BackgroundService
                 _logger.LogWarning("Rolled back retry move for {Kind}: {Target} -> {Source}",
                     move.Kind, move.Target, move.Source);
             }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (IsRetryFileSystemException(ex))
             {
                 _exitCode?.MarkFailure();
                 _logger.LogError(ex, "Failed to roll back retry move for {Kind}: {Target} -> {Source}",
@@ -647,6 +651,12 @@ public class Worker : BackgroundService
             }
         }
     }
+
+    private static bool IsRetryFileSystemException(Exception ex) =>
+        ex is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException;
 
     private string GetRetryFilePath(string relativePath)
     {
