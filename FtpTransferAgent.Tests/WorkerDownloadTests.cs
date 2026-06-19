@@ -48,7 +48,7 @@ public class WorkerDownloadTests
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new[] { remoteFile });
-        mock.Setup(c => c.DownloadAsync(remoteFile, localPath, It.IsAny<CancellationToken>()))
+        mock.Setup(c => c.DownloadAsync(remoteFile, It.Is<string>(p => p.StartsWith(localPath + ".verify.", StringComparison.Ordinal)), It.IsAny<CancellationToken>()))
             .Callback<string, string, CancellationToken>((_, lp, _) =>
             {
                 File.WriteAllText(lp, remoteContent);
@@ -84,6 +84,68 @@ public class WorkerDownloadTests
                 Directory.Delete(dir, true);
             }
         }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DownloadHashMismatch_DoesNotReplaceExistingLocalFile()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+
+        var remoteFile = "/remote/sample.txt";
+        var localPath = Path.Combine(dir, "sample.txt");
+        await File.WriteAllTextAsync(localPath, "existing good data");
+
+        var expectedRemoteContent = "expected remote data";
+        var corruptedDownloadContent = "corrupted download data";
+        string remoteHash;
+        {
+            await using var ms = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(expectedRemoteContent));
+            remoteHash = await HashUtil.ComputeHashAsync(ms, "SHA256", CancellationToken.None);
+        }
+
+        var watch = Options.Create(new WatchOptions { Path = dir });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "get",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 1
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+        var hashOpt = Options.Create(new HashOptions { Algorithm = "SHA256" });
+        var cleanup = Options.Create(new CleanupOptions { DeleteRemoteAfterDownload = true });
+
+        var mock = new Mock<IFileTransferClient>();
+        mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(new[] { remoteFile });
+        mock.Setup(c => c.GetRemoteHashAsync(remoteFile, "SHA256", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(remoteHash);
+        mock.Setup(c => c.DownloadAsync(remoteFile, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, CancellationToken>((_, lp, _) => File.WriteAllText(lp, corruptedDownloadContent))
+            .Returns(Task.CompletedTask);
+        mock.Setup(c => c.Dispose());
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        using var provider = services.BuildServiceProvider();
+        var logger = provider.GetRequiredService<ILogger<Worker>>();
+        var exitCode = new ApplicationExitCode();
+
+        using var lifetime = new DummyLifetime();
+        var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object), exitCode);
+        await worker.RunAsync(CancellationToken.None);
+
+        mock.Verify(c => c.DownloadAsync(remoteFile, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(c => c.DeleteAsync(remoteFile, It.IsAny<CancellationToken>()), Times.Never);
+        Assert.Equal(1, exitCode.Code);
+        Assert.Equal("existing good data", await File.ReadAllTextAsync(localPath));
+        Assert.DoesNotContain(Directory.EnumerateFiles(dir), p => Path.GetFileName(p).Contains(".verify.", StringComparison.Ordinal));
+
+        Directory.Delete(dir, true);
     }
 
     [Fact]
@@ -476,8 +538,8 @@ public class WorkerDownloadTests
     private class TestWorker : Worker
     {
         private readonly IFileTransferClient _client;
-        public TestWorker(IOptions<WatchOptions> w, IOptions<TransferOptions> t, IOptions<RetryOptions> r, IOptions<HashOptions> h, IOptions<CleanupOptions> c, IServiceProvider sp, ILogger<Worker> l, IHostApplicationLifetime lifetime, IFileTransferClient client)
-            : base(w, t, r, h, c, sp, l, lifetime)
+        public TestWorker(IOptions<WatchOptions> w, IOptions<TransferOptions> t, IOptions<RetryOptions> r, IOptions<HashOptions> h, IOptions<CleanupOptions> c, IServiceProvider sp, ILogger<Worker> l, IHostApplicationLifetime lifetime, IFileTransferClient client, ApplicationExitCode? exitCode = null)
+            : base(w, t, r, h, c, sp, l, lifetime, exitCode)
         {
             _client = client;
         }

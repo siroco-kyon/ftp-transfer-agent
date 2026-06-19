@@ -1933,21 +1933,32 @@ public class Worker : BackgroundService
             var remoteHash = await client.GetRemoteHashAsync(item.Path, _hash.Algorithm, token, _hash.UseServerCommand).ConfigureAwait(false);
             _logger.LogDebug("[{Id}] Remote hash calculated: {Hash}", id, remoteHash);
 
-            // ダウンロード実行
-            await client.DownloadAsync(item.Path, localPath, token).ConfigureAwait(false);
-            fileSize = new FileInfo(localPath).Length;
-            _logger.LogInformation("[{Id}] Download completed for {Remote} ({Size})", id, item.Path, FormatBytes(fileSize));
-
-            // ローカルファイルのハッシュを計算して検証
-            var localHash = await HashUtil.ComputeHashAsync(localPath, _hash.Algorithm, token).ConfigureAwait(false);
-            _logger.LogDebug("[{Id}] Local hash calculated: {Hash}", id, localHash);
-
-            if (!string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
+            var verifiedDownloadPath = $"{localPath}.verify.{Guid.NewGuid():N}";
+            try
             {
-                var error = $"Hash mismatch for {item.Path}: Remote={remoteHash}, Local={localHash}";
-                _logger.LogError("[{Id}] {Error}", id, error);
-                // 転送中の一過性破損で起こり得るためリトライ可能な専用例外を投げる
-                throw new HashMismatchException(error);
+                // ダウンロード実行
+                await client.DownloadAsync(item.Path, verifiedDownloadPath, token).ConfigureAwait(false);
+                fileSize = new FileInfo(verifiedDownloadPath).Length;
+
+                // ローカルファイルのハッシュを計算して検証
+                var localHash = await HashUtil.ComputeHashAsync(verifiedDownloadPath, _hash.Algorithm, token).ConfigureAwait(false);
+                _logger.LogDebug("[{Id}] Local hash calculated: {Hash}", id, localHash);
+
+                if (!string.Equals(remoteHash, localHash, StringComparison.OrdinalIgnoreCase))
+                {
+                    var error = $"Hash mismatch for {item.Path}: Remote={remoteHash}, Local={localHash}";
+                    _logger.LogError("[{Id}] {Error}", id, error);
+                    // 転送中の一過性破損で起こり得るためリトライ可能な専用例外を投げる
+                    throw new HashMismatchException(error);
+                }
+
+                File.Move(verifiedDownloadPath, localPath, true);
+                _logger.LogInformation("[{Id}] Download completed for {Remote} ({Size})", id, item.Path, FormatBytes(fileSize));
+            }
+            catch
+            {
+                try { File.Delete(verifiedDownloadPath); } catch { }
+                throw;
             }
 
             _logger.LogInformation("[{Id}] Hash verification successful for {Remote}", id, item.Path);
