@@ -224,7 +224,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `RetryDirectory` | string/null | 任意 | `null` | 配信トラッキングで部分失敗したファイルの移動先。未指定/null は `LocalApplicationData/FtpTransferAgent/delivery-retry/<watch hash>` を使う。相対パスを明示した場合は `Watch.Path` 配下として解決し、空文字で移動を無効化する |
 | `DeliverySignatureMode` | string | 任意 | `"sizetime"` | 配信トラッキングの上書き検出方式。`sizetime`（サイズ+更新時刻）または `hash`（ファイルハッシュ、厳密） |
 
-複数宛先の put、または単一宛先で `PerDestinationDeliveryTracking: true` のとき、一部宛先だけ失敗すると成功済み宛先のマーカーを残したうえで対象ファイルを `RetryDirectory` へ退避します。関連 END ファイルも同時に扱い、移動途中で失敗した場合は完了済みの移動を Watch 側へ戻します。全宛先への配信が完了したら、`DeleteAfterVerify: true`（既定）ではファイルを削除し、`false` では `Watch.Path` の元の位置へ復元します（隠しフォルダに取り残しません）。`sizetime` 署名は移動でファイルの更新時刻が変わらないよう、退避時に元の更新時刻を保持します。
+複数宛先の put、または単一宛先で `PerDestinationDeliveryTracking: true` のとき、一部宛先だけ失敗すると成功済み宛先のマーカーを残したうえで対象ファイルを `RetryDirectory` へ退避します。関連 END ファイルも同時に扱い、移動途中で失敗した場合は完了済みの移動を Watch 側へ戻します。全宛先への配信が完了したら、`DeleteAfterVerify: true`（既定）ではファイルを削除し、`false` では `Watch.Path` の元の位置へ復元します（隠しフォルダに取り残しません）。`sizetime` 署名は退避・復元でファイルの更新時刻が変わらないよう、移動時に元の更新時刻を保持します。`DeleteAfterVerify: false` でローカルを残す場合、保持マーカーの指紋は次回列挙時に再計算される指紋に合わせて記録するため、成功後に END ファイルを削除する構成（`TransferEndFiles` / `DeleteLocalSkippedEndFiles`）でも配信済みファイルが毎回再送されることはありません。
 
 複数宛先では、各宛先へ同じ内容を届けるために列挙時のファイルを一時スナップショット化してからアップロードします。関連 END ファイルがある場合は END 側の指紋も配信トラッキングの判定に含めます。スナップショット作成中、転送完了処理前、または全宛先配信済みとして送信をスキップした後の cleanup 前に、元ファイルや関連 END ファイルが変更された場合、その実行ではローカル削除や retry 退避を行わず、終了コード `1` で次回実行に持ち越します。マーカー書き込みなど完了処理の失敗も転送失敗として扱われます。
 

@@ -3,7 +3,7 @@
 > 複数宛先（ファンアウト）転送で「未配信の宛先だけ再送する」機能の、設計・対策・設定・懸念をまとめた資料。
 > 仕様の要約は [ftp-transfer-agent-spec.md 5.9](../ftp-transfer-agent-spec.md) を参照。本書はその背後にある判断と細部を後から読み返せるようにするためのもの。
 
-- 対象バージョン: 3.1.0
+- 対象バージョン: 3.2.1
 - 関連設定: `Transfer.PerDestinationDeliveryTracking` / `Transfer.StateDirectory` / `Transfer.RetryDirectory` / `Transfer.DeliverySignatureMode` / `Transfer.Name`（各宛先） / `Smtp.SuppressPerDestinationFailureDetailEmails`
 - 主な実装: [`Services/DeliveryStateStore.cs`](../FtpTransferAgent/Services/DeliveryStateStore.cs) / [`Worker.cs`](../FtpTransferAgent/Worker.cs) / [`Logging/LogEvents.cs`](../FtpTransferAgent/Logging/LogEvents.cs)
 
@@ -105,6 +105,19 @@ watch/
   - `hash`: `Hash.Algorithm` でファイルハッシュを算出。厳密。
 - **追加対策**: 複数宛先では、キュー投入前にデータファイルと関連 END ファイルを一時ディレクトリへコピーし、全宛先がそのスナップショットを送る。コピー後に元ファイルまたは関連 END ファイルの指紋が変わっていた場合は、その実行では投入しない。投入後に元ファイルや関連 END ファイルが変わった場合も、完了時の削除・retry 退避は行わず次回へ持ち越す。全宛先配信済みで送信をスキップする場合も、cleanup 直前に同じ再確認を行う。
 - **実装**: `DeliveryStateStore.ComputeSignatureAsync` / `GetDeliveredDestinations`（指紋不一致のマーカーをその場で削除）、`Worker.TryCreateUploadSnapshotAsync` / `AreLocalFilesStillPlannedVersion`。
+
+### 3.4.1 保持マーカーの指紋は「次回列挙時の指紋」に合わせる（3.2.1 で修正）
+
+- **問題**: `DeleteAfterVerify: false` でローカルを残す構成で、成功後に END ファイルを削除する（`TransferEndFiles` / `DeleteLocalSkippedEndFiles`）と、マーカーに記録したフル指紋（データ+END）と、次回列挙時に再計算される指紋（END が消えているのでデータ単体）が食い違う。結果、配信済みなのに指紋不一致で「未配信」と誤判定し、**毎回全宛先へ再送**してしまう。
+- **対策**: 完了時に保持マーカーを記録する指紋を「**cleanup 後にローカルへ残る状態で再計算される指紋**」に合わせる。END を削除する構成ならデータ単体指紋、END を残す構成ならフル指紋を記録する（`Worker.PersistedDeliverySignature`）。
+- **追加対策**: 部分失敗時はフル指紋で記録し、復旧完了時にデータ単体指紋へ揃えるため、完了時は **全宛先分のマーカーを記録し直す**（成功宛先だけでなく既存マーカーも上書き）。これにより、先に配信済みだった宛先のフル指紋マーカーだけが陳腐化扱いされて再送される事態を防ぐ。
+- **実装**: `Worker.PersistedDeliverySignature` / `HandleFanoutCompletionTracked`（保持パスで `tracking.AllDestinationNames` を記録）。
+
+### 3.4.2 retry からの復元でも指紋（mtime）を保持する（3.2.1 で修正）
+
+- **問題**: 部分失敗で retry へ退避したファイルを全宛先完了時に `Watch.Path` へ復元する際、既定の retry 先は別ボリューム（`LocalApplicationData`）になり得る。クロスボリュームの copy+delete で最終更新時刻が変わると `sizetime` 指紋が変化し、復元後の指紋が保持マーカーと食い違って全再送になる。
+- **対策**: 退避（`MovePartialFailureToRetryDirectory`）と対称に、復元（`RestoreFromRetryDirectoryIfNeeded`）でも元の最終更新時刻を明示的に再適用する。
+- **実装**: `Worker.RestoreFromRetryDirectoryIfNeeded`。
 
 ### 3.5 完了判定（次回はキューに未送先しか入らない）→ 「今回成功 ∪ 既存マーカー」で判定
 
@@ -221,7 +234,7 @@ watch/
 | 上書き | Run1 後に内容差し替え | 指紋不一致 → 再送 | 再送 | （完了後）削除 | （完了後）削除 |
 | 通常 | 最初から全宛先成功 | 成功 | 成功 | 削除 | **作られない** |
 
-`DeleteAfterVerify: false` の場合: 全宛先配信済みでもローカルを残す。部分失敗で `RetryDirectory` へ退避していたファイルは、全宛先完了時に `Watch.Path` の元の位置へ**復元**される（隠しフォルダに取り残さない）。全宛先分のマーカーは保持し続け、次回以降は送信をスキップする（再送はしない）。
+`DeleteAfterVerify: false` の場合: 全宛先配信済みでもローカルを残す。部分失敗で `RetryDirectory` へ退避していたファイルは、全宛先完了時に `Watch.Path` の元の位置へ**復元**される（隠しフォルダに取り残さない）。全宛先分のマーカーは保持し続け、次回以降は送信をスキップする（再送はしない）。保持マーカーの指紋は cleanup 後にローカルへ残る状態に合わせるため、END ファイルを削除する構成でもデータ単体指紋で記録され、次回も正しくスキップされる（3.4.1 参照）。
 
 ---
 
@@ -255,7 +268,7 @@ watch/
 | テスト | 内容 |
 |---|---|
 | `DeliveryStateStoreTests` | 指紋計算（sizetime/hash）、配信済み判定、指紋不一致での陳腐化削除、孤児掃除、永続化、`RemoveAll`、マーカー書き込み失敗時の失敗返却 |
-| `PerDestinationDeliveryTrackingTests` | バッチ 2 回実行で「未送先だけ再送」「配信済みへ再送しない」、上書き時の全宛先再送、全成功時にマーカーが作られずローカル削除 |
+| `PerDestinationDeliveryTrackingTests` | バッチ 2 回実行で「未送先だけ再送」「配信済みへ再送しない」、上書き時の全宛先再送、全成功時にマーカーが作られずローカル削除、`DeleteAfterVerify: false` + retry 復元、`DeleteAfterVerify: false` + END 削除構成で配信済みファイルを再送しない（3.2.1 回帰防止: 全成功時／部分失敗復旧時の両方） |
 | `WorkerFanoutSafetyTests` | 複数宛先転送中に元ファイルが変更されても全宛先が同じスナップショットを受け取り、ローカル削除・retry 退避を行わない |
 | `ParallelTransferQueueTests` | 完了コールバック例外を critical error として集計する |
 | `DeliveryTrackingValidationTests` | `Name` 必須・一意・署名モード・get 方向警告・重複リモート宛先警告のバリデーション、`LogEvents.IsMultiDestinationFailure` の判定 |

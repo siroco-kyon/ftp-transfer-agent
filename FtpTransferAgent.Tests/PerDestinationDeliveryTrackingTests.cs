@@ -306,6 +306,86 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
         Assert.True(File.Exists(dataPath));
     }
 
+    [Fact]
+    public async Task DeleteAfterVerifyFalse_WithEndFileDeletedOnSuccess_DoesNotResendOnNextRun()
+    {
+        // DeleteAfterVerify=false でデータを残し、TransferEndFiles=true で END を転送後ローカル削除する構成。
+        // マーカーの指紋に END ファイルが含まれると、配信後に END が消えることで次回の指紋が変わり、
+        // 配信済みなのに毎回全宛先へ再送されてしまう (回帰防止)。
+        var dataPath = Path.Combine(_watchDir, "report.txt");
+        var endPath = Path.Combine(_watchDir, "report.txt.END");
+        await File.WriteAllTextAsync(dataPath, "payload");
+        await File.WriteAllTextAsync(endPath, "end-marker");
+
+        var (transfer, additional) = BuildOptions();
+        var primaryStore = new DestinationStore();
+        var backupStore = new DestinationStore();
+
+        // --- Run 1: 全宛先成功。END は転送後にローカル削除、データは DeleteAfterVerify=false で保持 ---
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(),
+            transferEndFiles: true, deleteAfterVerify: false);
+
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt"));
+        Assert.Equal(1, backupStore.UploadCount("/backup/report.txt"));
+        Assert.True(File.Exists(dataPath), "DeleteAfterVerify=false なのでデータは残る");
+        Assert.False(File.Exists(endPath), "TransferEndFiles=true は転送後 END をローカル削除する");
+        Assert.Equal(2, Directory.GetFiles(_stateDir, "*.marker").Length);
+
+        // --- Run 2: 変更なし。END が消えても配信済み判定が崩れず再送しないこと ---
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(),
+            transferEndFiles: true, deleteAfterVerify: false);
+
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt"));
+        Assert.Equal(1, backupStore.UploadCount("/backup/report.txt"));
+        Assert.True(File.Exists(dataPath));
+        Assert.Equal(2, Directory.GetFiles(_stateDir, "*.marker").Length);
+    }
+
+    [Fact]
+    public async Task DeleteAfterVerifyFalse_PartialRecoveryWithEndFile_UnifiesMarkersAndDoesNotResend()
+    {
+        // 部分失敗ではフル指紋 (データ+END) でマーカーを記録し、復旧完了時に END を削除して
+        // データを保持する。完了時に全宛先のマーカーをデータ単体指紋へ揃え直さないと、
+        // 先に配信済みだった宛先のフル指紋マーカーだけが陳腐化扱いされ再送される (回帰防止)。
+        var dataPath = Path.Combine(_watchDir, "report.txt");
+        var endPath = Path.Combine(_watchDir, "report.txt.END");
+        await File.WriteAllTextAsync(dataPath, "payload");
+        await File.WriteAllTextAsync(endPath, "end-marker");
+
+        var (transfer, additional) = BuildOptions();
+        var primaryStore = new DestinationStore();
+        var backupStore = new DestinationStore();
+
+        // --- Run 1: backup 全失敗 → 部分失敗。primary をフル指紋で記録し retry へ退避 ---
+        backupStore.FailUploads = true;
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(),
+            transferEndFiles: true, deleteAfterVerify: false);
+
+        var retryPath = Path.Combine(_retryDir, "report.txt");
+        Assert.True(File.Exists(retryPath));
+        Assert.True(File.Exists(Path.Combine(_retryDir, "report.txt.END")));
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt"));
+
+        // --- Run 2: backup 復活 → 全宛先完了。END 削除・データ復元・マーカー統一 ---
+        backupStore.FailUploads = false;
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(),
+            transferEndFiles: true, deleteAfterVerify: false);
+
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt")); // primary へ再送しない
+        Assert.Equal(1, backupStore.UploadCount("/backup/report.txt"));
+        Assert.True(File.Exists(dataPath), "DeleteAfterVerify=false なら watch へ復元される");
+        Assert.False(File.Exists(retryPath));
+        Assert.Equal(2, Directory.GetFiles(_stateDir, "*.marker").Length);
+
+        // --- Run 3: 変更なし → どの宛先へも再送しない ---
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(),
+            transferEndFiles: true, deleteAfterVerify: false);
+
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt"));
+        Assert.Equal(1, backupStore.UploadCount("/backup/report.txt"));
+        Assert.True(File.Exists(dataPath));
+    }
+
     private (TransferOptions, DestinationOptions) BuildOptions()
     {
         var additional = new DestinationOptions
