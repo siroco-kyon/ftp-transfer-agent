@@ -83,7 +83,7 @@ public class WorkerFanoutSafetyTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_FanoutEndUploadFailure_RetainsLocalDataAndEndFiles()
+    public async Task ExecuteAsync_FanoutEndUploadFailure_MovesDataAndEndFilesToRetryDirectory()
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
@@ -132,14 +132,22 @@ public class WorkerFanoutSafetyTests
 
             await worker.RunAsync(CancellationToken.None);
 
-            Assert.True(File.Exists(dataPath), "Data file must remain when any destination fails.");
-            Assert.True(File.Exists(endPath), "END file must remain when any destination fails.");
+            // 部分失敗 (backup の END アップロード失敗) → データ/END はリトライディレクトリへ退避される。
+            // 次回バッチでは未配信の backup だけに再送される (primary には再送しない)。
+            var retryDir = Path.Combine(dir, ".retry");
+            Assert.False(File.Exists(dataPath), "Data file should be moved to the retry directory on partial failure.");
+            Assert.False(File.Exists(endPath), "END file should be moved to the retry directory on partial failure.");
+            Assert.True(File.Exists(Path.Combine(retryDir, "sample.txt")), "Data file must be in the retry directory.");
+            Assert.True(File.Exists(Path.Combine(retryDir, "sample.txt.END")), "END file must be in the retry directory.");
             Assert.Equal(1, exitCode.Code);
 
             Assert.True(primaryStore.Contains("/primary/sample.txt"));
             Assert.True(primaryStore.Contains("/primary/sample.txt.END"));
             Assert.True(backupStore.Contains("/backup/sample.txt"));
             Assert.False(backupStore.Contains("/backup/sample.txt.END"));
+
+            // primary への配信マーカーが 1 件記録される
+            Assert.Single(Directory.GetFiles(Path.Combine(dir, ".state"), "*.marker"));
         }
         finally
         {
@@ -168,6 +176,10 @@ public class WorkerFanoutSafetyTests
             TransferEndFiles = true,
             EndFileExtensions = new[] { ".END" }
         });
+        // 複数宛先 put は配信トラッキングが常時有効になるため、状態/リトライディレクトリを
+        // テスト用の一時サブフォルダに固定する (既定の LocalApplicationData を汚さない)。
+        transferOptions.StateDirectory = Path.Combine(dir, ".state");
+        transferOptions.RetryDirectory = Path.Combine(dir, ".retry");
         var transfer = Options.Create(transferOptions);
         var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
         var hash = Options.Create(hashOptions);

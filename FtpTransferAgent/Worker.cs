@@ -169,52 +169,58 @@ public class Worker : BackgroundService
         return queueContexts[0];
     }
 
-    private QueueContext GetQueueContextForDestination(IReadOnlyList<QueueContext> queueContexts, DestinationOptions destination)
-    {
-        foreach (var context in queueContexts)
-        {
-            if (ReferenceEquals(context.Destination, destination))
-            {
-                return context;
-            }
-        }
+    // 計画フェーズで確定した 1 ファイル分のファンアウト投入計画。
+    // Pending = 今回送る宛先 (未配信先)。RelatedEndFilePaths は列挙時に確定した END の実ファイル名。
+    private sealed record FanoutPlan(
+        string GroupId,
+        string File,
+        string RelativeKey,
+        IReadOnlyList<DestinationOptions> Pending,
+        IReadOnlyList<string> RelatedEndFiles,
+        IReadOnlyList<string> RelatedEndFileRelativePaths);
 
-        throw new InvalidOperationException($"Queue context not found for destination {DescribeDestination(destination)}");
-    }
-
-    // 1 ファイルを指定宛先群に対してファンアウトしてキューへ投入する。
-    // 全宛先完了時に FanoutCoordinator からコールバックされ、
-    // HandleFanoutCompletion が削除/保持/マーカー更新を判断する。
-    // トラッキング無効時は destinationsToSend = 全宛先、tracking = null。
-    // トラッキング有効時は destinationsToSend = 未配信の宛先のみ。
-    private async Task EnqueueFanoutAsync(
-        string file,
-        string relativePath,
-        IReadOnlyList<DestinationOptions> destinationsToSend,
+    // 計画済みのファンアウトを宛先ごとの独立プロデューサで投入する。
+    // 各プロデューサは自分の宛先チャネルにのみ WriteAsync するため、ある宛先のチャネルが
+    // 満杯でも他宛先への投入はブロックされない (1 宛先の不調が全体を律速しない)。
+    private async Task EnqueueFanoutPlansAsync(
+        IReadOnlyList<FanoutPlan> plans,
         IReadOnlyList<QueueContext> queueContexts,
-        IReadOnlyList<string> relatedEndFiles,
-        IReadOnlyList<string> relatedEndFileRelativePaths,
-        DeliveryTrackingContext? tracking,
         CancellationToken token)
     {
-        var groupId = Guid.NewGuid().ToString("N");
-        var endFilesToDeleteOnSuccess = EndFilesToDeleteOnSuccess(relatedEndFiles);
-
-        _fanout.Register(groupId, file, destinationsToSend.Count, (source, results) =>
+        var producers = new Task[queueContexts.Count];
+        for (int i = 0; i < queueContexts.Count; i++)
         {
-            HandleFanoutCompletion(source, results, endFilesToDeleteOnSuccess, relatedEndFiles, relatedEndFileRelativePaths, tracking);
-        });
+            var context = queueContexts[i];
+            producers[i] = Task.Run(async () =>
+            {
+                try
+                {
+                    foreach (var plan in plans)
+                    {
+                        // この宛先が当該ファイルの未配信先に含まれる場合のみ投入する
+                        if (!plan.Pending.Any(d => ReferenceEquals(d, context.Destination)))
+                        {
+                            continue;
+                        }
 
-        foreach (var dest in destinationsToSend)
-        {
-            var queueContext = GetQueueContextForDestination(queueContexts, dest);
-            // RelatedEndFilePaths に列挙時に確定した END ファイル(実ファイル名)を載せ、
-            // アップロード経路で再探索せず同じ集合を使う。これにより「転送する END」と
-            // 「成功時に削除する END」が必ず一致し、大小を区別する FS でも不整合が起きない。
-            await queueContext.Channel.Writer.WriteAsync(
-                new TransferItem(file, TransferAction.Upload, dest, groupId, relatedEndFiles, relativePath, relatedEndFileRelativePaths),
-                token).ConfigureAwait(false);
+                        // RelatedEndFilePaths に列挙時に確定した END ファイル(実ファイル名)を載せ、
+                        // アップロード経路で再探索せず同じ集合を使う。これにより「転送する END」と
+                        // 「成功時に削除する END」が必ず一致し、大小を区別する FS でも不整合が起きない。
+                        await context.Channel.Writer.WriteAsync(
+                            new TransferItem(plan.File, TransferAction.Upload, context.Destination, plan.GroupId, plan.RelatedEndFiles, plan.RelativeKey, plan.RelatedEndFileRelativePaths),
+                            token).ConfigureAwait(false);
+                    }
+                }
+                finally
+                {
+                    // 自分の投入完了でチャネルを閉じ、この宛先のワーカーを早期に解放する
+                    // (他宛先のプロデューサがまだ投入中でも、完了した宛先は先に終われる)。
+                    context.Channel.Writer.TryComplete();
+                }
+            }, token);
         }
+
+        await Task.WhenAll(producers).ConfigureAwait(false);
     }
 
     // 全宛先成功時にローカル削除する END ファイル集合を返す:
@@ -489,7 +495,11 @@ public class Worker : BackgroundService
             }
             else
             {
-                // ローカルを残す構成 (DeleteAfterVerify=false 等)。
+                // ローカルを残す構成 (DeleteAfterVerify=false)。
+                // 過去の部分失敗でリトライディレクトリへ退避していた場合は watch.Path へ戻し、
+                // 隠しフォルダにファイルが取り残されないようにする (元ファイルは利用者の場所に残す)。
+                RestoreFromRetryDirectoryIfNeeded(sourcePath, tracking.RelativePath, relatedEndFiles, relatedEndFileRelativePaths);
+
                 // 全宛先分のマーカーを揃えておき、次回バッチで送信をスキップさせる。
                 foreach (var name in succeededNames)
                 {
@@ -597,8 +607,23 @@ public class Worker : BackgroundService
                     Directory.CreateDirectory(targetDirectory);
                 }
 
+                // sizetime 署名 (サイズ + 最終更新時刻) を移動後も安定させる。
+                // 同一ボリュームの File.Move は更新時刻を保持するが、既定のリトライディレクトリは
+                // 別ボリューム (LocalApplicationData) になり得る。クロスボリュームの copy+delete でも
+                // 署名が変わって全宛先へ再送されないよう、元の更新時刻を明示的に再適用する。
+                DateTime? originalWriteTimeUtc = null;
+                try { originalWriteTimeUtc = File.GetLastWriteTimeUtc(move.Source); }
+                catch (Exception ex) when (IsRetryFileSystemException(ex)) { /* best-effort */ }
+
                 File.Move(move.Source, move.Target);
                 completedMoves.Add(move);
+
+                if (originalWriteTimeUtc is { } writeTimeUtc)
+                {
+                    try { File.SetLastWriteTimeUtc(move.Target, writeTimeUtc); }
+                    catch (Exception ex) when (IsRetryFileSystemException(ex)) { /* best-effort */ }
+                }
+
                 _logger.LogInformation("Moved partial delivery {Kind} {File} to retry directory: {Target}",
                     move.Kind, move.Source, move.Target);
             }
@@ -674,6 +699,78 @@ public class Worker : BackgroundService
         return target;
     }
 
+    private string GetWatchFilePath(string relativePath)
+    {
+        var target = Path.GetFullPath(Path.Combine(_watch.Path, relativePath.Replace('/', Path.DirectorySeparatorChar)));
+        if (!IsUnderDirectory(target, _watch.Path))
+        {
+            throw new InvalidOperationException($"Restore target path is outside the watch directory: {target}");
+        }
+
+        return target;
+    }
+
+    // DeleteAfterVerify=false かつ全宛先配信完了時に、過去の部分失敗でリトライディレクトリへ
+    // 退避していたデータ/END ファイルを watch.Path の元の相対位置へ戻す。
+    // 退避していない (既に watch 配下にある) 場合は何もしない。ベストエフォートで、
+    // 失敗してもマーカーは記録されるため再送は起きない (ファイルがリトライ側に残るだけ)。
+    private void RestoreFromRetryDirectoryIfNeeded(
+        string sourcePath,
+        string relativePath,
+        IReadOnlyList<string> relatedEndFiles,
+        IReadOnlyList<string> relatedEndFileRelativePaths)
+    {
+        if (_retryDirectoryFullPath is null || !IsUnderDirectory(sourcePath, _retryDirectoryFullPath))
+        {
+            return;
+        }
+
+        var moves = new List<(string Source, string Target, string Kind)>();
+        for (var i = 0; i < relatedEndFiles.Count; i++)
+        {
+            var endFile = relatedEndFiles[i];
+            var endRelative = i < relatedEndFileRelativePaths.Count
+                ? relatedEndFileRelativePaths[i]
+                : Path.GetFileName(endFile);
+            moves.Add((endFile, GetWatchFilePath(endRelative), "END file"));
+        }
+        moves.Add((sourcePath, GetWatchFilePath(relativePath), "file"));
+
+        foreach (var move in moves)
+        {
+            try
+            {
+                if (!File.Exists(move.Source)
+                    || string.Equals(Path.GetFullPath(move.Source), move.Target, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (File.Exists(move.Target))
+                {
+                    _logger.LogWarning("Cannot restore {Kind} {File} to watch directory because target already exists: {Target}. File remains in retry directory.",
+                        move.Kind, move.Source, move.Target);
+                    continue;
+                }
+
+                var targetDirectory = Path.GetDirectoryName(move.Target);
+                if (!string.IsNullOrEmpty(targetDirectory))
+                {
+                    Directory.CreateDirectory(targetDirectory);
+                }
+
+                File.Move(move.Source, move.Target);
+                _logger.LogInformation("Restored {Kind} {File} from retry directory to watch directory: {Target}",
+                    move.Kind, move.Source, move.Target);
+            }
+            catch (Exception ex) when (IsRetryFileSystemException(ex))
+            {
+                _logger.LogWarning(ex, "Failed to restore {Kind} {File} from retry directory; it remains there: {Error}",
+                    move.Kind, move.Source, ex.Message);
+            }
+        }
+    }
+
     // Main background processing loop.
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
@@ -683,8 +780,11 @@ public class Worker : BackgroundService
         var queueContexts = CreateQueueContexts();
         var primaryQueue = GetPrimaryQueueContext(queueContexts);
 
-        // 宛先別配信トラッキング (put 方向のみ)。完了コールバックより前に初期化しておく。
-        var trackingEnabled = _transfer.PerDestinationDeliveryTracking && _transfer.Direction is "put";
+        // 宛先別配信トラッキング: 複数宛先 (ファンアウト) の put では常時有効化し、
+        // 「未配信の宛先だけ再送」する (全宛先への一括再送は行わない)。単一宛先では
+        // PerDestinationDeliveryTracking フラグで明示的に有効化したときのみ使う。
+        var multiDestination = _transfer.Direction is "put" && _transfer.AdditionalDestinations is { Count: > 0 };
+        var trackingEnabled = _transfer.Direction is "put" && (multiDestination || _transfer.PerDestinationDeliveryTracking);
         string? stateDirFullPath = null;
         if (trackingEnabled)
         {
@@ -870,8 +970,10 @@ public class Worker : BackgroundService
                         ? destinations.Select(GetDestinationName).ToHashSet(StringComparer.Ordinal)
                         : null;
 
-                    // 1. データファイルを宛先へファンアウトしてキューへ投入
-                    //    関連 END ファイル(列挙時に確定した実ファイル名)を渡し、転送・削除で同じ集合を使う
+                    // 1. データファイルごとに「どの宛先へ送るか」を確定し、ファンアウトグループを登録する (計画フェーズ)。
+                    //    関連 END ファイル(列挙時に確定した実ファイル名)を渡し、転送・削除で同じ集合を使う。
+                    //    実際のキュー投入は宛先ごとの独立プロデューサで行う (後段)。
+                    var plans = new List<FanoutPlan>(candidates.Count);
                     int queuedItems = 0;
                     int skippedFullyDelivered = 0;
                     foreach (var candidate in candidates)
@@ -881,44 +983,56 @@ public class Worker : BackgroundService
                         var related = candidate.RelatedEndFilePaths;
                         var relatedRelativePaths = candidate.RelatedEndFileRelativePaths;
 
+                        IReadOnlyList<DestinationOptions> pending;
+                        DeliveryTrackingContext? tracking;
+
                         if (_deliveryStore is null)
                         {
-                            // トラッキング無効: 従来どおり全宛先へ投入
-                            await EnqueueFanoutAsync(file, relativeKey, destinations, queueContexts, related, relatedRelativePaths, null, stoppingToken).ConfigureAwait(false);
-                            queuedItems += destinations.Count;
-                            continue;
+                            // トラッキング無効 (単一宛先): 全宛先 (= primary のみ) へ投入
+                            pending = destinations;
+                            tracking = null;
+                        }
+                        else
+                        {
+                            // トラッキング有効: 既に配信済みの宛先を除いた「未配信先」だけに送る
+                            string signature;
+                            HashSet<string> delivered;
+                            try
+                            {
+                                signature = await _deliveryStore.ComputeSignatureAsync(file, stoppingToken).ConfigureAwait(false);
+                                delivered = new HashSet<string>(
+                                    _deliveryStore.GetDeliveredDestinations(relativeKey, signature), StringComparer.Ordinal);
+                            }
+                            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                            {
+                                _exitCode?.MarkFailure();
+                                _logger.LogError(ex,
+                                    "Skipping file {File} because delivery tracking signature could not be computed: {Error}",
+                                    file, ex.Message);
+                                continue;
+                            }
+
+                            var pendingList = destinations.Where(d => !delivered.Contains(GetDestinationName(d))).ToList();
+                            if (pendingList.Count == 0)
+                            {
+                                // 全宛先へ配信済み (前回までに完了)。残骸の後始末だけ行う。
+                                HandleAlreadyDelivered(file, related, relativeKey);
+                                skippedFullyDelivered++;
+                                continue;
+                            }
+
+                            pending = pendingList;
+                            tracking = new DeliveryTrackingContext(relativeKey, signature, allDestinationNames!, delivered);
                         }
 
-                        // トラッキング有効: 既に配信済みの宛先を除いた「未配信先」だけに送る
-                        string signature;
-                        HashSet<string> delivered;
-                        List<DestinationOptions> pending;
-                        try
+                        // 全宛先完了時に削除/復元/マーカー更新を判断するコールバックを登録する
+                        var groupId = Guid.NewGuid().ToString("N");
+                        var endFilesToDeleteOnSuccess = EndFilesToDeleteOnSuccess(related);
+                        _fanout.Register(groupId, file, pending.Count, (source, results) =>
                         {
-                            signature = await _deliveryStore.ComputeSignatureAsync(file, stoppingToken).ConfigureAwait(false);
-                            delivered = new HashSet<string>(
-                                _deliveryStore.GetDeliveredDestinations(relativeKey, signature), StringComparer.Ordinal);
-                            pending = destinations.Where(d => !delivered.Contains(GetDestinationName(d))).ToList();
-                        }
-                        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                        {
-                            _exitCode?.MarkFailure();
-                            _logger.LogError(ex,
-                                "Skipping file {File} because delivery tracking signature could not be computed: {Error}",
-                                file, ex.Message);
-                            continue;
-                        }
-
-                        if (pending.Count == 0)
-                        {
-                            // 全宛先へ配信済み (前回までに完了)。残骸の後始末だけ行う。
-                            HandleAlreadyDelivered(file, related, relativeKey);
-                            skippedFullyDelivered++;
-                            continue;
-                        }
-
-                        var tracking = new DeliveryTrackingContext(relativeKey, signature, allDestinationNames!, delivered);
-                        await EnqueueFanoutAsync(file, relativeKey, pending, queueContexts, related, relatedRelativePaths, tracking, stoppingToken).ConfigureAwait(false);
+                            HandleFanoutCompletion(source, results, endFilesToDeleteOnSuccess, related, relatedRelativePaths, tracking);
+                        });
+                        plans.Add(new FanoutPlan(groupId, file, relativeKey, pending, related, relatedRelativePaths));
                         queuedItems += pending.Count;
                     }
 
@@ -927,6 +1041,11 @@ public class Worker : BackgroundService
                         _logger.LogInformation("Delivery tracking: {Queued} transfer item(s) queued, {Skipped} file(s) already fully delivered (skipped).",
                             queuedItems, skippedFullyDelivered);
                     }
+
+                    // 2. 宛先ごとの独立プロデューサで投入する。各プロデューサは自分のチャネルにだけ
+                    //    WriteAsync するため、ある宛先のチャネルが詰まっても他宛先の投入は止まらない
+                    //    (宛先間のスループット結合を避ける)。
+                    await EnqueueFanoutPlansAsync(plans, queueContexts, stoppingToken).ConfigureAwait(false);
                 }
                 catch (DirectoryNotFoundException ex)
                 {

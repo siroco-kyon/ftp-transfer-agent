@@ -224,15 +224,29 @@ public class DeliveryTrackingValidationTests : IDisposable
     }
 
     [Fact]
-    public void Tracking_Disabled_SkipsNameRequirement()
+    public void SingleDestination_NoTrackingFlag_SkipsNameRequirement()
     {
+        // 単一宛先かつフラグ off ではトラッキングは無効 → Name は不要
+        var transfer = ValidPrimary(name: null);
+        transfer.PerDestinationDeliveryTracking = false;
+        transfer.AdditionalDestinations = new List<DestinationOptions>();
+
+        var result = Validate(transfer);
+
+        Assert.DoesNotContain(result.Errors, e => e.Contains("Missing Name"));
+    }
+
+    [Fact]
+    public void MultipleDestinations_WithoutFlag_StillRequireName()
+    {
+        // 複数宛先 (ファンアウト) の put は常時トラッキング → フラグ off でも Name 必須
         var transfer = ValidPrimary(name: null);
         transfer.PerDestinationDeliveryTracking = false;
         transfer.AdditionalDestinations = new List<DestinationOptions> { ValidBackup(name: null) };
 
         var result = Validate(transfer);
 
-        Assert.DoesNotContain(result.Errors, e => e.Contains("Missing Name"));
+        Assert.Contains(result.Errors, e => e.Contains("Missing Name"));
     }
 
     [Theory]
@@ -243,6 +257,16 @@ public class DeliveryTrackingValidationTests : IDisposable
     public void LogEvents_IsMultiDestinationFailure_IdentifiesFailureEvents(int eventId, bool expected)
     {
         Assert.Equal(expected, LogEvents.IsMultiDestinationFailure(new EventId(eventId)));
+    }
+
+    [Theory]
+    [InlineData(1001, true)]  // per-destination 詳細 → 抑制可
+    [InlineData(1002, false)] // 部分失敗サマリ → 抑制しない (通知を残す)
+    [InlineData(0, false)]
+    [InlineData(500, false)]
+    public void LogEvents_IsSuppressiblePerDestinationDetail_SuppressesDetailOnly(int eventId, bool expected)
+    {
+        Assert.Equal(expected, LogEvents.IsSuppressiblePerDestinationDetail(new EventId(eventId)));
     }
 
     [Fact]

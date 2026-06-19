@@ -269,6 +269,43 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
         Assert.True(File.Exists(lockedPath));
     }
 
+    [Fact]
+    public async Task DeleteAfterVerifyFalse_RecoveryRestoresFileFromRetryDirectoryToWatch()
+    {
+        var dataPath = Path.Combine(_watchDir, "report.txt");
+        await File.WriteAllTextAsync(dataPath, "the-payload");
+
+        var (transfer, additional) = BuildOptions();
+        var primaryStore = new DestinationStore();
+        var backupStore = new DestinationStore();
+
+        // --- Run 1: backup 全失敗 → 部分失敗で retry ディレクトリへ退避 (DeleteAfterVerify=false でも退避する) ---
+        backupStore.FailUploads = true;
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(), deleteAfterVerify: false);
+
+        var retryPath = Path.Combine(_retryDir, "report.txt");
+        Assert.False(File.Exists(dataPath));
+        Assert.True(File.Exists(retryPath), "部分失敗時は retry ディレクトリへ退避する");
+
+        // --- Run 2: backup 復活 → 全宛先完了。DeleteAfterVerify=false なので削除せず watch.Path へ復元する ---
+        backupStore.FailUploads = false;
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(), deleteAfterVerify: false);
+
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt")); // primary へは再送しない
+        Assert.Equal(1, backupStore.UploadCount("/backup/report.txt"));   // backup へ今回送信
+        // ファイルは隠しリトライディレクトリに取り残されず、watch の元の場所へ戻る
+        Assert.True(File.Exists(dataPath), "全宛先完了かつ DeleteAfterVerify=false なら watch へ復元される");
+        Assert.False(File.Exists(retryPath));
+        // 全宛先分のマーカーが揃い、次回は再送されない
+        Assert.Equal(2, Directory.GetFiles(_stateDir, "*.marker").Length);
+
+        // --- Run 3: 変更なし → 全宛先配信済みとしてスキップ、再送されない ---
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(), deleteAfterVerify: false);
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt"));
+        Assert.Equal(1, backupStore.UploadCount("/backup/report.txt"));
+        Assert.True(File.Exists(dataPath));
+    }
+
     private (TransferOptions, DestinationOptions) BuildOptions()
     {
         var additional = new DestinationOptions
@@ -310,7 +347,8 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
         ApplicationExitCode exitCode,
         bool includeSubfolders = false,
         bool requireEndFile = false,
-        bool transferEndFiles = false)
+        bool transferEndFiles = false,
+        bool deleteAfterVerify = true)
     {
         var services = new ServiceCollection();
         services.AddLogging();
@@ -329,7 +367,7 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
             Options.Create(transfer),
             Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 }),
             Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" }),
-            Options.Create(new CleanupOptions { DeleteAfterVerify = true }),
+            Options.Create(new CleanupOptions { DeleteAfterVerify = deleteAfterVerify }),
             provider,
             provider.GetRequiredService<ILogger<Worker>>(),
             new DummyLifetime(),

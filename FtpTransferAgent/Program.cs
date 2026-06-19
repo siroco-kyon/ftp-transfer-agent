@@ -114,7 +114,7 @@ try
     ProcessLock? procLock;
     try
     {
-        procLock = ProcessLock.Acquire(appOptions.LockFilePath);
+        procLock = ProcessLock.Acquire(appOptions.LockFilePath, watchOptions.Path);
         Console.WriteLine($"INFO: Acquired process lock at {procLock.LockFilePath}");
     }
     catch (InvalidOperationException ex)

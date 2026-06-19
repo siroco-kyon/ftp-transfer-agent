@@ -34,7 +34,11 @@ public static class RetryableExceptionClassifier
 
             // ファイルシステム関連の一時的な例外（リトライ可能）
             IOException ioEx when IsRetryableIOException(ioEx) => true,
-            UnauthorizedAccessException => true, // ファイルロック等の一時的な問題の可能性
+            // UnauthorizedAccessException は通常 ACL 拒否・読み取り専用属性など恒久的な要因で発生する。
+            // 一時的なファイルロック/共有違反は Windows では IOException (ERROR_SHARING_VIOLATION 等) として
+            // 投げられ上の IsRetryableIOException が拾うため、ここでリトライ対象にすると恒久エラーを
+            // 無駄に再試行するだけになる。よって非リトライ扱いとする。
+            UnauthorizedAccessException => false,
 
             // 設定やセキュリティ関連の例外（リトライ不可）
             ArgumentNullException => false, // より具体的な例外を先に配置
@@ -53,6 +57,26 @@ public static class RetryableExceptionClassifier
     /// </summary>
     private static bool IsRetryableFtpException(FtpException ftpException)
     {
+        // サーバ応答コードが取れる場合はメッセージ文字列より先に判定する
+        // (FTP 応答コードは RFC 959 準拠で言語非依存。メッセージはサーバのロケールで揺れる)
+        //   4xx = 一時的な拒否 (Transient Negative) → リトライ可能
+        //   5xx = 恒久的な拒否 (Permanent Negative)  → リトライ不可
+        if (ftpException is FtpCommandException cmdEx)
+        {
+            var code = cmdEx.CompletionCode;
+            if (!string.IsNullOrEmpty(code))
+            {
+                if (code[0] == '4')
+                {
+                    return true;
+                }
+                if (code[0] == '5')
+                {
+                    return false;
+                }
+            }
+        }
+
         // FluentFTPの例外メッセージやタイプに基づいて判定
         var message = ftpException.Message;
 
