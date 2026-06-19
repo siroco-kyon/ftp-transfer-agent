@@ -538,14 +538,28 @@ public class Worker : BackgroundService
     // 既に全宛先へ配信済み (マーカーが揃っている) ファイルの後始末。
     // DeleteAfterVerify=true なら削除しマーカーも掃除。false ならローカルを残し
     // マーカーも保持して次回も送信をスキップさせる。
-    private void HandleAlreadyDelivered(string sourcePath, IReadOnlyList<string> relatedEndFiles, string relativeKey)
+    private bool HandleAlreadyDelivered(
+        string sourcePath,
+        IReadOnlyList<string> relatedEndFiles,
+        DeliveryTrackingContext tracking)
     {
         _logger.LogInformation("All destinations already delivered for {File} (per delivery state); skipping send.", sourcePath);
+
+        if (!AreLocalFilesStillPlannedVersion(sourcePath, relatedEndFiles, tracking))
+        {
+            _logger.LogWarning(
+                "All destinations were already delivered for {File}, but local files changed before cleanup. Local files were retained for the next run.",
+                sourcePath);
+            return false;
+        }
+
         var deleted = DeleteLocalAfterSuccess(sourcePath, EndFilesToDeleteOnSuccess(relatedEndFiles));
         if (deleted)
         {
-            _deliveryStore?.RemoveAll(relativeKey);
+            _deliveryStore?.RemoveAll(tracking.RelativePath);
         }
+
+        return true;
     }
 
     // ローカルのデータファイル/END ファイルを成功後ポリシーに従って削除する。
@@ -1303,16 +1317,6 @@ public class Worker : BackgroundService
                                 continue;
                             }
 
-                            var pendingList = destinations.Where(d => !delivered.Contains(GetDestinationName(d))).ToList();
-                            if (pendingList.Count == 0)
-                            {
-                                // 全宛先へ配信済み (前回までに完了)。残骸の後始末だけ行う。
-                                HandleAlreadyDelivered(file, related, relativeKey);
-                                skippedFullyDelivered++;
-                                continue;
-                            }
-
-                            pending = pendingList;
                             tracking = new DeliveryTrackingContext(
                                 relativeKey,
                                 dataSignature,
@@ -1320,6 +1324,19 @@ public class Worker : BackgroundService
                                 relatedEndFileSignatures,
                                 allDestinationNames!,
                                 delivered);
+
+                            var pendingList = destinations.Where(d => !delivered.Contains(GetDestinationName(d))).ToList();
+                            if (pendingList.Count == 0)
+                            {
+                                // 全宛先へ配信済み (前回までに完了)。残骸の後始末だけ行う。
+                                if (HandleAlreadyDelivered(file, related, tracking))
+                                {
+                                    skippedFullyDelivered++;
+                                }
+                                continue;
+                            }
+
+                            pending = pendingList;
                         }
 
                         // 全宛先完了時に削除/復元/マーカー更新を判断するコールバックを登録する
