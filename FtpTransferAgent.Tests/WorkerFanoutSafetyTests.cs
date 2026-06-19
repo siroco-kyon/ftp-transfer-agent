@@ -1,9 +1,11 @@
 using System.Collections.Concurrent;
+using System.Reflection;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 
 namespace FtpTransferAgent.Tests;
@@ -324,6 +326,81 @@ public class WorkerFanoutSafetyTests
             Assert.True(File.Exists(endPath));
             Assert.Equal("mutated end marker", await File.ReadAllTextAsync(endPath));
             Assert.Equal(1, exitCode.Code);
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task HandleAlreadyDelivered_WhenLocalFileChangesBeforeCleanup_RetainsLocalFileAndMarksFailure()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+
+        try
+        {
+            var dataPath = Path.Combine(dir, "sample.txt");
+            var stateDir = Path.Combine(dir, ".state");
+            await File.WriteAllTextAsync(dataPath, "original payload");
+            File.SetLastWriteTimeUtc(dataPath, DateTime.UtcNow.AddMinutes(-10));
+
+            var store = new DeliveryStateStore(
+                stateDir,
+                dir,
+                DeliveryStateStore.SignatureModeSizeTime,
+                "SHA256",
+                NullLogger.Instance);
+            var originalSignature = await store.ComputeSignatureAsync(dataPath, CancellationToken.None);
+            Assert.True(store.RecordDelivered("sample.txt", "primary", originalSignature));
+
+            await File.WriteAllTextAsync(dataPath, "changed payload");
+            File.SetLastWriteTimeUtc(dataPath, DateTime.UtcNow);
+
+            using var provider = new ServiceCollection().AddLogging().BuildServiceProvider();
+            var exitCode = new ApplicationExitCode();
+            var worker = new Worker(
+                Options.Create(new WatchOptions { Path = dir }),
+                Options.Create(new TransferOptions { Direction = "put" }),
+                Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 }),
+                Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" }),
+                Options.Create(new CleanupOptions { DeleteAfterVerify = true }),
+                provider,
+                provider.GetRequiredService<ILogger<Worker>>(),
+                new DummyLifetime(),
+                exitCode);
+
+            typeof(Worker)
+                .GetField("_deliveryStore", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .SetValue(worker, store);
+
+            var trackingType = typeof(Worker).GetNestedType("DeliveryTrackingContext", BindingFlags.NonPublic)!;
+            var tracking = trackingType
+                .GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
+                .Single(c => c.GetParameters().Length == 6)
+                .Invoke(new object[]
+                {
+                    "sample.txt",
+                    originalSignature,
+                    originalSignature,
+                    Array.Empty<string>(),
+                    new[] { "primary" },
+                    new[] { "primary" }
+                });
+
+            var handled = (bool)typeof(Worker)
+                .GetMethod("HandleAlreadyDelivered", BindingFlags.Instance | BindingFlags.NonPublic)!
+                .Invoke(worker, new[] { dataPath, Array.Empty<string>(), tracking })!;
+
+            Assert.False(handled);
+            Assert.True(File.Exists(dataPath));
+            Assert.Equal("changed payload", await File.ReadAllTextAsync(dataPath));
+            Assert.Equal(1, exitCode.Code);
+            Assert.Single(Directory.GetFiles(stateDir, "*.marker"));
         }
         finally
         {
