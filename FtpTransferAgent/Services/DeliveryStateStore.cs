@@ -306,6 +306,33 @@ public sealed class DeliveryStateStore
             return Path.GetFullPath(configured);
         }
 
+        return ResolveDefaultDataDirectory("delivery-state", watchPath);
+    }
+
+    /// <summary>
+    /// 部分配信失敗ファイルのリトライディレクトリを解決する。
+    /// 未指定なら Watch.Path の外の LocalApplicationData 配下へ置き、空文字なら移動を無効化する。
+    /// 明示された相対パスは従来互換のため Watch.Path 基準で解決する。
+    /// </summary>
+    public static string? ResolveRetryDirectory(string? configured, string watchPath)
+    {
+        if (configured is not null && string.IsNullOrWhiteSpace(configured))
+        {
+            return null;
+        }
+
+        if (!string.IsNullOrWhiteSpace(configured))
+        {
+            return Path.IsPathRooted(configured)
+                ? Path.GetFullPath(configured)
+                : Path.GetFullPath(Path.Combine(watchPath, configured));
+        }
+
+        return ResolveDefaultDataDirectory("delivery-retry", watchPath);
+    }
+
+    private static string ResolveDefaultDataDirectory(string leafDirectoryName, string watchPath)
+    {
         var baseDir = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
         if (string.IsNullOrWhiteSpace(baseDir))
         {
@@ -315,6 +342,6 @@ public sealed class DeliveryStateStore
         var watchFull = Path.GetFullPath(watchPath);
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(watchFull.ToLowerInvariant()));
         var sub = Convert.ToHexString(hash).ToLowerInvariant()[..16];
-        return Path.Combine(baseDir, "FtpTransferAgent", "delivery-state", sub);
+        return Path.Combine(baseDir, "FtpTransferAgent", leafDirectoryName, sub);
     }
 }

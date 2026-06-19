@@ -163,8 +163,9 @@ public class DeliveryTrackingValidationTests : IDisposable
     {
         var transfer = ValidPrimary("primary");
         transfer.AdditionalDestinations = new List<DestinationOptions> { ValidBackup("backup") };
-        transfer.StateDirectory = ".delivery-state";
-        transfer.RetryDirectory = ".delivery-state";
+        var directory = Path.Combine(_watchDir, "delivery-work");
+        transfer.StateDirectory = directory;
+        transfer.RetryDirectory = directory;
 
         var result = Validate(transfer);
 
@@ -182,6 +183,21 @@ public class DeliveryTrackingValidationTests : IDisposable
         var result = Validate(transfer);
 
         Assert.Contains(result.Errors, e => e.Contains("RetryDirectory") && e.Contains("StateDirectory"));
+    }
+
+    [Fact]
+    public void RetryDirectory_Default_IsOutsideWatchPath()
+    {
+        var transfer = ValidPrimary("primary");
+        transfer.AdditionalDestinations = new List<DestinationOptions> { ValidBackup("backup") };
+        transfer.RetryDirectory = null;
+
+        var result = Validate(transfer);
+        var resolved = FtpTransferAgent.Services.DeliveryStateStore.ResolveRetryDirectory(null, _watchDir);
+
+        Assert.DoesNotContain(result.Errors, e => e.Contains("RetryDirectory"));
+        Assert.NotNull(resolved);
+        Assert.False(Path.GetFullPath(resolved!).StartsWith(Path.GetFullPath(_watchDir) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]

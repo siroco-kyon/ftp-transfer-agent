@@ -85,7 +85,8 @@ watch/
 - **問題**: ファイルごとにディスクを探索したり、毎回マーカーを作ると重い。
 - **対策**:
   - マーカーは **部分失敗時にだけ**作る。全宛先成功（＝通常時）はマーカーを 1 つも作らず、従来どおりローカル削除するだけ。**通常時の追加コストはゼロ**。
-  - 部分失敗したファイルは `RetryDirectory` へ移動する。次回は retry 配下のファイルを元の相対パスとして扱うため、リモートパスやマーカーキーは Watch 配下にあったときと同じ。ユーザーが retry ファイルを削除した場合は、起動時に孤児マーカーも掃除される。
+  - 部分失敗したファイルは `RetryDirectory` へ移動する。未指定時の retry 先は `Watch.Path` の外に作られる。次回は retry 配下のファイルを元の相対パスとして扱うため、リモートパスやマーカーキーは Watch 配下にあったときと同じ。ユーザーが retry ファイルを削除した場合は、起動時に孤児マーカーも掃除される。
+  - retry 移動前にデータファイルと関連 END ファイルの移動先をすべて検証する。移動途中で I/O エラー等が起きた場合は、完了済みの移動を逆順で Watch 側へ戻し、データと END が分断されたまま残るリスクを下げる。
   - 探索は**起動時に状態ディレクトリを 1 回だけ走査**してメモリ（`ConcurrentDictionary`）に載せ、以降はメモリ照合。ファイルごとのディスク探索はしない。マーカーは「詰まったファイル」分しか存在しないため軽量。
   - 仮にマーカー I/O が発生しても、空に近いファイルの作成・削除はメタデータ操作でマイクロ秒オーダー。ネットワーク転送＋ハッシュ（ミリ秒〜秒）に比べれば誤差。
 - **実装**: `DeliveryStateStore.Initialize()`（1 回走査）、`Worker.HandleFanoutCompletionTracked`（全成功時はマーカーを書かない）。
@@ -163,7 +164,7 @@ watch/
 |---|---|---|
 | `Transfer.PerDestinationDeliveryTracking` | `false` | 機能の ON/OFF。OFF なら従来の all-or-nothing。 |
 | `Transfer.StateDirectory` | `""` | マーカー保存先。空なら `LocalApplicationData/FtpTransferAgent/delivery-state/<hash>`。watch 外推奨。 |
-| `Transfer.RetryDirectory` | `"retry"` | 部分失敗したファイルの移動先。相対パスは `Watch.Path` 配下として解決。空文字で移動を無効化。 |
+| `Transfer.RetryDirectory` | `null` | 部分失敗したファイルの移動先。未指定/null は `LocalApplicationData/FtpTransferAgent/delivery-retry/<hash>`。相対パスを明示した場合は `Watch.Path` 配下として解決。空文字で移動を無効化。 |
 | `Transfer.DeliverySignatureMode` | `"sizetime"` | 上書き検出の指紋方式。`sizetime`（軽量）/ `hash`（厳密）。 |
 | `Transfer.Name`（各宛先） | `null` | 宛先の安定識別子。トラッキング有効時は全宛先で**必須かつ一意**。 |
 | `Smtp.SuppressPerDestinationFailureDetailEmails` | `false` | 複数宛先の個別宛先失敗・部分失敗の詳細メールを抑制。他のエラーメール・終了コードには影響しない。 |
@@ -183,7 +184,7 @@ watch/
     "RemotePath": "/incoming",
     "PerDestinationDeliveryTracking": true,
     "StateDirectory": "/var/lib/ftp-transfer-agent/state",
-    "RetryDirectory": "retry",
+    "RetryDirectory": "/var/lib/ftp-transfer-agent/retry",
     "DeliverySignatureMode": "sizetime",
     "AdditionalDestinations": [
       {

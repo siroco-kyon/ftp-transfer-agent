@@ -43,6 +43,42 @@ public class ParallelTransferQueueTests
     }
 
     [Fact]
+    public async Task TransferQueue_DuplicateItem_ReportsFinalOutcomeAsFailure()
+    {
+        var options = new RetryOptions { MaxAttempts = 1, DelaySeconds = 1 };
+        var channel = Channel.CreateUnbounded<TransferItem>();
+        var mockLogger = new Mock<ILogger<TransferQueue>>();
+        var queue = new TransferQueue(channel, options, mockLogger.Object, 2);
+
+        var item = new TransferItem("test.txt", TransferAction.Upload);
+        channel.Writer.TryWrite(item);
+        channel.Writer.TryWrite(item);
+        channel.Writer.Complete();
+
+        var handlerCalls = 0;
+        var outcomes = new ConcurrentBag<Exception?>();
+
+        await queue.StartAsync(
+            async (_, token) =>
+            {
+                Interlocked.Increment(ref handlerCalls);
+                await Task.Delay(50, token);
+            },
+            (_, ex) => outcomes.Add(ex),
+            CancellationToken.None);
+
+        Assert.Equal(1, handlerCalls);
+        Assert.Equal(2, outcomes.Count);
+        Assert.Single(outcomes, ex => ex is null);
+        Assert.Single(outcomes, ex => ex is InvalidOperationException);
+
+        var stats = queue.GetStatistics();
+        Assert.Equal(2, stats.TotalEnqueued);
+        Assert.Equal(1, stats.TotalCompleted);
+        Assert.Equal(1, stats.TotalFailed);
+    }
+
+    [Fact]
     public async Task TransferQueue_RetriesOnFailure()
     {
         // Arrange

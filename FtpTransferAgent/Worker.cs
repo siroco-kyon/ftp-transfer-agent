@@ -239,18 +239,6 @@ public class Worker : BackgroundService
             ? ToRelativeKey(file)
             : Path.GetRelativePath(_retryDirectoryFullPath, file).Replace('\\', '/');
 
-    private static string? ResolveRetryDirectory(string? configured, string watchPath)
-    {
-        if (string.IsNullOrWhiteSpace(configured))
-        {
-            return null;
-        }
-
-        return Path.IsPathRooted(configured)
-            ? Path.GetFullPath(configured)
-            : Path.GetFullPath(Path.Combine(watchPath, configured));
-    }
-
     private static string NormalizeDirectoryPath(string path) =>
         Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
@@ -539,17 +527,17 @@ public class Worker : BackgroundService
             return false;
         }
 
-        var requests = new List<(string Source, string RelativePath, string Kind)>
-        {
-            (sourcePath, relativePath, "file")
-        };
+        var requests = new List<(string Source, string RelativePath, string Kind)>();
 
         for (var i = 0; i < relatedEndFiles.Count; i++)
         {
             var endFile = relatedEndFiles[i];
             if (!File.Exists(endFile))
             {
-                continue;
+                _exitCode?.MarkFailure();
+                _logger.LogWarning("Cannot move partial delivery END file {File} to retry directory because it no longer exists. The data file will remain in place.",
+                    endFile);
+                return false;
             }
 
             var endRelativePath = i < relatedEndFileRelativePaths.Count
@@ -558,33 +546,47 @@ public class Worker : BackgroundService
             requests.Add((endFile, endRelativePath, "END file"));
         }
 
+        // Move the data file last. If an END file cannot be moved, the main retry target is not created.
+        requests.Add((sourcePath, relativePath, "file"));
+
         var plannedMoves = new List<(string Source, string Target, string Kind)>();
-        foreach (var request in requests)
+        try
         {
-            if (!File.Exists(request.Source))
+            foreach (var request in requests)
             {
-                _logger.LogWarning("Cannot move partial delivery {Kind} {File} to retry directory because it no longer exists.",
-                    request.Kind, request.Source);
-                return false;
-            }
+                if (!File.Exists(request.Source))
+                {
+                    _exitCode?.MarkFailure();
+                    _logger.LogWarning("Cannot move partial delivery {Kind} {File} to retry directory because it no longer exists.",
+                        request.Kind, request.Source);
+                    return false;
+                }
 
-            var target = GetRetryFilePath(request.RelativePath);
-            if (string.Equals(Path.GetFullPath(request.Source), target, StringComparison.OrdinalIgnoreCase))
-            {
-                continue;
-            }
+                var target = GetRetryFilePath(request.RelativePath);
+                if (string.Equals(Path.GetFullPath(request.Source), target, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
 
-            if (File.Exists(target))
-            {
-                _exitCode?.MarkFailure();
-                _logger.LogError("Cannot move partial delivery {Kind} {File} to retry directory because target already exists: {Target}",
-                    request.Kind, request.Source, target);
-                return false;
-            }
+                if (File.Exists(target))
+                {
+                    _exitCode?.MarkFailure();
+                    _logger.LogError("Cannot move partial delivery {Kind} {File} to retry directory because target already exists: {Target}",
+                        request.Kind, request.Source, target);
+                    return false;
+                }
 
-            plannedMoves.Add((request.Source, target, request.Kind));
+                plannedMoves.Add((request.Source, target, request.Kind));
+            }
+        }
+        catch (Exception ex) when (IsRetryFileSystemException(ex) || ex is InvalidOperationException)
+        {
+            _exitCode?.MarkFailure();
+            _logger.LogError(ex, "Cannot plan retry directory move: {Error}", ex.Message);
+            return false;
         }
 
+        var completedMoves = new List<(string Source, string Target, string Kind)>();
         try
         {
             foreach (var move in plannedMoves)
@@ -596,19 +598,65 @@ public class Worker : BackgroundService
                 }
 
                 File.Move(move.Source, move.Target);
+                completedMoves.Add(move);
                 _logger.LogInformation("Moved partial delivery {Kind} {File} to retry directory: {Target}",
                     move.Kind, move.Source, move.Target);
             }
 
             return true;
         }
-        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (IsRetryFileSystemException(ex))
         {
             _exitCode?.MarkFailure();
             _logger.LogError(ex, "Failed to move partial delivery file(s) to retry directory: {Error}", ex.Message);
+            RollBackRetryMoves(completedMoves);
             return false;
         }
     }
+
+    private void RollBackRetryMoves(IReadOnlyList<(string Source, string Target, string Kind)> completedMoves)
+    {
+        foreach (var move in completedMoves.Reverse())
+        {
+            try
+            {
+                if (!File.Exists(move.Target))
+                {
+                    continue;
+                }
+
+                if (File.Exists(move.Source))
+                {
+                    _exitCode?.MarkFailure();
+                    _logger.LogError("Cannot roll back retry move for {Kind}; source already exists: {Source}. Retry file remains at {Target}",
+                        move.Kind, move.Source, move.Target);
+                    continue;
+                }
+
+                var sourceDirectory = Path.GetDirectoryName(move.Source);
+                if (!string.IsNullOrEmpty(sourceDirectory))
+                {
+                    Directory.CreateDirectory(sourceDirectory);
+                }
+
+                File.Move(move.Target, move.Source);
+                _logger.LogWarning("Rolled back retry move for {Kind}: {Target} -> {Source}",
+                    move.Kind, move.Target, move.Source);
+            }
+            catch (Exception ex) when (IsRetryFileSystemException(ex))
+            {
+                _exitCode?.MarkFailure();
+                _logger.LogError(ex, "Failed to roll back retry move for {Kind}: {Target} -> {Source}",
+                    move.Kind, move.Target, move.Source);
+            }
+        }
+    }
+
+    private static bool IsRetryFileSystemException(Exception ex) =>
+        ex is IOException
+            or UnauthorizedAccessException
+            or ArgumentException
+            or NotSupportedException;
 
     private string GetRetryFilePath(string relativePath)
     {
@@ -641,7 +689,7 @@ public class Worker : BackgroundService
         if (trackingEnabled)
         {
             stateDirFullPath = DeliveryStateStore.ResolveStateDirectory(_transfer.StateDirectory, _watch.Path);
-            _retryDirectoryFullPath = ResolveRetryDirectory(_transfer.RetryDirectory, _watch.Path);
+            _retryDirectoryFullPath = DeliveryStateStore.ResolveRetryDirectory(_transfer.RetryDirectory, _watch.Path);
             var storeLogger = _services.GetRequiredService<ILogger<DeliveryStateStore>>();
             _deliveryStore = new DeliveryStateStore(stateDirFullPath, _watch.Path, _transfer.DeliverySignatureMode, _hash.Algorithm, storeLogger, _retryDirectoryFullPath);
             _deliveryStore.Initialize();
