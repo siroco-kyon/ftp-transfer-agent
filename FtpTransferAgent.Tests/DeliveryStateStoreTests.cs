@@ -44,8 +44,9 @@ public class DeliveryStateStoreTests : IDisposable
 
         Assert.True(store.RecordDelivered("a.txt", "primary", sig));
 
-        var delivered = store.GetDeliveredDestinations("a.txt", sig);
+        var delivered = store.GetDeliveredDestinations("a.txt", sig, new[] { "primary", "backup" });
         Assert.Contains("primary", delivered);
+        Assert.DoesNotContain("backup", delivered);
     }
 
     [Fact]
@@ -70,7 +71,7 @@ public class DeliveryStateStoreTests : IDisposable
 
         // 内容が差し替わって指紋が変わると、配信済み扱いにならず古いマーカーは削除される
         var newSig = oldSig + "-changed";
-        var delivered = store.GetDeliveredDestinations("a.txt", newSig);
+        var delivered = store.GetDeliveredDestinations("a.txt", newSig, new[] { "primary" });
 
         Assert.Empty(delivered);
         Assert.Empty(store.GetMarkedDestinations("a.txt"));
@@ -147,7 +148,7 @@ public class DeliveryStateStoreTests : IDisposable
 
         store.RemoveAll("a.txt");
 
-        Assert.Empty(store.GetDeliveredDestinations("a.txt", sig));
+        Assert.Empty(store.GetDeliveredDestinations("a.txt", sig, new[] { "primary", "backup" }));
         Assert.Empty(store.GetMarkedDestinations("a.txt"));
     }
 
@@ -164,7 +165,34 @@ public class DeliveryStateStoreTests : IDisposable
 
         // 別インスタンス (= 次回バッチ相当) でも配信済みが見える
         var reloaded = CreateStore();
-        Assert.Contains("primary", reloaded.GetDeliveredDestinations("a.txt", sig));
+        Assert.Contains("primary", reloaded.GetDeliveredDestinations("a.txt", sig, new[] { "primary" }));
+    }
+
+    [Fact]
+    public async Task GetDelivered_KeyedLookup_OnlyReturnsCandidates_AndDoesNotCrossFiles()
+    {
+        var store = CreateStore();
+        var pathA = CreateFile("a.txt", "hello");
+        var pathB = CreateFile("b.txt", "world");
+        var sigA = await store.ComputeSignatureAsync(pathA, CancellationToken.None);
+        var sigB = await store.ComputeSignatureAsync(pathB, CancellationToken.None);
+
+        // a.txt は primary と osaka に配信済み、b.txt は tokyo に配信済み
+        store.RecordDelivered("a.txt", "primary", sigA);
+        store.RecordDelivered("a.txt", "osaka", sigA);
+        store.RecordDelivered("b.txt", "tokyo", sigB);
+
+        var delivered = store.GetDeliveredDestinations("a.txt", sigA, new[] { "primary", "tokyo" });
+
+        // 候補に入れた primary だけが配信済みとして返る
+        Assert.Contains("primary", delivered);
+        // tokyo は b.txt の配信であって a.txt ではない → 直引きなのでファイルを跨がない
+        Assert.DoesNotContain("tokyo", delivered);
+        // 候補外の osaka は判定に出てこないが、マーカーは消されずに残る（現構成の判定には無影響）
+        Assert.DoesNotContain("osaka", delivered);
+        Assert.Contains("osaka", store.GetMarkedDestinations("a.txt"));
+        // b.txt の tokyo マーカーも無傷
+        Assert.Contains("tokyo", store.GetMarkedDestinations("b.txt"));
     }
 
     [Fact]
