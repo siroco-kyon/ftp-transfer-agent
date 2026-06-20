@@ -41,4 +41,15 @@ public class TransferOptions : DestinationOptions
     /// File signature mode used to detect overwritten files: "sizetime" or "hash".
     /// </summary>
     public string DeliverySignatureMode { get; set; } = "sizetime";
+
+    /// <summary>
+    /// When true, each file (and its related END files) is copied to a temporary snapshot before
+    /// uploading so that every destination in a fanout receives byte-identical, point-in-time content
+    /// even if the source is modified mid-transfer. Only applies when delivery tracking is active
+    /// (multi-destination put, or single destination with PerDestinationDeliveryTracking).
+    /// Default false: uploads read the live source directly (lower I/O, no temporary copy). A source
+    /// change during transfer is still detected after the fact, so the file is retained for the next
+    /// run; the only difference is that destinations may briefly diverge within that single run.
+    /// </summary>
+    public bool EnableUploadSnapshot { get; set; }
 }

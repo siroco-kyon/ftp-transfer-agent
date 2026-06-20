@@ -535,6 +535,73 @@ public class WorkerDownloadTests
         Directory.Delete(dir, true);
     }
 
+    [Fact]
+    public async Task ExecuteAsync_Get_CleansUpOrphanedDownloadTempFiles()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        try
+        {
+            // 強制終了で残った検証用一時ファイル (削除されるべき)
+            var verifyTemp = Path.Combine(dir, "data.txt.verify." + Guid.NewGuid().ToString("N"));
+            var tmpTemp = Path.Combine(dir, "data.txt.tmp." + Guid.NewGuid().ToString("N"));
+            await File.WriteAllTextAsync(verifyTemp, "partial");
+            await File.WriteAllTextAsync(tmpTemp, "partial");
+            // サブフォルダの残骸も再帰的に掃除されること
+            var subDir = Path.Combine(dir, "sub");
+            Directory.CreateDirectory(subDir);
+            var nestedTemp = Path.Combine(subDir, "x.csv.verify." + Guid.NewGuid().ToString("N"));
+            await File.WriteAllTextAsync(nestedTemp, "partial");
+            // 実ファイルと紛らわしい名前 (削除されないべき)
+            var realFile = Path.Combine(dir, "data.txt");
+            var nearMiss = Path.Combine(dir, "report.verify.notahexsuffix");
+            await File.WriteAllTextAsync(realFile, "keep me");
+            await File.WriteAllTextAsync(nearMiss, "keep me too");
+
+            var watch = Options.Create(new WatchOptions { Path = dir });
+            var transfer = Options.Create(new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "get",
+                Host = "host",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/remote",
+                Concurrency = 1
+            });
+            var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+            var hashOpt = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+            var cleanup = Options.Create(new CleanupOptions());
+
+            var mock = new Mock<IFileTransferClient>();
+            mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+                .ReturnsAsync(Array.Empty<string>());
+            mock.Setup(c => c.Dispose());
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            using var provider = services.BuildServiceProvider();
+            var logger = provider.GetRequiredService<ILogger<Worker>>();
+            using var lifetime = new DummyLifetime();
+            var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
+
+            await worker.RunAsync(CancellationToken.None);
+
+            Assert.False(File.Exists(verifyTemp), ".verify.<hex> temp file should be cleaned up");
+            Assert.False(File.Exists(tmpTemp), ".tmp.<hex> temp file should be cleaned up");
+            Assert.False(File.Exists(nestedTemp), "nested temp file should be cleaned up recursively");
+            Assert.True(File.Exists(realFile), "real data file must be kept");
+            Assert.True(File.Exists(nearMiss), "non-temp file with a similar name must be kept");
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
     private class TestWorker : Worker
     {
         private readonly IFileTransferClient _client;

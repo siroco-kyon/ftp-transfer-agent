@@ -341,9 +341,24 @@ public sealed class DeliveryStateStore
             baseDir = Path.GetTempPath();
         }
 
+        return Path.Combine(baseDir, "FtpTransferAgent", leafDirectoryName, WatchHash(watchPath));
+    }
+
+    // watch フルパス (大小無視) の安定したハッシュ先頭 16 桁。構成ごとに衝突しない
+    // サブフォルダ名を作るために使う (状態/リトライ/スナップショットの分離に共通)。
+    private static string WatchHash(string watchPath)
+    {
         var watchFull = Path.GetFullPath(watchPath);
         var hash = SHA256.HashData(Encoding.UTF8.GetBytes(watchFull.ToLowerInvariant()));
-        var sub = Convert.ToHexString(hash).ToLowerInvariant()[..16];
-        return Path.Combine(baseDir, "FtpTransferAgent", leafDirectoryName, sub);
+        return Convert.ToHexString(hash).ToLowerInvariant()[..16];
     }
+
+    /// <summary>
+    /// アップロードスナップショットの一時ルートディレクトリ (watch 構成ごとに分離)。
+    /// テンポラリ配下に置き、構成別サブフォルダにすることで、異なる watch の同時実行が
+    /// 互いのスナップショットを掃除しないようにする (二重起動防止ロックと組み合わせて、
+    /// 起動時に同一構成の前回残骸だけを安全に削除できる)。
+    /// </summary>
+    public static string ResolveUploadSnapshotDirectory(string watchPath) =>
+        Path.Combine(Path.GetTempPath(), "FtpTransferAgent", "upload-snapshots", WatchHash(watchPath));
 }

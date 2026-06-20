@@ -39,6 +39,7 @@
         "StateDirectory": { "type": "string" },
         "RetryDirectory": { "type": ["string", "null"] },
         "DeliverySignatureMode": { "enum": ["sizetime", "hash"] },
+        "EnableUploadSnapshot": { "type": "boolean" },
         "AdditionalDestinations": {
           "type": "array",
           "items": { "$ref": "#/definitions/Destination" }

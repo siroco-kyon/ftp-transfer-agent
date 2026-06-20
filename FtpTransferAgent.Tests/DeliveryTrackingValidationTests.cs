@@ -75,6 +75,40 @@ public class DeliveryTrackingValidationTests : IDisposable
     }
 
     [Fact]
+    public void EnableUploadSnapshot_WithoutActiveTracking_ProducesWarning()
+    {
+        // 単一宛先・トラッキング非活性で EnableUploadSnapshot だけ立てると無視される旨を警告する
+        var transfer = new TransferOptions
+        {
+            Name = "primary",
+            Mode = "ftp",
+            Direction = "put",
+            Host = "primary",
+            Username = "u",
+            Password = "p",
+            RemotePath = "/primary",
+            PerDestinationDeliveryTracking = false,
+            EnableUploadSnapshot = true
+        };
+
+        var result = Validate(transfer);
+
+        Assert.Contains(result.Warnings, w => w.Contains("EnableUploadSnapshot"));
+    }
+
+    [Fact]
+    public void EnableUploadSnapshot_WithActiveTracking_DoesNotWarn()
+    {
+        var transfer = ValidPrimary("primary");
+        transfer.AdditionalDestinations = new List<DestinationOptions> { ValidBackup("backup") };
+        transfer.EnableUploadSnapshot = true;
+
+        var result = Validate(transfer);
+
+        Assert.DoesNotContain(result.Warnings, w => w.Contains("EnableUploadSnapshot"));
+    }
+
+    [Fact]
     public void DuplicateRemoteDestinationTargets_ProducesWarning()
     {
         var transfer = ValidPrimary("primary");
