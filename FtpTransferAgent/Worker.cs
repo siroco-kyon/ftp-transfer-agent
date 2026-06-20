@@ -32,6 +32,15 @@ public class Worker : BackgroundService
     private DeliveryStateStore? _deliveryStore;
     private string? _retryDirectoryFullPath;
 
+    // アップロードスナップショットの一時ルート (watch 構成ごとに分離)。トラッキング初期化時に設定。
+    private string? _uploadSnapshotRootFullPath;
+
+    // ダウンロード時の一時ファイル名パターン (".verify.<32hex>" / ".tmp.<32hex>")。
+    // 強制終了で残った検証用一時ファイルを起動時に掃除する判定に使う。Guid("N") = 小文字 32 桁。
+    private static readonly System.Text.RegularExpressions.Regex DownloadTempFilePattern =
+        new(@"\.(verify|tmp)\.[0-9a-f]{32}$",
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+
     // 転送処理用のチャンネル（容量制限でメモリリーク防止）
 
     // DI された各種オプションを受け取る
@@ -383,7 +392,9 @@ public class Worker : BackgroundService
             return new UploadSnapshot(candidate.PhysicalPath, candidate.RelatedEndFilePaths);
         }
 
-        var snapshotRoot = Path.Combine(Path.GetTempPath(), "FtpTransferAgent", "upload-snapshots", Guid.NewGuid().ToString("N"));
+        var snapshotBase = _uploadSnapshotRootFullPath
+            ?? Path.Combine(Path.GetTempPath(), "FtpTransferAgent", "upload-snapshots");
+        var snapshotRoot = Path.Combine(snapshotBase, Guid.NewGuid().ToString("N"));
         try
         {
             var dataSnapshot = Path.Combine(snapshotRoot, "data", Path.GetFileName(candidate.PhysicalPath));
@@ -473,6 +484,80 @@ public class Worker : BackgroundService
         catch (Exception ex) when (IsRetryFileSystemException(ex))
         {
             _logger.LogWarning(ex, "Failed to delete temporary upload snapshot directory {Directory}: {Error}", directory, ex.Message);
+        }
+    }
+
+    // 前回の異常終了で残ったアップロードスナップショットの一時フォルダを掃除する。
+    // 対象は当該 watch 構成専用のサブフォルダ配下だけ (ProcessLock で同一構成の並走は無いため安全)。
+    private void CleanupOrphanedUploadSnapshots(string snapshotRoot)
+    {
+        string[] leftovers;
+        try
+        {
+            if (!Directory.Exists(snapshotRoot))
+            {
+                return;
+            }
+            leftovers = Directory.GetDirectories(snapshotRoot);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _logger.LogDebug("Could not scan for orphaned upload snapshots in {Dir}: {Error}", snapshotRoot, ex.Message);
+            return;
+        }
+
+        if (leftovers.Length == 0)
+        {
+            return;
+        }
+
+        foreach (var dir in leftovers)
+        {
+            TryDeleteDirectory(dir);
+        }
+
+        _logger.LogInformation("Cleaned up {Count} orphaned upload snapshot folder(s) left by a previously interrupted run in {Dir}.",
+            leftovers.Length, snapshotRoot);
+    }
+
+    // 前回の異常終了で watch (ダウンロード先) ディレクトリに残った検証用一時ファイルを掃除する。
+    // ".verify.<32hex>" / ".tmp.<32hex>" の厳密なパターンにのみ一致させ、利用者の実ファイルは消さない。
+    private void CleanupOrphanedDownloadTempFiles()
+    {
+        string[] files;
+        try
+        {
+            if (!Directory.Exists(_watch.Path))
+            {
+                return;
+            }
+            files = Directory.EnumerateFiles(_watch.Path, "*", SearchOption.AllDirectories)
+                .Where(f => DownloadTempFilePattern.IsMatch(Path.GetFileName(f)))
+                .ToArray();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
+        {
+            _logger.LogDebug("Could not scan for orphaned download temp files in {Path}: {Error}", _watch.Path, ex.Message);
+            return;
+        }
+
+        int removed = 0;
+        foreach (var file in files)
+        {
+            try
+            {
+                File.Delete(file);
+                removed++;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                _logger.LogDebug("Could not delete orphaned download temp file {File}: {Error}", file, ex.Message);
+            }
+        }
+
+        if (removed > 0)
+        {
+            _logger.LogInformation("Cleaned up {Count} orphaned download temp file(s) left by a previously interrupted run.", removed);
         }
     }
 
@@ -1118,8 +1203,15 @@ public class Worker : BackgroundService
             var storeLogger = _services.GetRequiredService<ILogger<DeliveryStateStore>>();
             _deliveryStore = new DeliveryStateStore(stateDirFullPath, _watch.Path, _transfer.DeliverySignatureMode, _hash.Algorithm, storeLogger, _retryDirectoryFullPath);
             _deliveryStore.Initialize();
-            _logger.LogInformation("Per-destination delivery tracking enabled (signature mode: {Mode}). State directory: {Dir}. Retry directory: {RetryDir}",
-                _transfer.DeliverySignatureMode, _deliveryStore.StateDirectory, _retryDirectoryFullPath ?? "(disabled)");
+
+            // スナップショットの一時ルートを構成ごとに確定し、前回の異常終了 (強制終了/電源断) で
+            // 残った残骸を起動時に掃除する。EnableUploadSnapshot が無効でも、過去に有効だった実行の
+            // 残骸を片付けられるよう常に掃除する。
+            _uploadSnapshotRootFullPath = DeliveryStateStore.ResolveUploadSnapshotDirectory(_watch.Path);
+            CleanupOrphanedUploadSnapshots(_uploadSnapshotRootFullPath);
+
+            _logger.LogInformation("Per-destination delivery tracking enabled (signature mode: {Mode}, upload snapshot: {Snapshot}). State directory: {Dir}. Retry directory: {RetryDir}",
+                _transfer.DeliverySignatureMode, _transfer.EnableUploadSnapshot ? "on" : "off", _deliveryStore.StateDirectory, _retryDirectoryFullPath ?? "(disabled)");
         }
 
         // パフォーマンス監視用のCancellationTokenSourceを作成
@@ -1371,8 +1463,12 @@ public class Worker : BackgroundService
                         }
 
                         // 全宛先完了時に削除/復元/マーカー更新を判断するコールバックを登録する
+                        // EnableUploadSnapshot=true のときのみ、列挙時のデータ/END を一時スナップショットへ
+                        // 複製して全宛先へ同一内容を送る (転送中のソース変更でも宛先間で内容が割れない)。
+                        // 既定 (false) はライブのソースを直接読む。転送中の変更は転送後に検出してファイルを
+                        // 保持・次回持ち越しするため安全性は保たれ、一時コピーの I/O を避けられる。
                         UploadSnapshot snapshot;
-                        if (tracking is not null)
+                        if (tracking is not null && _transfer.EnableUploadSnapshot)
                         {
                             var createdSnapshot = await TryCreateUploadSnapshotAsync(
                                 candidate,
@@ -1439,6 +1535,10 @@ public class Worker : BackgroundService
             // ダウンロード処理が有効な場合はリモート一覧を取得
             if (_transfer.Direction is "get")
             {
+                // 前回の異常終了 (強制終了/電源断) で残った検証用一時ファイル (.verify./.tmp.) を掃除する。
+                // 二重起動防止ロックにより同一 watch の別インスタンスは並走しないため、ここで消すのは
+                // 必ず死んだ前回実行の残骸であり、進行中の転送を壊さない。
+                CleanupOrphanedDownloadTempFiles();
                 try
                 {
                     // リモート一覧取得用に専用のクライアントを生成する

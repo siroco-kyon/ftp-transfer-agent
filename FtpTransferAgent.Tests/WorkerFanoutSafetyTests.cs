@@ -194,6 +194,8 @@ public class WorkerFanoutSafetyTests
                 Concurrency = 1,
                 AdditionalDestinations = new List<DestinationOptions> { additionalDestination }
             };
+            // スナップショットの内容凍結保証を検証するため明示的に有効化する (既定は無効)。
+            transferOptions.EnableUploadSnapshot = true;
 
             using var sourceChanged = new ManualResetEventSlim(initialState: false);
             var primaryStore = new DestinationStore
@@ -281,6 +283,8 @@ public class WorkerFanoutSafetyTests
                 Concurrency = 1,
                 AdditionalDestinations = new List<DestinationOptions> { additionalDestination }
             };
+            // スナップショットの内容凍結保証を検証するため明示的に有効化する (既定は無効)。
+            transferOptions.EnableUploadSnapshot = true;
 
             using var endChanged = new ManualResetEventSlim(initialState: false);
             var primaryStore = new DestinationStore
@@ -325,6 +329,97 @@ public class WorkerFanoutSafetyTests
             Assert.True(File.Exists(dataPath));
             Assert.True(File.Exists(endPath));
             Assert.Equal("mutated end marker", await File.ReadAllTextAsync(endPath));
+            Assert.Equal(1, exitCode.Code);
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_FanoutUpload_WithoutSnapshotByDefault_RetainsSourceWhenFileChangesDuringTransfer()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+
+        try
+        {
+            var dataPath = Path.Combine(dir, "sample.txt");
+            var endPath = Path.Combine(dir, "sample.txt.END");
+            await File.WriteAllTextAsync(dataPath, "initial payload");
+            await File.WriteAllTextAsync(endPath, "end marker");
+
+            var additionalDestination = new DestinationOptions
+            {
+                Mode = "ftp",
+                Host = "backup",
+                Username = "backup-user",
+                Password = "backup-pass",
+                RemotePath = "/backup",
+                Concurrency = 1
+            };
+
+            var transferOptions = new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "put",
+                Host = "primary",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/primary",
+                Concurrency = 1,
+                AdditionalDestinations = new List<DestinationOptions> { additionalDestination }
+            };
+            // 既定 (EnableUploadSnapshot=false) のまま: 各宛先はライブのソースを直接読む。
+
+            using var sourceChanged = new ManualResetEventSlim(initialState: false);
+            var primaryStore = new DestinationStore
+            {
+                AfterUpload = remotePath =>
+                {
+                    if (remotePath.EndsWith("/sample.txt", StringComparison.OrdinalIgnoreCase))
+                    {
+                        File.WriteAllText(dataPath, "mutated payload with new bytes");
+                        sourceChanged.Set();
+                    }
+                }
+            };
+            var backupStore = new DestinationStore
+            {
+                BeforeUpload = remotePath =>
+                {
+                    if (remotePath.EndsWith("/sample.txt", StringComparison.OrdinalIgnoreCase))
+                    {
+                        Assert.True(sourceChanged.Wait(TimeSpan.FromSeconds(5)), "primary upload should mutate the source before backup reads");
+                    }
+                }
+            };
+            var exitCode = new ApplicationExitCode();
+
+            var worker = CreateWorker(
+                dir,
+                transferOptions,
+                additionalDestination,
+                primaryStore,
+                backupStore,
+                new CleanupOptions { DeleteAfterVerify = true },
+                new HashOptions { Enabled = false, Algorithm = "SHA256" },
+                exitCode);
+
+            await worker.RunAsync(CancellationToken.None);
+
+            // スナップショット無効なので各宛先はライブのソースを読む → 宛先間で内容が割れ得る
+            // (これは利用者が許容したトレードオフ)。
+            Assert.Equal("initial payload", System.Text.Encoding.UTF8.GetString(primaryStore.Get("/primary/sample.txt")));
+            Assert.Equal("mutated payload with new bytes", System.Text.Encoding.UTF8.GetString(backupStore.Get("/backup/sample.txt")));
+            // ただしソース変更は転送後に検出されるため、削除しない・終了コード1 の安全性は保たれる。
+            Assert.True(File.Exists(dataPath), "Source must be retained when it changed during transfer.");
+            Assert.True(File.Exists(endPath));
+            Assert.Equal("mutated payload with new bytes", await File.ReadAllTextAsync(dataPath));
             Assert.Equal(1, exitCode.Code);
         }
         finally
@@ -407,6 +502,75 @@ public class WorkerFanoutSafetyTests
             if (Directory.Exists(dir))
             {
                 Directory.Delete(dir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Fanout_CleansUpOrphanedUploadSnapshotsFromPreviousRun()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        var snapshotRoot = DeliveryStateStore.ResolveUploadSnapshotDirectory(dir);
+
+        try
+        {
+            var dataPath = Path.Combine(dir, "sample.txt");
+            var endPath = Path.Combine(dir, "sample.txt.END");
+            await File.WriteAllTextAsync(dataPath, "payload");
+            await File.WriteAllTextAsync(endPath, "end marker");
+
+            // 前回の異常終了 (強制終了/電源断) で残ったスナップショット残骸を再現する。
+            var orphan = Path.Combine(snapshotRoot, "deadbeefdeadbeefdeadbeefdeadbeef");
+            Directory.CreateDirectory(Path.Combine(orphan, "data"));
+            await File.WriteAllTextAsync(Path.Combine(orphan, "data", "sample.txt"), "stale snapshot");
+            Assert.True(Directory.Exists(orphan), "precondition: orphan snapshot exists before the run");
+
+            var additionalDestination = new DestinationOptions
+            {
+                Mode = "ftp",
+                Host = "backup",
+                Username = "backup-user",
+                Password = "backup-pass",
+                RemotePath = "/backup",
+                Concurrency = 1
+            };
+
+            var transferOptions = new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "put",
+                Host = "primary",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/primary",
+                Concurrency = 1,
+                AdditionalDestinations = new List<DestinationOptions> { additionalDestination }
+            };
+
+            var worker = CreateWorker(
+                dir,
+                transferOptions,
+                additionalDestination,
+                new DestinationStore(),
+                new DestinationStore(),
+                new CleanupOptions { DeleteAfterVerify = true },
+                new HashOptions { Enabled = false, Algorithm = "SHA256" });
+
+            await worker.RunAsync(CancellationToken.None);
+
+            // スナップショットが既定で無効でも、トラッキング初期化時に前回残骸が掃除される。
+            Assert.False(Directory.Exists(orphan), "orphaned upload snapshot from a previous run should be cleaned up at startup");
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
+            if (Directory.Exists(snapshotRoot))
+            {
+                Directory.Delete(snapshotRoot, true);
             }
         }
     }

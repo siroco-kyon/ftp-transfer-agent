@@ -68,6 +68,13 @@ public class ConfigurationValidator
             result.Warnings.Add($"PerDestinationDeliveryTracking is enabled but Direction is '{transfer.Direction}'. Delivery tracking applies only to uploads (put) and will be ignored.");
         }
 
+        // スナップショットはトラッキング経路でのみ有効。トラッキングが効かない構成で
+        // EnableUploadSnapshot だけ立っていると無視されるため警告する。
+        if (transfer.EnableUploadSnapshot && !trackingActive)
+        {
+            result.Warnings.Add("EnableUploadSnapshot is enabled but per-destination delivery tracking is not active (it requires a put with multiple destinations, or PerDestinationDeliveryTracking). Upload snapshots apply only to tracked uploads and will be ignored.");
+        }
+
         if (!trackingActive)
         {
             return;
