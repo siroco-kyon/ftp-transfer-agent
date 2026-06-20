@@ -133,32 +133,39 @@ public sealed class DeliveryStateStore
     /// <summary>
     /// 指定ファイル (相対パス) について、現在の指紋と一致するマーカーを持つ宛先名の集合を返す。
     /// 指紋が一致しない (＝内容が差し替わった) マーカーは陳腐化とみなし、ここで削除する。
+    ///
+    /// <paramref name="candidateDestinationNames"/> に「今回判定したい宛先名」(= 現構成の全宛先)
+    /// を渡し、辞書キー (相対パス\0宛先名) で直接引く。全マーカーの線形走査は行わないため、
+    /// 背景に大量のマーカーが溜まっていても、コストは宛先数ぶん (O(宛先数)) で済む。
+    /// 構成から外された宛先の古いマーカーはここでは触らない (現構成の判定には影響せず、
+    /// 全宛先配信完了時の <see cref="RemoveAll"/> や起動時の孤児掃除で片付く)。
     /// </summary>
-    public IReadOnlyCollection<string> GetDeliveredDestinations(string relativePath, string currentSignature)
+    public IReadOnlyCollection<string> GetDeliveredDestinations(
+        string relativePath, string currentSignature, IReadOnlyCollection<string> candidateDestinationNames)
     {
         var delivered = new HashSet<string>(StringComparer.Ordinal);
 
-        // 列挙中の変更に備えてスナップショットで走査する
-        foreach (var entry in _markers.Values.ToArray())
+        foreach (var destinationName in candidateDestinationNames)
         {
-            if (!string.Equals(entry.RelativePath, relativePath, StringComparison.Ordinal))
+            var key = Key(relativePath, destinationName);
+            if (!_markers.TryGetValue(key, out var entry))
             {
                 continue;
             }
 
             if (string.Equals(entry.Signature, currentSignature, StringComparison.Ordinal))
             {
-                delivered.Add(entry.DestinationName);
+                delivered.Add(destinationName);
             }
             else
             {
                 // 内容が変わっている → 古い配信記録は無効。削除して再送対象にする
-                if (_markers.TryRemove(Key(entry.RelativePath, entry.DestinationName), out _))
+                if (_markers.TryRemove(key, out _))
                 {
                     TryDeleteFile(entry.MarkerFilePath);
                     _logger.LogInformation(
                         "Delivery marker for {File} -> {Dest} is stale (file content changed); will re-send.",
-                        relativePath, entry.DestinationName);
+                        relativePath, destinationName);
                 }
             }
         }

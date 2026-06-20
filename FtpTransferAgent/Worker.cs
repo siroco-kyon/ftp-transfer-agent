@@ -1432,8 +1432,9 @@ public class Worker : BackgroundService
 
                                 relatedEndFileSignatures = computedRelatedEndFileSignatures;
                                 trackingSignature = BuildTrackingSignature(dataSignature, relatedRelativePaths, relatedEndFileSignatures);
+                                // 現構成の全宛先名で辞書を直引きする (全マーカー走査を避ける)。
                                 delivered = new HashSet<string>(
-                                    _deliveryStore.GetDeliveredDestinations(relativeKey, trackingSignature), StringComparer.Ordinal);
+                                    _deliveryStore.GetDeliveredDestinations(relativeKey, trackingSignature, allDestinationNames!), StringComparer.Ordinal);
                             }
                             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
                             {
