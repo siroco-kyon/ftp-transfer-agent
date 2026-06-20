@@ -361,6 +361,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 - 同一の mode/host/port/remote path に複数宛先が向く設定は、同時上書きや END ファイル重複配信の恐れがあるため起動時に警告される
 - `Direction: get` では追加宛先は使用されず、警告が表示される
 - 詳細は [宛先別配信トラッキングのドキュメント](docs/per-destination-delivery-tracking.md) を参照
+- 実装（ファンアウトのキュー構成・並列処理の仕組み・マーカーの作成条件と保存先）は [ファンアウトと並列処理 実装詳細](docs/fanout-and-parallelism.md) を参照
 
 ### Cleanup
 

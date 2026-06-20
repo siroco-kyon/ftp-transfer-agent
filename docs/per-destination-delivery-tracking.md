@@ -2,6 +2,7 @@
 
 > 複数宛先（ファンアウト）転送で「未配信の宛先だけ再送する」機能の、設計・対策・設定・懸念をまとめた資料。
 > 仕様の要約は [ftp-transfer-agent-spec.md 5.9](../ftp-transfer-agent-spec.md) を参照。本書はその背後にある判断と細部を後から読み返せるようにするためのもの。
+> ファンアウトのキュー構成・並列処理の実装・マーカーの作成条件と保存先など **実装機構** は [ファンアウトと並列処理 実装詳細](fanout-and-parallelism.md) を参照。
 
 - 対象バージョン: 3.2.1
 - 関連設定: `Transfer.PerDestinationDeliveryTracking` / `Transfer.StateDirectory` / `Transfer.RetryDirectory` / `Transfer.DeliverySignatureMode` / `Transfer.Name`（各宛先） / `Smtp.SuppressPerDestinationFailureDetailEmails`
