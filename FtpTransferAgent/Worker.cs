@@ -35,11 +35,9 @@ public class Worker : BackgroundService
     // アップロードスナップショットの一時ルート (watch 構成ごとに分離)。トラッキング初期化時に設定。
     private string? _uploadSnapshotRootFullPath;
 
-    // ダウンロード時の一時ファイル名パターン (".verify.<32hex>" / ".tmp.<32hex>")。
-    // 強制終了で残った検証用一時ファイルを起動時に掃除する判定に使う。Guid("N") = 小文字 32 桁。
-    private static readonly System.Text.RegularExpressions.Regex DownloadTempFilePattern =
-        new(@"\.(verify|tmp)\.[0-9a-f]{32}$",
-            System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Compiled);
+    // ダウンロードの検証用一時ファイルを置くエージェント専用ディレクトリ名 (Watch.Path 配下)。
+    // 利用者ファイルと混在させず、このディレクトリ単位で残骸を安全に掃除するために使う。
+    private const string DownloadTempDirectoryName = ".ftptransferagent-tmp";
 
     // 転送処理用のチャンネル（容量制限でメモリリーク防止）
 
@@ -483,7 +481,7 @@ public class Worker : BackgroundService
         }
         catch (Exception ex) when (IsRetryFileSystemException(ex))
         {
-            _logger.LogWarning(ex, "Failed to delete temporary upload snapshot directory {Directory}: {Error}", directory, ex.Message);
+            _logger.LogWarning(ex, "Failed to delete temporary directory {Directory}: {Error}", directory, ex.Message);
         }
     }
 
@@ -520,45 +518,47 @@ public class Worker : BackgroundService
             leftovers.Length, snapshotRoot);
     }
 
-    // 前回の異常終了で watch (ダウンロード先) ディレクトリに残った検証用一時ファイルを掃除する。
-    // ".verify.<32hex>" / ".tmp.<32hex>" の厳密なパターンにのみ一致させ、利用者の実ファイルは消さない。
+    // ダウンロードの検証用一時ファイルを置くエージェント専用ディレクトリのフルパス (Watch.Path 配下)。
+    private string GetDownloadTempDirectory() =>
+        Path.Combine(Path.GetFullPath(_watch.Path), DownloadTempDirectoryName);
+
+    // 検証用一時ディレクトリを作成して返す (冪等)。
+    private string EnsureDownloadTempDirectory()
+    {
+        var dir = GetDownloadTempDirectory();
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    // 前回の異常終了で残ったダウンロード検証用一時ファイルを掃除する。
+    // エージェント専用ディレクトリ配下だけを対象にするため、利用者ファイルに名前が似ていても
+    // 触れることはない (誤削除によるデータ損失が起きない)。
     private void CleanupOrphanedDownloadTempFiles()
     {
-        string[] files;
+        var tempDir = GetDownloadTempDirectory();
+        int leftovers;
         try
         {
-            if (!Directory.Exists(_watch.Path))
+            if (!Directory.Exists(tempDir))
             {
                 return;
             }
-            files = Directory.EnumerateFiles(_watch.Path, "*", SearchOption.AllDirectories)
-                .Where(f => DownloadTempFilePattern.IsMatch(Path.GetFileName(f)))
-                .ToArray();
+            leftovers = Directory.EnumerateFileSystemEntries(tempDir).Count();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
         {
-            _logger.LogDebug("Could not scan for orphaned download temp files in {Path}: {Error}", _watch.Path, ex.Message);
+            _logger.LogDebug("Could not scan the download temp directory {Dir}: {Error}", tempDir, ex.Message);
             return;
         }
 
-        int removed = 0;
-        foreach (var file in files)
+        if (leftovers == 0)
         {
-            try
-            {
-                File.Delete(file);
-                removed++;
-            }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-            {
-                _logger.LogDebug("Could not delete orphaned download temp file {File}: {Error}", file, ex.Message);
-            }
+            return;
         }
 
-        if (removed > 0)
-        {
-            _logger.LogInformation("Cleaned up {Count} orphaned download temp file(s) left by a previously interrupted run.", removed);
-        }
+        TryDeleteDirectory(tempDir);
+        _logger.LogInformation("Cleaned up {Count} orphaned download temp file(s) left by a previously interrupted run in {Dir}.",
+            leftovers, tempDir);
     }
 
     private bool AreLocalFilesStillPlannedVersion(
@@ -1287,11 +1287,15 @@ public class Worker : BackgroundService
                     var retryDirPrefix = _retryDirectoryFullPath is null
                         ? null
                         : DirectoryPrefix(_retryDirectoryFullPath);
+                    // get と同一の Watch.Path で put した場合に、ダウンロード一時ディレクトリの
+                    // 残骸を誤って転送対象にしないよう除外する
+                    var downloadTempPrefix = DirectoryPrefix(GetDownloadTempDirectory());
 
                     // ファイル順序を安定化するためファイル名でソート (END ファイルの振り分けは後段で行う)
                     var files = Directory.EnumerateFiles(_watch.Path, "*", option)
                         .Where(f => !IsUnderDirectoryPrefix(f, stateDirPrefix)
-                                    && !IsUnderDirectoryPrefix(f, retryDirPrefix))
+                                    && !IsUnderDirectoryPrefix(f, retryDirPrefix)
+                                    && !IsUnderDirectoryPrefix(f, downloadTempPrefix))
                         .OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
                         .ToList();
 
@@ -2033,7 +2037,11 @@ public class Worker : BackgroundService
             var remoteHash = await client.GetRemoteHashAsync(item.Path, _hash.Algorithm, token, _hash.UseServerCommand).ConfigureAwait(false);
             _logger.LogDebug("[{Id}] Remote hash calculated: {Hash}", id, remoteHash);
 
-            var verifiedDownloadPath = $"{localPath}.verify.{Guid.NewGuid():N}";
+            // 検証用一時ファイルはエージェント専用の一時ディレクトリ (Watch.Path 配下) に作る。
+            // localPath と同一ボリュームなので最終リネームはアトミックなまま。強制終了で残った
+            // 残骸は起動時にこのディレクトリ単位で安全に掃除でき、利用者ファイルには触れない。
+            var downloadTempDir = EnsureDownloadTempDirectory();
+            var verifiedDownloadPath = Path.Combine(downloadTempDir, $"{Guid.NewGuid():N}.verify");
             try
             {
                 // ダウンロード実行
@@ -2065,9 +2073,22 @@ public class Worker : BackgroundService
         }
         else
         {
-            // ハッシュ検証なしでダウンロード
-            await client.DownloadAsync(item.Path, localPath, token).ConfigureAwait(false);
-            fileSize = new FileInfo(localPath).Length;
+            // ハッシュ検証なしでも、一時ファイルをエージェント専用ディレクトリに作ってから
+            // localPath へアトミックに移す。これによりクライアントが作る一時ファイルも専用
+            // ディレクトリ配下に収まり、強制終了時の残骸を安全に掃除できる。
+            var downloadTempDir = EnsureDownloadTempDirectory();
+            var downloadTempPath = Path.Combine(downloadTempDir, $"{Guid.NewGuid():N}.dl");
+            try
+            {
+                await client.DownloadAsync(item.Path, downloadTempPath, token).ConfigureAwait(false);
+                fileSize = new FileInfo(downloadTempPath).Length;
+                File.Move(downloadTempPath, localPath, true);
+            }
+            catch
+            {
+                try { File.Delete(downloadTempPath); } catch { }
+                throw;
+            }
             _logger.LogInformation("[{Id}] Download completed for {Remote} ({Size}, hash verification disabled)", id, item.Path, FormatBytes(fileSize));
         }
 
