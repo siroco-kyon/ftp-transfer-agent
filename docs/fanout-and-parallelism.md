@@ -104,6 +104,41 @@ private sealed class QueueContext
 
 各 `TransferQueue` は独立に走り、各宛先の結果は `FanoutCoordinator` に集約される。
 
+> 上の ASCII 図と同じ構造を、GitHub 上ではそのまま図として表示できる Mermaid で描くと次のとおり。
+
+```mermaid
+flowchart LR
+    W["Worker.ExecuteAsync<br/>計画 → 投入"]
+
+    subgraph QC0["QueueContext[0] = primary"]
+        direction TB
+        C0(["Channel<br/>投入口"]) --> Q0["TransferQueue<br/>ワーカー × Concurrency"] --> P0["ClientPool<br/>接続再利用"]
+    end
+    subgraph QC1["QueueContext[1] = osaka"]
+        direction TB
+        C1(["Channel"]) --> Q1["TransferQueue"] --> P1["ClientPool"]
+    end
+    subgraph QC2["QueueContext[2] = tokyo"]
+        direction TB
+        C2(["Channel"]) --> Q2["TransferQueue"] --> P2["ClientPool"]
+    end
+
+    W --> C0
+    W --> C1
+    W --> C2
+
+    P0 --> S0["primary サーバ"]
+    P1 --> S1["大阪サーバ"]
+    P2 --> S2["東京サーバ"]
+
+    Q0 -. "結果を報告" .-> FC["FanoutCoordinator<br/>GroupId 単位に集約"]
+    Q1 -. "結果を報告" .-> FC
+    Q2 -. "結果を報告" .-> FC
+    FC --> CB["全宛先そろったら<br/>完了コールバックを 1 回だけ"]
+```
+
+**この図のキモは「宛先ごとに縦 1 本のライン（Channel → ワーカー群 → 接続プール）が完全に独立している」こと。** Worker は計画した内容を各宛先の Channel に投入するだけで、あとは宛先ごとのラインが勝手に並列で走る。結果だけが横串の `FanoutCoordinator` に集まり、1 ファイル分の宛先が出そろった瞬間に後始末を 1 回判断する。
+
 ---
 
 ## 3. 3 つのフェーズ
@@ -188,6 +223,32 @@ public void ReportResult(string groupId, DestinationResult result)
 
 > スレッド安全性: `_groups` は `ConcurrentDictionary`、カウンタは `Interlocked`、結果は `ConcurrentBag`。複数宛先のワーカーが別スレッドから同時に `ReportResult` してよい。
 
+時系列で見るとこうなる（3 宛先のうち osaka が失敗するケース。報告の順番は宛先の速さ次第でバラバラに来る）。
+
+```mermaid
+sequenceDiagram
+    autonumber
+    participant Plan as 計画フェーズ
+    participant FC as FanoutCoordinator
+    participant Wp as primary ワーカー
+    participant Wt as tokyo ワーカー
+    participant Wo as osaka ワーカー
+
+    Plan->>FC: Register("g1", report.csv, pending=3, cb)
+    Note over FC: Remaining = 3
+
+    Wp->>FC: ReportResult(g1, primary, success)
+    Note over FC: Remaining 3 → 2
+    Wt->>FC: ReportResult(g1, tokyo, success)
+    Note over FC: Remaining 2 → 1
+    Wo->>FC: ReportResult(g1, osaka, fail)
+    Note over FC: Remaining 1 → 0
+    FC-->>Plan: 完了コールバック（厳密に 1 回）
+    Note over Plan: succeeded={primary,tokyo}<br/>osaka 未達 → 部分失敗の後始末へ
+```
+
+ポイントは **「各ワーカーは自分の結果を投げ込むだけ」「最後の 1 件を報告したワーカーがコールバックを引く」** という点。誰が最後になるかは実行時まで分からないが、`Remaining==0` かつ `Interlocked.Exchange` の二重ガードで、同時に複数ワーカーが最後の報告をしても**コールバックは 1 回しか走らない**。
+
 完了コールバックの中身は `Worker.HandleFanoutCompletion` → トラッキング無効なら all-or-nothing、有効なら `HandleFanoutCompletionTracked`（§6 で詳述）。
 
 ---
@@ -248,6 +309,45 @@ public void ReportResult(string groupId, DestinationResult result)
 ```
 
 **ポイント**: Run 2 では配信済みの primary/tokyo へは送らず、未配信の osaka だけ送る。完了したのでマーカーは全部消える。**最終的に「全部送れた状態」ではマーカーは残らない。**
+
+### 図で見る Run 1 → Run 2
+
+2 回の実行で「宛先・マーカー・元ファイル」がどう動くかを 1 枚にまとめると次のとおり。**マーカーは "まだ配り切れていない分" を覚えておく付箋**、と捉えると分かりやすい。
+
+```mermaid
+flowchart TB
+    subgraph R1["Run 1 — osaka ダウン"]
+        direction TB
+        A1["report.csv<br/>配信済み = なし<br/>pending = {primary, osaka, tokyo}"]
+        A1 --> B1p["primary ✅"]
+        A1 --> B1t["tokyo ✅"]
+        A1 --> B1o["osaka ❌（メンテ中）"]
+        B1p --> C1["部分失敗"]
+        B1t --> C1
+        B1o --> C1
+        C1 --> D1["マーカー作成: primary, tokyo<br/>（osaka は作らない）"]
+        C1 --> E1["report.csv を RetryDirectory へ退避"]
+        C1 --> F1["終了コード 1"]
+    end
+
+    R1 -->|次回起動| R2
+
+    subgraph R2["Run 2 — osaka 復旧"]
+        direction TB
+        A2["report.csv の指紋を計算<br/>primary, tokyo のマーカーと一致<br/>配信済み = {primary, tokyo}<br/>pending = {osaka} のみ"]
+        A2 --> B2o["osaka ✅<br/>（primary/tokyo へは送らない＝重複配信しない）"]
+        B2o --> C2["全宛先そろった = 完了"]
+        C2 --> D2["DeleteAfterVerify=true → report.csv をローカル削除"]
+        C2 --> E2["RemoveAll → primary/tokyo のマーカーも掃除"]
+        C2 --> F2["終了コード 0<br/>（マーカーは何も残らない）"]
+    end
+```
+
+この絵で押さえてほしいファンアウトの設計思想は 3 つ:
+
+1. **進捗はメモリ、確定はディスク** — 「何宛先まで送れたか」の途中経過は `FanoutCoordinator` のメモリ上カウンタだけで持つ。ディスクのマーカーを書くのは**全宛先の結果が出そろった完了コールバックの中だけ**（各宛先成功のたびに逐次書かない）。
+2. **マーカーは "未完了" の印** — 全部配ってファイルも消す正常運用ではマーカーは残らない。マーカーがある = 「部分失敗で残っている」か「保持運用で次回スキップしたい」のどちらか。
+3. **再送は差分だけ** — Run 2 では `pending = 全宛先 − 配信済み` を取り直すので、復旧した osaka にだけ送る。配信済みへ二重に送らない。
 
 ---
 
@@ -494,6 +594,17 @@ async (item, token) =>
      [1][4]  [2][5]  [3][6]
 ```
 
+```mermaid
+flowchart TB
+    L["先にそろった一覧<br/>[1][2][3][4][5][6]"]
+    L -->|分割して配る| A["担当A<br/>1, 4"]
+    L -->|分割して配る| B["担当B<br/>2, 5"]
+    L -->|分割して配る| C["担当C<br/>3, 6"]
+    A --> X["各担当は I/O 待ちの間も<br/>スレッドを占有しがち"]
+    B --> X
+    C --> X
+```
+
 - もともと **計算（CPU を使う処理）を分担する**のが得意な仕組み。
 - 弱点①: **一覧が最初に全部そろっている前提**。「フォルダを見ながら、見つけ次第どんどん流す」用途には向かない。
 - 弱点②: 単純な使い方だと、通信の待ち時間の間も **担当（処理を実行する係＝OS のスレッド）を占有して塞いでしまう**。通信（ネットワーク I/O）が主役の処理には不向き。
@@ -518,11 +629,47 @@ async (item, token) =>
                                           取れるのは1人だけ（取り合い）   1件失敗しても隣は止まらない
 ```
 
+```mermaid
+flowchart LR
+    Prod["① 作る人<br/>フォルダを見て<br/>見つけ次第 投入"]
+    Prod -->|WriteAsync| Ch{{"② 待ち行列（最大 1000）<br/>満杯なら投入側が自動で待つ＝ブレーキ"}}
+    Ch -->|取れるのは 1 人だけ<br/>（取り合い）| W1["担当1"]
+    Ch --> W2["担当2"]
+    Ch --> W3["担当3 …最大16"]
+    W1 -->|接続を使い回して送信| Net["サーバ"]
+    W2 -->|"await で I/O 待ち中は<br/>スレッドを手放す"| Net
+    W3 -->|1 件失敗しても隣は止まらない| Net
+```
+
 - 担当の数 = `Concurrency`（1〜16）。**「作る」と「処理する」を分けている**のがミソ。
 - 待ち行列が満杯になると **投入する側が自動で待つ**（＝ブレーキ＝流量調整が標準で効く。メモリが膨らまない）。
 - 担当は「待ち合わせ（`await`）」で待つので、**通信の待ち時間の間は担当（スレッド）をいったん手放す**。だから 8 担当でも 8 本のスレッドを常時占有するわけではなく、待ち時間は他の仕事に回せる（通信主体の処理に強い理由）。
 - 1 件失敗しても、その担当が握りつぶして次へ進む（**他の担当は止まらない**＝失敗の隔離）。
 - 各担当は接続を **使い回す**（毎回つなぎ直さない）ので、接続確立のコストを抑えられる。
+
+### 核心: 「Parallel.ForEach」と本実装は何が本質的に違うのか
+
+ここがいちばん混同されやすいので 1 点に絞ると、**違いは「何を速くしたいか」**。
+
+```mermaid
+flowchart TB
+    subgraph PF["Parallel.ForEach（計算を速くする道具）"]
+        direction TB
+        PFa["CPU を使う処理を<br/>コア数ぶんに分担"] --> PFb["待ち時間ゼロの処理を<br/>束ねるのが得意"]
+        PFb --> PFc["I/O 待ち中もスレッドを占有<br/>＝通信主体だと無駄に塞ぐ"]
+    end
+    subgraph CH["本実装 = Channel + ワーカー Task（通信を速くする道具）"]
+        direction TB
+        CHa["ネットワーク待ちが主役"] --> CHb["await で待つ間は<br/>スレッドを手放す"]
+        CHb --> CHc["少ないスレッドで<br/>多数の転送を同時にさばける"]
+    end
+```
+
+- **Parallel.ForEach は「CPU バウンドな処理」を速くする道具**。100 万件の数値計算を 8 コアで割り算する、みたいな用途。各担当（スレッド）が休まず計算し続ける前提なので、**通信の待ち時間でスレッドを遊ばせる FTP/SFTP 転送には筋が悪い**（待っている間もスレッドを占有してしまう）。
+- **本実装は「I/O バウンドな処理」を速くする形**。転送のほとんどは「送って応答を待つ」時間で、その間 CPU は暇。だから `await` で**スレッドをいったん手放し**、待っている間に別の転送を進める。結果、たかだか 16 スレッドでも数千ファイルの転送を効率よく回せる。
+- おまけに本実装には **ブレーキ（待ち行列の容量）・1 件ごとの再試行（Polly）・失敗の隔離・宛先ごとの振り分け・接続の使い回し**が最初から組み込まれている。これらを `Parallel.ForEach` で再現しようとすると、結局これと同じものを自作することになる。
+
+> 早い話、**`Parallel.ForEach` は「計算を分担」、本実装は「通信を待ち合わせながら流す」**。だから同じ「並列」でも道具が違う。FTP/SFTP のような通信主体の仕事には後者が素直にはまる、というのがこのツールの選択。
 
 ### 早見表
 
