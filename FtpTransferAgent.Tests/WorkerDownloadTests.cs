@@ -48,7 +48,7 @@ public class WorkerDownloadTests
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), It.IsAny<bool>()))
             .ReturnsAsync(new[] { remoteFile });
-        mock.Setup(c => c.DownloadAsync(remoteFile, It.Is<string>(p => p.StartsWith(localPath + ".verify.", StringComparison.Ordinal)), It.IsAny<CancellationToken>()))
+        mock.Setup(c => c.DownloadAsync(remoteFile, It.Is<string>(p => p.EndsWith(".verify", StringComparison.Ordinal)), It.IsAny<CancellationToken>()))
             .Callback<string, string, CancellationToken>((_, lp, _) =>
             {
                 File.WriteAllText(lp, remoteContent);
@@ -188,22 +188,24 @@ public class WorkerDownloadTests
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(new[] { remoteFile, remoteEndFile });
-        mock.Setup(c => c.DownloadAsync(remoteFile, localPath, It.IsAny<CancellationToken>()))
-            .Returns(async () =>
+        // 非ハッシュのダウンロードは一時ディレクトリ配下のパスに書き、Worker が最終パスへ移動する。
+        // 宛先はリモートパスで識別する (第2引数は一時パスになるため一致条件には使わない)。
+        mock.Setup(c => c.DownloadAsync(remoteFile, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(async (string _, string lp, CancellationToken _) =>
             {
                 dataStarted.TrySetResult(true);
                 await releaseData.Task;
-                File.WriteAllText(localPath, "data");
+                File.WriteAllText(lp, "data");
                 Interlocked.Exchange(ref dataCompleted, 1);
             });
-        mock.Setup(c => c.DownloadAsync(remoteEndFile, localEndPath, It.IsAny<CancellationToken>()))
-            .Returns(() =>
+        mock.Setup(c => c.DownloadAsync(remoteEndFile, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns((string _, string lp, CancellationToken _) =>
             {
                 if (Volatile.Read(ref dataCompleted) == 0)
                 {
                     Interlocked.Exchange(ref endStartedBeforeDataCompleted, 1);
                 }
-                File.WriteAllText(localEndPath, "end");
+                File.WriteAllText(lp, "end");
                 return Task.CompletedTask;
             });
         mock.Setup(c => c.Dispose());
@@ -224,7 +226,7 @@ public class WorkerDownloadTests
         releaseData.TrySetResult(true);
         await workerTask;
 
-        mock.Verify(c => c.DownloadAsync(remoteEndFile, localEndPath, It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(c => c.DownloadAsync(remoteEndFile, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         Assert.Equal(0, Volatile.Read(ref endStartedBeforeDataCompleted));
 
         Directory.Delete(dir, true);
@@ -272,13 +274,14 @@ public class WorkerDownloadTests
         // DeleteRemoteEndFiles 有効時、Worker は END ダウンロード前に存在確認を行う
         mock.Setup(c => c.ExistsAsync(remoteEndFile, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
-        mock.Setup(c => c.DownloadAsync(remoteFile, localPath, It.IsAny<CancellationToken>()))
+        // 非ハッシュのダウンロードは一時パスに書かれ、Worker が最終パスへ移動する。
+        mock.Setup(c => c.DownloadAsync(remoteFile, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Callback<string, string, CancellationToken>((_, lp, _) =>
             {
                 File.WriteAllText(lp, "data");
             })
             .Returns(Task.CompletedTask);
-        mock.Setup(c => c.DownloadAsync(remoteEndFile, localEndPath, It.IsAny<CancellationToken>()))
+        mock.Setup(c => c.DownloadAsync(remoteEndFile, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .ThrowsAsync(new IOException("end download failed"));
         mock.Setup(c => c.Dispose());
 
@@ -291,8 +294,8 @@ public class WorkerDownloadTests
         var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
         await worker.RunAsync(CancellationToken.None);
 
-        mock.Verify(c => c.DownloadAsync(remoteFile, localPath, It.IsAny<CancellationToken>()), Times.Once);
-        mock.Verify(c => c.DownloadAsync(remoteEndFile, localEndPath, It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(c => c.DownloadAsync(remoteFile, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
+        mock.Verify(c => c.DownloadAsync(remoteEndFile, It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Once);
         mock.Verify(c => c.DeleteAsync(remoteFile, It.IsAny<CancellationToken>()), Times.Never);
         mock.Verify(c => c.DeleteAsync(remoteEndFile, It.IsAny<CancellationToken>()), Times.Never);
         Assert.True(File.Exists(localPath));
@@ -536,27 +539,30 @@ public class WorkerDownloadTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_Get_CleansUpOrphanedDownloadTempFiles()
+    public async Task ExecuteAsync_Get_CleansUpOrphanedDownloadTempDirectoryButKeepsUserFiles()
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
         try
         {
-            // 強制終了で残った検証用一時ファイル (削除されるべき)
-            var verifyTemp = Path.Combine(dir, "data.txt.verify." + Guid.NewGuid().ToString("N"));
-            var tmpTemp = Path.Combine(dir, "data.txt.tmp." + Guid.NewGuid().ToString("N"));
-            await File.WriteAllTextAsync(verifyTemp, "partial");
-            await File.WriteAllTextAsync(tmpTemp, "partial");
-            // サブフォルダの残骸も再帰的に掃除されること
-            var subDir = Path.Combine(dir, "sub");
-            Directory.CreateDirectory(subDir);
-            var nestedTemp = Path.Combine(subDir, "x.csv.verify." + Guid.NewGuid().ToString("N"));
-            await File.WriteAllTextAsync(nestedTemp, "partial");
-            // 実ファイルと紛らわしい名前 (削除されないべき)
+            // 前回の異常終了で残ったエージェント専用の一時ディレクトリと残骸 (削除されるべき)
+            var tempDir = Path.Combine(dir, ".ftptransferagent-tmp");
+            Directory.CreateDirectory(tempDir);
+            var verifyLeftover = Path.Combine(tempDir, Guid.NewGuid().ToString("N") + ".verify");
+            var dlLeftover = Path.Combine(tempDir, Guid.NewGuid().ToString("N") + ".dl");
+            var innerTmpLeftover = Path.Combine(tempDir, Guid.NewGuid().ToString("N") + ".verify.tmp." + Guid.NewGuid().ToString("N"));
+            await File.WriteAllTextAsync(verifyLeftover, "partial");
+            await File.WriteAllTextAsync(dlLeftover, "partial");
+            await File.WriteAllTextAsync(innerTmpLeftover, "partial");
+
+            // 利用者ファイル: エージェントの一時命名規則に「似た」名前でも消してはいけない
+            // (Codex レビュー指摘の回帰: 名前パターンで利用者データを消さない)
             var realFile = Path.Combine(dir, "data.txt");
-            var nearMiss = Path.Combine(dir, "report.verify.notahexsuffix");
+            var lookAlike = Path.Combine(dir, "report.tmp." + new string('a', 32)); // *.tmp.<32hex> に酷似
+            var verifyLookAlike = Path.Combine(dir, "notes.verify." + new string('b', 32));
             await File.WriteAllTextAsync(realFile, "keep me");
-            await File.WriteAllTextAsync(nearMiss, "keep me too");
+            await File.WriteAllTextAsync(lookAlike, "keep me too");
+            await File.WriteAllTextAsync(verifyLookAlike, "keep me three");
 
             var watch = Options.Create(new WatchOptions { Path = dir });
             var transfer = Options.Create(new TransferOptions
@@ -587,11 +593,14 @@ public class WorkerDownloadTests
 
             await worker.RunAsync(CancellationToken.None);
 
-            Assert.False(File.Exists(verifyTemp), ".verify.<hex> temp file should be cleaned up");
-            Assert.False(File.Exists(tmpTemp), ".tmp.<hex> temp file should be cleaned up");
-            Assert.False(File.Exists(nestedTemp), "nested temp file should be cleaned up recursively");
+            // エージェント専用ディレクトリの残骸だけが消える
+            Assert.False(File.Exists(verifyLeftover), "orphaned .verify temp must be cleaned up");
+            Assert.False(File.Exists(dlLeftover), "orphaned .dl temp must be cleaned up");
+            Assert.False(File.Exists(innerTmpLeftover), "orphaned inner client temp must be cleaned up");
+            // 利用者ファイルは名前が似ていても保持される
             Assert.True(File.Exists(realFile), "real data file must be kept");
-            Assert.True(File.Exists(nearMiss), "non-temp file with a similar name must be kept");
+            Assert.True(File.Exists(lookAlike), "user file resembling the temp pattern must be kept");
+            Assert.True(File.Exists(verifyLookAlike), "user file resembling the verify pattern must be kept");
         }
         finally
         {

@@ -372,7 +372,8 @@ public class WorkerTests
         var mock = new Mock<IFileTransferClient>();
         mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
             .ReturnsAsync(new[] { remoteFile });
-        mock.Setup(c => c.DownloadAsync(remoteFile, localPath, It.IsAny<CancellationToken>()))
+        // 非ハッシュのダウンロードは一時パスに書かれ、Worker が最終パスへ移動する。
+        mock.Setup(c => c.DownloadAsync(remoteFile, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Callback<string, string, CancellationToken>((_, lp, _) => File.WriteAllText(lp, "content"))
             .Returns(Task.CompletedTask).Verifiable();
         mock.Setup(c => c.Dispose());
