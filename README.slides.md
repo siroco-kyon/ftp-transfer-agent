@@ -50,7 +50,7 @@ style: |
 
 README スライド
 
-.NET 8 のバッチ型ファイル転送ツール  
+.NET 10 のバッチ型ファイル転送ツール  
 FTP / SFTP / ハッシュ検証 / END ファイル制御
 
 ---
@@ -92,7 +92,7 @@ FTP / SFTP / ハッシュ検証 / END ファイル制御
 
 前提:
 
-- `.NET 8 SDK` または Runtime
+- `.NET 10 SDK` または Runtime
 - FTP または SFTP サーバー
 
 実行:
