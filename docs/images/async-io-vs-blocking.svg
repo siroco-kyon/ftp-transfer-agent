@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" font-family="'BIZ UDPGothic','Yu Gothic','Meiryo',sans-serif" role="img" aria-label="同期ブロッキングと非同期awaitでスレッドの使われ方が違うことを示す図">
+  <defs>
+    <filter id="shA" x="-10%" y="-10%" width="120%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#0b548c" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <text x="480" y="32" text-anchor="middle" font-size="20" font-weight="bold" fill="#0b548c">なぜ async/await なのか（I/O 待ちでスレッドを手放す）</text>
+  <text x="480" y="54" text-anchor="middle" font-size="13" fill="#5a6b7b">FTP/SFTP 転送は時間のほとんどが「送って応答を待つ」時間。その間 CPU は暇 ＝ I/O バウンド</text>
+
+  <!-- legend -->
+  <rect x="300" y="74" width="16" height="16" rx="3" fill="#0f7a57"/>
+  <text x="322" y="87" font-size="12.5" fill="#1f2f3d">CPU で実際に働いている</text>
+  <rect x="500" y="74" width="16" height="16" rx="3" fill="#d9e6f0" stroke="#15729e"/>
+  <text x="522" y="87" font-size="12.5" fill="#1f2f3d">ネットワーク応答待ち（CPU は暇）</text>
+
+  <!-- (A) blocking -->
+  <text x="40" y="130" font-size="15" font-weight="bold" fill="#0b548c">(A) 同期ブロッキング … 待つ間もスレッドを占有</text>
+  <text x="40" y="152" font-size="12.5" fill="#5a6b7b">スレッド1本が「待ち」で塞がるので、同時にさばける数を増やすにはスレッドを増やすしかない</text>
+
+  <g filter="url(#shA)"><rect x="40" y="166" width="880" height="40" rx="8" fill="#ffffff" stroke="#0b548c" stroke-width="1.5"/></g>
+  <text x="30" y="190" text-anchor="end" font-size="12" fill="#1f2f3d" transform="translate(28,0)"></text>
+  <text x="20" y="190" font-size="12" fill="#1f2f3d">T1</text>
+  <rect x="48" y="174" width="40" height="24" rx="4" fill="#0f7a57"/>
+  <rect x="90" y="174" width="240" height="24" rx="4" fill="#d9e6f0" stroke="#15729e"/>
+  <rect x="332" y="174" width="40" height="24" rx="4" fill="#0f7a57"/>
+  <rect x="374" y="174" width="240" height="24" rx="4" fill="#d9e6f0" stroke="#15729e"/>
+  <rect x="616" y="174" width="40" height="24" rx="4" fill="#0f7a57"/>
+  <rect x="658" y="174" width="240" height="24" rx="4" fill="#d9e6f0" stroke="#15729e"/>
+  <text x="210" y="191" text-anchor="middle" font-size="11" fill="#15729e">ファイル1 を待つ（スレッド占有）</text>
+  <text x="494" y="191" text-anchor="middle" font-size="11" fill="#15729e">ファイル2 を待つ（スレッド占有）</text>
+
+  <!-- (B) async -->
+  <text x="40" y="252" font-size="15" font-weight="bold" fill="#0f7a57">(B) 非同期 await … 待つ間はスレッドを手放す</text>
+  <text x="40" y="274" font-size="12.5" fill="#5a6b7b">await で待ちに入った瞬間スレッドを返却。同じ1本で別ファイルの処理を進められる＝少ないスレッドで多数を同時進行</text>
+
+  <g filter="url(#shA)"><rect x="40" y="288" width="880" height="40" rx="8" fill="#ffffff" stroke="#0f7a57" stroke-width="1.5"/></g>
+  <text x="20" y="312" font-size="12" fill="#1f2f3d">T1</text>
+  <rect x="48" y="296" width="40" height="24" rx="4" fill="#0f7a57"/>
+  <rect x="92" y="296" width="40" height="24" rx="4" fill="#0f7a57"/>
+  <rect x="136" y="296" width="40" height="24" rx="4" fill="#0f7a57"/>
+  <rect x="180" y="296" width="40" height="24" rx="4" fill="#0f7a57"/>
+  <rect x="224" y="296" width="40" height="24" rx="4" fill="#0f7a57"/>
+  <rect x="268" y="296" width="40" height="24" rx="4" fill="#0f7a57"/>
+  <text x="600" y="312" font-size="12" fill="#5a6b7b">空いた時間で別の転送の続きを処理（待ちは裏で同時進行）</text>
+
+  <!-- waits below as concurrent -->
+  <rect x="92" y="338" width="300" height="14" rx="3" fill="#d9e6f0" stroke="#15729e"/>
+  <rect x="136" y="356" width="300" height="14" rx="3" fill="#d9e6f0" stroke="#15729e"/>
+  <rect x="180" y="374" width="300" height="14" rx="3" fill="#d9e6f0" stroke="#15729e"/>
+  <text x="40" y="349" font-size="11" fill="#15729e">待ち（裏で並行）</text>
+
+  <text x="40" y="416" font-size="13" fill="#1f2f3d">→ だから本ツールは <tspan font-weight="bold" fill="#0f7a57">Channel + ワーカー Task</tspan> で I/O 待ちを重ね、たかだか 16 スレッドでも数千ファイルを効率よくさばける。</text>
+  <text x="40" y="434" font-size="12" fill="#5a6b7b">（CPU 計算を分担する Parallel.ForEach とは目的が違う。詳細は本文「第6回」を参照）</text>
+</svg>

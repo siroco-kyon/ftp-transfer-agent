@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 440" font-family="'BIZ UDPGothic','Yu Gothic','Meiryo',sans-serif" role="img" aria-label="配信マーカーのライフサイクルを示す図">
+  <defs>
+    <marker id="arM" markerWidth="12" markerHeight="12" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#0b548c"/>
+    </marker>
+    <filter id="shM" x="-10%" y="-10%" width="120%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#0b548c" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <text x="480" y="32" text-anchor="middle" font-size="20" font-weight="bold" fill="#0b548c">配信マーカーのライフサイクル（＝「まだ配り切れていない」付箋）</text>
+  <text x="480" y="54" text-anchor="middle" font-size="13" fill="#5a6b7b">マーカーは部分失敗のときだけ作られる。全宛先に配り切ってファイルも消す通常運用では存在しない</text>
+
+  <!-- start: normal success -->
+  <g filter="url(#shM)"><rect x="40" y="90" width="240" height="86" rx="12" fill="#eaf4ee" stroke="#0f7a57" stroke-width="2"/></g>
+  <text x="160" y="120" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f7a57">全宛先 成功（通常）</text>
+  <text x="160" y="144" text-anchor="middle" font-size="12.5" fill="#1f2f3d">ローカル削除するだけ</text>
+  <text x="160" y="163" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#0f7a57">マーカーは作られない</text>
+
+  <!-- partial fail -->
+  <g filter="url(#shM)"><rect x="360" y="90" width="240" height="86" rx="12" fill="#fff4e6" stroke="#e08e45" stroke-width="2.5"/></g>
+  <text x="480" y="120" text-anchor="middle" font-size="14" font-weight="bold" fill="#9a5b1f">部分失敗（例: 大阪 ❌）</text>
+  <text x="480" y="144" text-anchor="middle" font-size="12.5" fill="#1f2f3d">成功宛先のマーカーを作成</text>
+  <text x="480" y="163" text-anchor="middle" font-size="12.5" fill="#1f2f3d">元ファイルは retry へ退避</text>
+
+  <!-- marker file -->
+  <g filter="url(#shM)"><rect x="680" y="86" width="240" height="120" rx="12" fill="#ffffff" stroke="#0b548c" stroke-width="2"/></g>
+  <text x="800" y="110" text-anchor="middle" font-size="13" font-weight="bold" fill="#0b548c">&lt;hash&gt;.marker（JSON）</text>
+  <text x="696" y="134" font-size="11.5" fill="#1f2f3d">RelativePath: report.csv</text>
+  <text x="696" y="152" font-size="11.5" fill="#1f2f3d">DestinationName: primary</text>
+  <text x="696" y="170" font-size="11.5" fill="#1f2f3d">Signature: st:11-638…（指紋）</text>
+  <text x="696" y="188" font-size="11.5" fill="#1f2f3d">DeliveredAtUtc: 2026-…</text>
+
+  <path d="M600,133 L676,140" fill="none" stroke="#0b548c" stroke-width="2" marker-end="url(#arM)"/>
+
+  <!-- next run check -->
+  <g filter="url(#shM)"><rect x="360" y="232" width="240" height="96" rx="12" fill="#eef5fa" stroke="#15729e" stroke-width="2"/></g>
+  <text x="480" y="258" text-anchor="middle" font-size="14" font-weight="bold" fill="#15729e">次回起動：指紋で照合</text>
+  <text x="480" y="282" text-anchor="middle" font-size="12" fill="#1f2f3d">一致 → 配信済み（送らない）</text>
+  <text x="480" y="302" text-anchor="middle" font-size="12" fill="#1f2f3d">不一致（中身が変わった）</text>
+  <text x="480" y="320" text-anchor="middle" font-size="12" font-weight="bold" fill="#9a5b1f">→ マーカー破棄して全再送</text>
+  <path d="M800,206 C800,232 600,240 600,272" fill="none" stroke="#15729e" stroke-width="2" marker-end="url(#arM)"/>
+
+  <!-- complete / cleanup -->
+  <g filter="url(#shM)"><rect x="40" y="232" width="240" height="96" rx="12" fill="#eaf4ee" stroke="#0f7a57" stroke-width="2"/></g>
+  <text x="160" y="258" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f7a57">全宛先そろった = 完了</text>
+  <text x="160" y="282" text-anchor="middle" font-size="12" fill="#1f2f3d">未送先だけ再送して達成</text>
+  <text x="160" y="302" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#0f7a57">RemoveAll でマーカー全消去</text>
+  <text x="160" y="320" text-anchor="middle" font-size="12" fill="#1f2f3d">ローカルも削除</text>
+  <path d="M360,288 C320,300 320,288 282,284" fill="none" stroke="#0f7a57" stroke-width="2" marker-end="url(#arM)"/>
+
+  <!-- orphan -->
+  <g filter="url(#shM)"><rect x="680" y="248" width="240" height="80" rx="12" fill="#ffffff" stroke="#0b548c" stroke-width="1.5" stroke-dasharray="5 4"/></g>
+  <text x="800" y="274" text-anchor="middle" font-size="13" font-weight="bold" fill="#0b548c">起動時の掃除</text>
+  <text x="800" y="298" text-anchor="middle" font-size="12" fill="#1f2f3d">元ファイルが消えた孤児マーカー</text>
+  <text x="800" y="316" text-anchor="middle" font-size="12" fill="#1f2f3d">壊れたマーカー → 削除</text>
+
+  <text x="40" y="372" font-size="13" fill="#1f2f3d">設計思想：<tspan font-weight="bold" fill="#0f7a57">進捗はメモリ・確定はディスク</tspan>。途中経過は FanoutCoordinator のカウンタだけで持ち、ディスクのマーカーは完了コールバックでしか触らない。</text>
+  <text x="40" y="396" font-size="13" fill="#1f2f3d"><tspan font-weight="bold" fill="#0f7a57">マーカー = 未完了の印。</tspan> あれば「部分失敗で残っている」か「保持運用で次回スキップしたい」のどちらか。</text>
+  <text x="40" y="420" font-size="12" fill="#5a6b7b">実装: DeliveryStateStore（Initialize / GetDeliveredDestinations / RecordDelivered / RemoveAll）, Worker.HandleFanoutCompletionTracked</text>
+</svg>
