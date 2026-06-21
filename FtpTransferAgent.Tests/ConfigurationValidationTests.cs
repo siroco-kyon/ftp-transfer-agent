@@ -81,17 +81,16 @@ public class ConfigurationValidationTests
     [Fact]
     public void TransferOptions_ShouldValidateRequiredFields()
     {
-        // Host is required
+        // Host / Username は DataAnnotations では必須にしていない (Mode=local は不要なため)。
+        // ftp/sftp での必須は ConfigurationValidator が担保する (LocalDestinationValidationTests 参照)。
+        // ここでは DataAnnotations レベルで Host/Username が flag されないことを確認する。
         var noHost = new TransferOptions { Mode = "ftp", Direction = "put", Host = "", Username = "user", Password = "pass", RemotePath = "/remote" };
         var hostValidation = ValidateObject(noHost);
-        Assert.NotEmpty(hostValidation);
-        Assert.Contains(hostValidation, r => r.MemberNames.Contains(nameof(TransferOptions.Host)));
+        Assert.DoesNotContain(hostValidation, r => r.MemberNames.Contains(nameof(TransferOptions.Host)));
 
-        // Username is required
         var noUsername = new TransferOptions { Mode = "ftp", Direction = "put", Host = "test.com", Username = "", Password = "pass", RemotePath = "/remote" };
         var usernameValidation = ValidateObject(noUsername);
-        Assert.NotEmpty(usernameValidation);
-        Assert.Contains(usernameValidation, r => r.MemberNames.Contains(nameof(TransferOptions.Username)));
+        Assert.DoesNotContain(usernameValidation, r => r.MemberNames.Contains(nameof(TransferOptions.Username)));
 
         // RemotePath is required
         var noRemotePath = new TransferOptions { Mode = "ftp", Direction = "put", Host = "test.com", Username = "user", Password = "pass", RemotePath = "" };

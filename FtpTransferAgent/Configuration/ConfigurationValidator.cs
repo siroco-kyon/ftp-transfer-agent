@@ -223,12 +223,14 @@ public class ConfigurationValidator
                 result.Errors.Add($"{label} is null");
                 continue;
             }
-            label = $"[Destination#{i + 1} host={d.Host}]";
-            if (string.IsNullOrWhiteSpace(d.Host))
+            var isLocal = d.Mode == "local";
+            label = isLocal ? $"[Destination#{i + 1} local={d.RemotePath}]" : $"[Destination#{i + 1} host={d.Host}]";
+            // Host/Username は ftp/sftp のみ必須。local は OS の実行ユーザー権限でアクセスするため不要。
+            if (!isLocal && string.IsNullOrWhiteSpace(d.Host))
             {
                 result.Errors.Add($"{label} Host is required");
             }
-            if (string.IsNullOrWhiteSpace(d.Username))
+            if (!isLocal && string.IsNullOrWhiteSpace(d.Username))
             {
                 result.Errors.Add($"{label} Username is required");
             }
@@ -236,9 +238,13 @@ public class ConfigurationValidator
             {
                 result.Errors.Add($"{label} RemotePath is required");
             }
-            if (!(d.Mode == "ftp" || d.Mode == "sftp"))
+            else if (isLocal && !Path.IsPathFullyQualified(d.RemotePath))
             {
-                result.Errors.Add($"{label} Mode must be 'ftp' or 'sftp' (got '{d.Mode}')");
+                result.Warnings.Add($"{label} local RemotePath is not an absolute/UNC path: {d.RemotePath}");
+            }
+            if (!(d.Mode == "ftp" || d.Mode == "sftp" || d.Mode == "local"))
+            {
+                result.Errors.Add($"{label} Mode must be 'ftp', 'sftp' or 'local' (got '{d.Mode}')");
             }
             if (d.Port < 1 || d.Port > 65535)
             {
@@ -323,12 +329,51 @@ public class ConfigurationValidator
         return $"{mode}|{host}|{destination.Port}|{remotePath}";
     }
 
+    // 転送方式 (Mode) ごとの必須項目・制約を検証する (primary 宛先)。
+    // DestinationOptions は local モードのため Host/Username を [Required] にしていないので、
+    // ftp/sftp の必須項目はここで担保する。
+    private static void ValidatePrimaryModeRequirements(TransferOptions transfer, ConfigurationValidationResult result)
+    {
+        var mode = transfer.Mode?.Trim().ToLowerInvariant();
+        if (mode is "ftp" or "sftp")
+        {
+            if (string.IsNullOrWhiteSpace(transfer.Host))
+            {
+                result.Errors.Add("Host is required for ftp/sftp mode.");
+            }
+            if (string.IsNullOrWhiteSpace(transfer.Username))
+            {
+                result.Errors.Add("Username is required for ftp/sftp mode.");
+            }
+        }
+        else if (mode is "local")
+        {
+            // local は put 専用。get 経路はリモートパスを '/' 前提で解決するため未対応。
+            if (transfer.Direction is "get")
+            {
+                result.Errors.Add("Mode 'local' is currently supported only for Direction 'put'.");
+            }
+            if (string.IsNullOrWhiteSpace(transfer.RemotePath))
+            {
+                result.Errors.Add("RemotePath (destination directory) is required for local mode.");
+            }
+            else if (!Path.IsPathFullyQualified(transfer.RemotePath))
+            {
+                result.Warnings.Add($"local RemotePath '{transfer.RemotePath}' is not an absolute/UNC path. Use a full path like 'D:\\out' or '\\\\server\\share\\in'.");
+            }
+            result.Infos.Add("Mode 'local' writes through the OS file system (including SMB/UNC shares). No CIFS/SMB1 is implemented; ensure SMB1 is disabled and enable SMB encryption on the server if on-the-wire confidentiality is required.");
+        }
+    }
+
     private void ValidateBasicConfiguration(WatchOptions watch, TransferOptions transfer, CleanupOptions cleanup, ConfigurationValidationResult result)
     {
         if (transfer.Direction is not "put" and not "get")
         {
             result.Errors.Add($"Direction must be 'put' or 'get' (got '{transfer.Direction}')");
         }
+
+        // 転送方式ごとの必須項目・制約チェック (primary 宛先)
+        ValidatePrimaryModeRequirements(transfer, result);
 
         // ローカルパスの存在チェック
         if (transfer.Direction is "put")

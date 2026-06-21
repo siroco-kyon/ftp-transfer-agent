@@ -16,16 +16,26 @@ public class DestinationOptions
     /// </summary>
     public string? Name { get; set; }
 
+    /// <summary>
+    /// 転送方式。<c>ftp</c> / <c>sftp</c> は通信プロトコル、<c>local</c> はローカル / UNC
+    /// (SMB 共有) のファイルシステムへの転送 (put 専用)。
+    /// </summary>
     [Required]
-    [RegularExpression("^(ftp|sftp)$")]
+    [RegularExpression("^(ftp|sftp|local)$")]
     public string Mode { get; set; } = "ftp";
 
-    [Required]
+    /// <summary>
+    /// 接続先ホスト。<c>ftp</c> / <c>sftp</c> では必須 (ConfigurationValidator で検証)。
+    /// <c>local</c> では使用しない。
+    /// </summary>
     public string Host { get; set; } = string.Empty;
 
     public int Port { get; set; } = 21;
 
-    [Required]
+    /// <summary>
+    /// 接続ユーザー名。<c>ftp</c> / <c>sftp</c> では必須 (ConfigurationValidator で検証)。
+    /// <c>local</c> では使用しない (OS の実行ユーザー権限でアクセスする)。
+    /// </summary>
     public string Username { get; set; } = string.Empty;
 
     public string? Password { get; set; }

@@ -1,3 +1,4 @@
+using System.IO;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,6 +23,25 @@ public class WorkerClientFactoryTests
         using var client = worker.CreatePrimaryClient();
 
         Assert.IsType<AsyncFtpClientWrapper>(client);
+    }
+
+    [Fact]
+    public void CreateClient_LocalMode_CreatesLocalFileTransferClient()
+    {
+        using var services = BuildServices();
+        var worker = new WorkerHarness(
+            Options.Create(new WatchOptions { Path = Path.GetTempPath() }),
+            Options.Create(new TransferOptions { Mode = "local", Direction = "put", RemotePath = Path.GetTempPath() }),
+            Options.Create(new RetryOptions()),
+            Options.Create(new HashOptions { Algorithm = "SHA256" }),
+            Options.Create(new CleanupOptions()),
+            services,
+            services.GetRequiredService<ILogger<Worker>>(),
+            Mock.Of<IHostApplicationLifetime>());
+
+        using var client = worker.CreatePrimaryClient();
+
+        Assert.IsType<LocalFileTransferClient>(client);
     }
 
     [Fact]
