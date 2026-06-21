@@ -184,6 +184,22 @@ public class LocalDestinationValidationTests : IDisposable
     }
 
     [Fact]
+    public void Local_RemotePath_AncestorOfWatchPath_IsRejected()
+    {
+        var parent = Directory.GetParent(_watchDir)!.FullName;  // 監視フォルダの祖先
+
+        var result = Validate(new TransferOptions
+        {
+            Mode = "local",
+            Direction = "put",
+            RemotePath = parent,  // フォルダ保持 + IncludeSubfolders で監視ツリーへ書き戻る恐れ
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("must not be a parent of Watch.Path"));
+    }
+
+    [Fact]
     public void AdditionalLocalDestination_InsideWatchPath_IsRejected()
     {
         var result = Validate(new TransferOptions

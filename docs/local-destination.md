@@ -104,10 +104,11 @@ local 追加のため `DestinationOptions.Host` / `Username` の `[Required]` �
   - `ftp` / `sftp`: `Host`・`Username` 必須。
   - `local`: `RemotePath` 必須、絶対/UNC でなければ警告、`Direction=get` はエラー、SMB セキュリティの Info を出す。
 - **追加宛先**（`ValidateAdditionalDestinations`）: `local` を許可。`Host`/`Username` は ftp/sftp のみ必須、`RemotePath` は全方式必須。
-- **監視フォルダとの重なり防止**（`ValidateLocalDestinationNotInsideWatch`, primary / 追加宛先の両方に適用）: `local` の `RemotePath` が `Watch.Path` と **同一**、またはその **配下** の場合は起動時エラー。
+- **監視フォルダとの重なり防止**（`ValidateLocalDestinationNotInsideWatch`, primary / 追加宛先の両方に適用）: `local` の `RemotePath` が `Watch.Path` と **同一**、その **配下**、またはその **祖先** の場合は起動時エラー。
   - 同一だと転送先がアップロード元と一致し、`Cleanup.DeleteAfterVerify`（既定 true）が唯一のコピーを削除して**データ消失**する。
   - 配下だと書き出したファイルが（特に `IncludeSubfolders` 有効時に）後続実行で**再取り込み**される。
-  - 対策: 宛先は `Watch.Path` の外側を指定する。
+  - 祖先だとフォルダ構造保持 + `IncludeSubfolders` 有効時に、相対パスの連結で出力が監視ツリー内へ書き戻り、同様に**再取り込み**される。
+  - 対策: 宛先は `Watch.Path` ツリーの外側を指定する。
 
 ---
 

@@ -405,6 +405,10 @@ public class ConfigurationValidator
             {
                 result.Errors.Add($"{labelPrefix}local RemotePath '{remotePath}' must not be inside Watch.Path ('{watch.Path}'). Files written under the watch folder can be picked up again by later runs (especially with IncludeSubfolders). Choose a destination outside Watch.Path.");
             }
+            else if (IsAncestorDirectory(destPath, watchPath))
+            {
+                result.Errors.Add($"{labelPrefix}local RemotePath '{remotePath}' must not be a parent of Watch.Path ('{watch.Path}'). With folder-structure preservation and IncludeSubfolders, transferred files can land back inside the watch folder and be picked up by later runs. Choose a destination outside the Watch.Path tree.");
+            }
         }
         catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException or SecurityException)
         {
