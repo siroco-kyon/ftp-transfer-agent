@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 380" font-family="'BIZ UDPGothic','Yu Gothic','Meiryo',sans-serif" role="img" aria-label="1つのファイルを複数宛先へ同時配信するファンアウトの図">
+  <defs>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#0b548c"/>
+    </marker>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#0b548c" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <!-- source file -->
+  <g filter="url(#shadow)">
+    <rect x="40" y="148" width="190" height="84" rx="12" fill="#ffffff" stroke="#0b548c" stroke-width="2.5"/>
+  </g>
+  <text x="135" y="182" text-anchor="middle" font-size="22" font-weight="bold" fill="#1f2f3d">data.csv</text>
+  <text x="135" y="208" text-anchor="middle" font-size="15" fill="#5a6b7b">1つのファイル</text>
+
+  <!-- fan-out arrows -->
+  <path d="M230,190 C320,190 330,96 420,96" fill="none" stroke="#0b548c" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <path d="M230,190 C320,190 330,190 420,190" fill="none" stroke="#0b548c" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <path d="M230,190 C320,190 330,284 420,284" fill="none" stroke="#0b548c" stroke-width="2.5" marker-end="url(#arrow)"/>
+  <text x="318" y="135" text-anchor="middle" font-size="15" fill="#0f7a57" font-weight="bold">同時に配信</text>
+
+  <!-- destination boxes -->
+  <g filter="url(#shadow)">
+    <rect x="430" y="62" width="490" height="68" rx="10" fill="#eaf4ee" stroke="#0f7a57" stroke-width="2"/>
+  </g>
+  <text x="452" y="92" font-size="17" font-weight="bold" fill="#0f7a57">メイン宛先</text>
+  <text x="452" y="116" font-size="16" fill="#1f2f3d">sftp://primary.example.com/in</text>
+
+  <g filter="url(#shadow)">
+    <rect x="430" y="156" width="490" height="68" rx="10" fill="#f4f8fb" stroke="#15729e" stroke-width="2"/>
+  </g>
+  <text x="452" y="186" font-size="17" font-weight="bold" fill="#15729e">追加宛先①（大阪）</text>
+  <text x="452" y="210" font-size="16" fill="#1f2f3d">ftp://osaka.example.com/inbox</text>
+
+  <g filter="url(#shadow)">
+    <rect x="430" y="250" width="490" height="68" rx="10" fill="#f4f8fb" stroke="#15729e" stroke-width="2"/>
+  </g>
+  <text x="452" y="280" font-size="17" font-weight="bold" fill="#15729e">追加宛先②（東京）</text>
+  <text x="452" y="304" font-size="16" fill="#1f2f3d">sftp://tokyo.example.com/in</text>
+
+  <!-- footnote -->
+  <text x="40" y="358" font-size="14" fill="#5a6b7b">宛先ごとにプロトコル・認証・並列数を個別設定でき、SFTP と FTP の混在も可能。</text>
+</svg>

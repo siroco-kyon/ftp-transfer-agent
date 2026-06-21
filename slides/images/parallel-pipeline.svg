@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 380" font-family="'BIZ UDPGothic','Yu Gothic','Meiryo',sans-serif" role="img" aria-label="作る人・待ち行列・担当に分けた並列転送の流れ作業の図">
+  <defs>
+    <marker id="arrow3" markerWidth="12" markerHeight="12" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#0b548c"/>
+    </marker>
+    <filter id="shadow3" x="-10%" y="-10%" width="120%" height="130%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#0b548c" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <!-- column headers -->
+  <text x="120" y="40" text-anchor="middle" font-size="16" font-weight="bold" fill="#0b548c">① 作る人</text>
+  <text x="420" y="40" text-anchor="middle" font-size="16" font-weight="bold" fill="#0b548c">② 待ち行列（最大1000）</text>
+  <text x="790" y="40" text-anchor="middle" font-size="16" font-weight="bold" fill="#0b548c">③ 担当（最大16）</text>
+
+  <!-- producer -->
+  <g filter="url(#shadow3)">
+    <rect x="30" y="120" width="180" height="120" rx="12" fill="#ffffff" stroke="#0b548c" stroke-width="2.5"/>
+  </g>
+  <text x="120" y="170" text-anchor="middle" font-size="16" fill="#1f2f3d">フォルダを見て</text>
+  <text x="120" y="196" text-anchor="middle" font-size="16" fill="#1f2f3d">見つけ次第</text>
+  <text x="120" y="222" text-anchor="middle" font-size="16" font-weight="bold" fill="#0f7a57">投入</text>
+
+  <!-- arrow to queue -->
+  <path d="M212,180 L286,180" fill="none" stroke="#0b548c" stroke-width="2.5" marker-end="url(#arrow3)"/>
+
+  <!-- queue -->
+  <g filter="url(#shadow3)">
+    <rect x="296" y="120" width="248" height="120" rx="12" fill="#eef5fa" stroke="#15729e" stroke-width="2.5"/>
+  </g>
+  <g fill="#ffffff" stroke="#15729e" stroke-width="1.5">
+    <rect x="320" y="160" width="40" height="40" rx="6"/>
+    <rect x="368" y="160" width="40" height="40" rx="6"/>
+    <rect x="416" y="160" width="40" height="40" rx="6"/>
+    <rect x="464" y="160" width="40" height="40" rx="6"/>
+  </g>
+  <text x="420" y="226" text-anchor="middle" font-size="13" fill="#15729e">満杯なら投入側が自動で待つ（ブレーキ）</text>
+
+  <!-- arrows to workers -->
+  <path d="M546,160 C600,160 600,96 656,96" fill="none" stroke="#0b548c" stroke-width="2.5" marker-end="url(#arrow3)"/>
+  <path d="M546,180 C600,180 600,180 656,180" fill="none" stroke="#0b548c" stroke-width="2.5" marker-end="url(#arrow3)"/>
+  <path d="M546,200 C600,200 600,264 656,264" fill="none" stroke="#0b548c" stroke-width="2.5" marker-end="url(#arrow3)"/>
+  <text x="600" y="135" text-anchor="middle" font-size="12" fill="#5a6b7b">取れるのは1人だけ（取り合い）</text>
+
+  <!-- workers -->
+  <g filter="url(#shadow3)">
+    <rect x="666" y="66" width="160" height="58" rx="10" fill="#eaf4ee" stroke="#0f7a57" stroke-width="2"/>
+    <rect x="666" y="151" width="160" height="58" rx="10" fill="#eaf4ee" stroke="#0f7a57" stroke-width="2"/>
+    <rect x="666" y="236" width="160" height="58" rx="10" fill="#eaf4ee" stroke="#0f7a57" stroke-width="2"/>
+  </g>
+  <text x="746" y="101" text-anchor="middle" font-size="16" font-weight="bold" fill="#0f7a57">担当1</text>
+  <text x="746" y="186" text-anchor="middle" font-size="16" font-weight="bold" fill="#0f7a57">担当2</text>
+  <text x="746" y="271" text-anchor="middle" font-size="16" font-weight="bold" fill="#0f7a57">担当3</text>
+
+  <!-- server -->
+  <text x="892" y="175" text-anchor="middle" font-size="15" fill="#5a6b7b">→ 接続を</text>
+  <text x="892" y="195" text-anchor="middle" font-size="15" fill="#5a6b7b">使い回して送信</text>
+
+  <!-- footnote -->
+  <text x="30" y="338" font-size="15" fill="#1f2f3d">「作る人」と「処理する人」を分けた流れ作業。<tspan font-weight="bold" fill="#0f7a57">1件失敗しても隣の担当は止まらない（ワーカー隔離）。</tspan></text>
+  <text x="30" y="362" font-size="14" fill="#5a6b7b">待ち時間（通信）は担当がスレッドを手放すので、少ない担当でも多数のファイルを効率よくさばける。</text>
+</svg>
