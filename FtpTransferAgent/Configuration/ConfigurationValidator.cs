@@ -42,7 +42,7 @@ public class ConfigurationValidator
         ValidateConfigurationCombinations(watch, transfer, hash, cleanup, result);
 
         // 追加宛先のバリデーション
-        ValidateAdditionalDestinations(transfer, result);
+        ValidateAdditionalDestinations(watch, transfer, result);
 
         // 宛先別配信トラッキングのバリデーション
         ValidateDeliveryTracking(watch, transfer, cleanup, result);
@@ -201,7 +201,7 @@ public class ConfigurationValidator
         child.StartsWith(ancestor + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
         || child.StartsWith(ancestor + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 
-    private void ValidateAdditionalDestinations(TransferOptions transfer, ConfigurationValidationResult result)
+    private void ValidateAdditionalDestinations(WatchOptions watch, TransferOptions transfer, ConfigurationValidationResult result)
     {
         if (transfer.AdditionalDestinations is null || transfer.AdditionalDestinations.Count == 0)
         {
@@ -241,6 +241,10 @@ public class ConfigurationValidator
             else if (isLocal && !Path.IsPathFullyQualified(d.RemotePath))
             {
                 result.Warnings.Add($"{label} local RemotePath is not an absolute/UNC path: {d.RemotePath}");
+            }
+            if (isLocal)
+            {
+                ValidateLocalDestinationNotInsideWatch(watch, d.Mode, d.RemotePath, $"{label} ", result);
             }
             if (!(d.Mode == "ftp" || d.Mode == "sftp" || d.Mode == "local"))
             {
@@ -365,6 +369,49 @@ public class ConfigurationValidator
         }
     }
 
+    /// <summary>
+    /// local 宛先の RemotePath が監視フォルダ (Watch.Path) と同一、またはその配下にないことを検証する。
+    /// 同一だと転送先がアップロード元と一致し、Cleanup.DeleteAfterVerify によって唯一のファイルが
+    /// 削除されてデータ消失する。配下だと書き出したファイルが (特に IncludeSubfolders 有効時に)
+    /// 後続実行で再取り込みされてしまう。いずれも起動時エラーとして弾く。
+    /// </summary>
+    private static void ValidateLocalDestinationNotInsideWatch(
+        WatchOptions watch,
+        string? mode,
+        string? remotePath,
+        string labelPrefix,
+        ConfigurationValidationResult result)
+    {
+        if (!string.Equals(mode?.Trim(), "local", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+        if (string.IsNullOrWhiteSpace(remotePath))
+        {
+            // RemotePath 必須チェックは別途行うため、ここでは何もしない。
+            return;
+        }
+
+        try
+        {
+            var watchPath = NormalizeDirectoryPath(Path.GetFullPath(watch.Path));
+            var destPath = NormalizeDirectoryPath(Path.GetFullPath(remotePath));
+
+            if (string.Equals(destPath, watchPath, StringComparison.OrdinalIgnoreCase))
+            {
+                result.Errors.Add($"{labelPrefix}local RemotePath '{remotePath}' must not be the same as Watch.Path ('{watch.Path}'). The uploaded file would target its own source, and Cleanup.DeleteAfterVerify would then delete the only copy. Choose a destination outside Watch.Path.");
+            }
+            else if (IsAncestorDirectory(watchPath, destPath))
+            {
+                result.Errors.Add($"{labelPrefix}local RemotePath '{remotePath}' must not be inside Watch.Path ('{watch.Path}'). Files written under the watch folder can be picked up again by later runs (especially with IncludeSubfolders). Choose a destination outside Watch.Path.");
+            }
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException or SecurityException)
+        {
+            result.Errors.Add($"{labelPrefix}local RemotePath is invalid: {ex.Message}");
+        }
+    }
+
     private void ValidateBasicConfiguration(WatchOptions watch, TransferOptions transfer, CleanupOptions cleanup, ConfigurationValidationResult result)
     {
         if (transfer.Direction is not "put" and not "get")
@@ -374,6 +421,9 @@ public class ConfigurationValidator
 
         // 転送方式ごとの必須項目・制約チェック (primary 宛先)
         ValidatePrimaryModeRequirements(transfer, result);
+
+        // local primary 宛先が監視フォルダと重ならないこと (自己上書き・再取り込み防止)
+        ValidateLocalDestinationNotInsideWatch(watch, transfer.Mode, transfer.RemotePath, string.Empty, result);
 
         // ローカルパスの存在チェック
         if (transfer.Direction is "put")

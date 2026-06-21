@@ -13,12 +13,16 @@ namespace FtpTransferAgent.Tests;
 public class LocalDestinationValidationTests : IDisposable
 {
     private readonly string _watchDir;
+    private readonly string _destDir;
     private readonly ConfigurationValidator _validator = new(NullLogger<ConfigurationValidator>.Instance);
 
     public LocalDestinationValidationTests()
     {
         _watchDir = Path.Combine(Path.GetTempPath(), "local-val-" + Path.GetRandomFileName());
         Directory.CreateDirectory(_watchDir);
+        // 監視フォルダの外側に置く宛先 (自己上書き・再取り込みを避けた正常系)
+        _destDir = Path.Combine(Path.GetTempPath(), "local-dest-" + Path.GetRandomFileName());
+        Directory.CreateDirectory(_destDir);
     }
 
     private ConfigurationValidationResult Validate(TransferOptions transfer) =>
@@ -36,7 +40,7 @@ public class LocalDestinationValidationTests : IDisposable
         {
             Mode = "local",
             Direction = "put",
-            RemotePath = Path.Combine(_watchDir, "out"),  // 絶対パス
+            RemotePath = Path.Combine(_destDir, "out"),  // 監視フォルダ外の絶対パス
         });
 
         Assert.True(result.IsValid, string.Join("; ", result.Errors));
@@ -120,7 +124,7 @@ public class LocalDestinationValidationTests : IDisposable
             RemotePath = "/in",
             AdditionalDestinations = new List<DestinationOptions>
             {
-                new() { Name = "share", Mode = "local", RemotePath = Path.Combine(_watchDir, "share") }
+                new() { Name = "share", Mode = "local", RemotePath = Path.Combine(_destDir, "share") }
             }
         });
 
@@ -151,8 +155,60 @@ public class LocalDestinationValidationTests : IDisposable
         Assert.Contains(result.Errors, e => e.Contains("RemotePath is required"));
     }
 
+    [Fact]
+    public void Local_RemotePath_EqualsWatchPath_IsRejected()
+    {
+        var result = Validate(new TransferOptions
+        {
+            Mode = "local",
+            Direction = "put",
+            RemotePath = _watchDir,  // 監視フォルダそのもの: 自己上書き → Cleanup でデータ消失
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("must not be the same as Watch.Path"));
+    }
+
+    [Fact]
+    public void Local_RemotePath_InsideWatchPath_IsRejected()
+    {
+        var result = Validate(new TransferOptions
+        {
+            Mode = "local",
+            Direction = "put",
+            RemotePath = Path.Combine(_watchDir, "out"),  // 監視フォルダ配下: 再取り込みの恐れ
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("must not be inside Watch.Path"));
+    }
+
+    [Fact]
+    public void AdditionalLocalDestination_InsideWatchPath_IsRejected()
+    {
+        var result = Validate(new TransferOptions
+        {
+            Name = "primary",
+            Mode = "sftp",
+            Direction = "put",
+            Host = "sftp.example.com",
+            Port = 22,
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/in",
+            AdditionalDestinations = new List<DestinationOptions>
+            {
+                new() { Name = "share", Mode = "local", RemotePath = Path.Combine(_watchDir, "share") }
+            }
+        });
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("must not be inside Watch.Path"));
+    }
+
     public void Dispose()
     {
         try { Directory.Delete(_watchDir, true); } catch { /* best effort */ }
+        try { Directory.Delete(_destDir, true); } catch { /* best effort */ }
     }
 }
