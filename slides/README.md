@@ -7,13 +7,18 @@
 - `FtpTransferAgent_社内説明スライド.md` — 社内説明用
 - 図版は `slides/images/*.svg`（`![](images/xxx.svg)` で参照）
 
-## ⚠️ 最重要: ローカル画像を含む書き出しは `--allow-local-files` が必須
+## ⚠️ 書き出し時に付けるフラグ（2 つ）
 
-このスライドは図を **ローカルの SVG ファイル**（`images/` 配下）として参照している。
-Marp CLI は PDF / PNG / PPTX への書き出し時、セキュリティのため **既定ではローカルファイルを読み込まない**。
-`--allow-local-files` を付け忘れると、**図が描画されず代わりに alt テキストだけが出る**ので注意。
+| フラグ | 区分 | 役割 |
+|---|---|---|
+| `--allow-local-files` | **必須** | ローカルの SVG（`images/` 配下）を読み込む。無いと図が描画されず **alt テキストだけ**になる。 |
+| `--html` | **推奨** | markdown 中の **生 HTML タグ**（`<div class="columns">`・`.placeholder` など）を有効化する。 |
 
-> HTML 出力（`--html`）では不要。PDF / PNG / PPTX のときだけ必要。
+補足:
+
+- `--html` は「**生 HTML タグを許可する**」フラグであって、「HTML 形式で出力する」フラグではない。出力形式は `--pdf` / `--images` / `--pptx` や出力ファイルの拡張子で決まる。
+- 本スライドは段組み（`<div class="columns">`）や画像枠（`<div class="placeholder">`）に生 HTML を使う。現行の Marp ではこれらは既定でも描画されるが、Marp の `html` 既定値はバージョン・設定で変わりうるため、**書き出しコマンドに `--html` も付けておくと環境差に左右されず確実**。
+- `--allow-local-files` が要るのは PDF / PNG / PPTX のときだけ（HTML 出力では不要）。
 
 ## 書き出しコマンド
 
@@ -21,22 +26,22 @@ Marp CLI は PDF / PNG / PPTX への書き出し時、セキュリティのた�
 cd slides
 
 # PDF（配布・印刷用）
-marp FtpTransferAgent_社内説明スライド.md --pdf --allow-local-files
+marp FtpTransferAgent_社内説明スライド.md --pdf       --allow-local-files --html
 
 # PNG（1 スライド = 1 枚）
-marp FtpTransferAgent_社内説明スライド.md --images png --allow-local-files
+marp FtpTransferAgent_社内説明スライド.md --images png --allow-local-files --html
 
 # PPTX（PowerPoint で編集したい場合）
-marp FtpTransferAgent_社内説明スライド.md --pptx --allow-local-files
+marp FtpTransferAgent_社内説明スライド.md --pptx      --allow-local-files --html
 
-# HTML（プレビュー。ローカル画像でもフラグ不要）
-marp FtpTransferAgent_社内説明スライド.md --html
+# HTML（プレビュー。出力形式は拡張子で指定。--html は生 HTML タグの有効化）
+marp FtpTransferAgent_社内説明スライド.md -o preview.html --html
 ```
 
 Marp CLI を常設したくない場合は `npx` で都度実行できる:
 
 ```bash
-npx -y @marp-team/marp-cli@latest FtpTransferAgent_社内説明スライド.md --pdf --allow-local-files
+npx -y @marp-team/marp-cli@latest FtpTransferAgent_社内説明スライド.md --pdf --allow-local-files --html
 ```
 
 PDF / PNG / PPTX 出力には Chromium 系ブラウザ（Chrome / Edge / Firefox のいずれか）が必要。
