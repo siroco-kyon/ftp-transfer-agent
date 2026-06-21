@@ -52,7 +52,7 @@ dotnet publish -c Release -r osx-x64 --self-contained
 
 ## Architecture Overview
 
-This is a .NET 8 console application that performs batch FTP/SFTP file transfers. It's designed as a **one-shot batch processor** that runs once and exits, not a continuous service.
+This is a .NET 10 console application that performs batch FTP/SFTP file transfers. It's designed as a **one-shot batch processor** that runs once and exits, not a continuous service.
 
 ### Core Components
 
@@ -126,7 +126,7 @@ The application uses `appsettings.json` with these main sections:
 - **Use Task Scheduler**: For continuous operation, schedule this batch processor at regular intervals
 
 ## Dependencies and Build Status
-- **Target Framework**: .NET 8.0 (Worker SDK)
+- **Target Framework**: .NET 10.0 (Worker SDK)
 - **External Libraries**: 
   - FluentFTP 52.1.0 - FTP client functionality
   - SSH.NET 2025.0.0 - SFTP client functionality

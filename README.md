@@ -1,6 +1,6 @@
 # FtpTransferAgent
 
-.NET 8 で動作するバッチ型のファイル転送ツールです。  
+.NET 10 で動作するバッチ型のファイル転送ツールです。  
 指定ディレクトリ内のファイルを FTP/SFTP で転送し、転送後にハッシュ検証を行います。
 
 ## 概要
@@ -35,7 +35,7 @@
 
 | 依存ライブラリ | 用途 | 備考 |
 |---|---|---|
-| **glibc 2.17 以上** | .NET 8 の動作基盤 | Ubuntu 18.04以降、CentOS 7以降は満たす |
+| **glibc 2.27 以上** | .NET 10 の動作基盤 | Ubuntu 22.04以降 / RHEL 8以降が対象（CentOS 7 は対象外） |
 | **libssl (OpenSSL 1.1 または 3.x)** | FTP over TLS / SFTP (SSH.NET) | このアプリでは必須 |
 | **libicu** | グローバリゼーション処理 | `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` で無効化可能 |
 | **libz (zlib)** | 圧縮処理 | ほぼ全ディストロに標準搭載 |
@@ -44,12 +44,12 @@
 
 #### Windows
 
-- **Windows 10 / Windows Server 2016 以降**
-- Windows 7/8.1 は .NET 8 の対象外のため非対応
+- **Windows 10 (1809) / Windows Server 2016 以降**
+- Windows 7/8.1/Server 2012(R2) は .NET 10 の対象外のため非対応
 
 #### macOS
 
-- **macOS 12 (Monterey) 以降**
+- **macOS 14 (Sonoma) 以降**
 
 ### 発行コマンド例
 
@@ -78,7 +78,7 @@ dotnet publish -c Release -r osx-x64 --self-contained /p:PublishSingleFile=true
 
 ### 1. 前提
 
-- **開発・ビルド時**: .NET 8 SDK
+- **開発・ビルド時**: .NET 10 SDK
 - **本番サーバ**: 自己完結発行（`--self-contained`）であれば .NET ランタイム不要（OS 依存ライブラリのみ必要、[動作環境](#動作環境) 参照）
 - 転送先/転送元の FTP または SFTP サーバー
 
