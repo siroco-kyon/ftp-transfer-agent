@@ -45,7 +45,7 @@
 #### Windows
 
 - **Windows 10 (1809) / Windows Server 2016 以降**
-- Windows 7/8.1/Server 2012(R2) は .NET 10 の対象外のため非対応
+- Windows 7/8.1 は .NET 10 の対象外のため非対応（Windows Server 2012/2012 R2 は ESU 環境でのみ対応）
 
 #### macOS
 
