@@ -82,6 +82,7 @@ public class Worker : BackgroundService
         {
             "sftp" => ActivatorUtilities.CreateInstance<SftpClientWrapper>(_services, dest),
             "ftp" => ActivatorUtilities.CreateInstance<AsyncFtpClientWrapper>(_services, dest),
+            "local" => ActivatorUtilities.CreateInstance<LocalFileTransferClient>(_services, dest),
             _ => throw new ArgumentException($"Unsupported transfer mode: {dest.Mode}")
         };
     }
@@ -115,7 +116,13 @@ public class Worker : BackgroundService
     }
 
     private static string DescribeDestination(DestinationOptions d) =>
-        $"{d.Mode}://{d.Host}:{d.Port}{d.RemotePath}";
+        string.Equals(d.Mode, "local", StringComparison.OrdinalIgnoreCase)
+            ? $"local:{d.RemotePath}"
+            : $"{d.Mode}://{d.Host}:{d.Port}{d.RemotePath}";
+
+    // 宛先がローカル / UNC ファイルシステム (Mode=local) かどうか
+    private static bool IsLocalMode(DestinationOptions d) =>
+        string.Equals(d.Mode, "local", StringComparison.OrdinalIgnoreCase);
 
     // リモートパスを比較用に正規化する (先頭に "/" を付与し、末尾の区切り文字を除去)
     private static string NormalizeRemotePath(string path)
@@ -1821,6 +1828,16 @@ public class Worker : BackgroundService
         var name = dest.PreserveFolderStructure
             ? originalRelativePath ?? Path.GetRelativePath(_watch.Path, localPath)
             : Path.GetFileName((originalRelativePath ?? localPath).Replace('/', Path.DirectorySeparatorChar));
+
+        // ローカル / UNC 宛先は OS ネイティブのパスとして組み立てる (FTP/SFTP の '/' 連結とは別物)。
+        // 例: RemotePath="\\\\server\\share\\in", name="sub/data.csv" -> "\\\\server\\share\\in\\sub\\data.csv"
+        if (IsLocalMode(dest))
+        {
+            var localName = name.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
+            var localBase = dest.RemotePath ?? string.Empty;
+            return string.IsNullOrEmpty(localBase) ? localName : Path.Combine(localBase, localName);
+        }
+
         var rawBase = dest.RemotePath ?? string.Empty;
         var remoteBase = rawBase == "/" ? "/" : rawBase.TrimEnd('/', '\\');
         var remoteName = name.Replace('\\', '/');

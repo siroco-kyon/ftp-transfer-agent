@@ -59,7 +59,7 @@ This is a .NET 10 console application that performs batch FTP/SFTP file transfer
 - **Program.cs**: Entry point that configures DI, logging, validates configuration, and starts the Worker service
 - **Worker.cs**: Main background service that orchestrates the transfer process using a Channel-based queue with performance monitoring
 - **Services/**: Contains transfer clients and utilities
-  - `AsyncFtpClientWrapper` (FtpClient.cs) / `SftpClientWrapper.cs`: Protocol-specific implementations
+  - `AsyncFtpClientWrapper` (FtpClient.cs) / `SftpClientWrapper.cs` / `LocalFileTransferClient.cs`: Transfer implementations (FTP / SFTP / local & UNC SMB share via OS file I/O)
   - `TransferQueue.cs`: Manages parallel transfers with intelligent retry logic and real-time statistics
   - `HashUtil.cs`: File integrity verification (SHA256/SHA512) with stream support
   - `RetryableExceptionClassifier.cs`: Smart exception classification for retry decisions
@@ -73,7 +73,7 @@ This is a .NET 10 console application that performs batch FTP/SFTP file transfer
 2. **Options Pattern**: Configuration is injected via `IOptions<T>` with comprehensive validation at startup
 3. **Dependency Injection**: Uses `ActivatorUtilities.CreateInstance` for factory pattern instead of direct instantiation
 4. **Background Service**: Implements `BackgroundService` but designed for one-time execution with performance monitoring
-5. **Strategy Pattern**: Different transfer clients (`IFileTransferClient`) for FTP vs SFTP
+5. **Strategy Pattern**: Different transfer clients (`IFileTransferClient`) for FTP / SFTP / local (UNC & SMB share, put-only via `Mode=local`)
 6. **Smart Retry**: Exception classification determines retryable vs non-retryable failures
 7. **Real-time Monitoring**: Statistics tracking with memory usage and long-running transfer detection
 

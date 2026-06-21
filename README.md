@@ -1,7 +1,7 @@
 # FtpTransferAgent
 
 .NET 10 で動作するバッチ型のファイル転送ツールです。  
-指定ディレクトリ内のファイルを FTP/SFTP で転送し、転送後にハッシュ検証を行います。
+指定ディレクトリ内のファイルを FTP / SFTP / ローカル(UNC 共有) で転送し、転送後にハッシュ検証を行います。
 
 ## 概要
 
@@ -12,6 +12,7 @@
 ## 主な機能
 
 - FTP / SFTP 転送
+- **ローカル / UNC (SMB 共有) への転送**（`Mode=local`、put 専用。CIFS/SMB1 は使わず OS のファイル I/O で書き込む。詳細は [docs/local-destination.md](docs/local-destination.md)）
 - SFTP のパスワード認証・秘密鍵認証
 - SFTP ホスト鍵フィンガープリント検証
 - ハッシュ検証（`SHA256` / `SHA512`）
