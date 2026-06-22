@@ -469,9 +469,15 @@ FtpTransferAgent の動き(RequireEndFile: true):
 
 ## 複数宛先への同時配信(ファンアウト)
 
+<style scoped>
+li { line-height: 1.3; margin: 0.12em 0; }
+p { margin: 0.4em 0; }
+blockquote { font-size: 0.85em; padding: 0.35em 0.8em; margin: 0.5em 0; }
+</style>
+
 1 つのファイルを**メイン宛先 + 追加宛先のすべてへ同時に送信**できます(put のみ)。
 
-![w:880 複数宛先への同時配信（ファンアウト）の図](images/fanout-overview.svg)
+![w:600 複数宛先への同時配信（ファンアウト）の図](images/fanout-overview.svg)
 
 - 宛先ごとに **プロトコル・認証・並列数を個別設定**できる(**SFTP と FTP の混在も可**)
 - **全宛先に成功したときだけ**ローカルファイルを削除(1 つでも失敗したら消さずに残す)
@@ -484,10 +490,16 @@ FtpTransferAgent の動き(RequireEndFile: true):
 
 ## 宛先がダウンしても「賢く」再送する(配信トラッキング)
 
+<style scoped>
+li { line-height: 1.3; margin: 0.12em 0; }
+p { margin: 0.4em 0; }
+blockquote { font-size: 0.85em; padding: 0.35em 0.8em; margin: 0.5em 0; }
+</style>
+
 複数宛先配信では、**どの宛先まで送れたかをファイル単位で記録**します。
 一部の宛先が落ちていても、次回は**まだ送れていない宛先にだけ**送り直します。
 
-![w:900 宛先がダウンしても未配信の宛先だけ再送する配信トラッキングの図](images/delivery-tracking.svg)
+![w:540 宛先がダウンしても未配信の宛先だけ再送する配信トラッキングの図](images/delivery-tracking.svg)
 
 - **配信済みの宛先へは二重配信しない**(重複送信事故を防ぐ)
 - 送信後に元ファイルが差し替わったら**指紋(サイズ+更新時刻 / ハッシュ)で検知**し、全宛先へ送り直す(静かなデータ欠落を防止)
@@ -499,10 +511,15 @@ FtpTransferAgent の動き(RequireEndFile: true):
 
 ## 並列処理で「速く・止まらず」送る
 
-大量のファイルも **最大 16 並列**で同時転送できます(`Concurrency`)。
-ただ速いだけでなく、**並列でも壊れない**ことを重視した設計です。
+<style scoped>
+li { line-height: 1.28; margin: 0.1em 0; }
+p { margin: 0.35em 0; }
+blockquote { font-size: 0.82em; padding: 0.3em 0.8em; margin: 0.45em 0; }
+</style>
 
-![w:880 作る人・待ち行列・担当に分けた並列転送の流れ作業の図](images/parallel-pipeline.svg)
+大量のファイルも **最大 16 並列**で同時転送できます(`Concurrency`)。ただ速いだけでなく、**並列でも壊れない**ことを重視した設計です。
+
+![w:560 作る人・待ち行列・担当に分けた並列転送の流れ作業の図](images/parallel-pipeline.svg)
 
 - **ワーカー隔離** — 1 ファイルの失敗が他の転送を巻き込まない(失敗分だけエラー記録)
 - **接続の再利用** — 1 ファイルごとに繋ぎ直さず接続を使い回し、確立コストを削減
@@ -511,11 +528,12 @@ FtpTransferAgent の動き(RequireEndFile: true):
 
 > 「並列で速く」かつ「1 つの失敗・遅延が全体を巻き込まない」を両立しています。
 
-<div class="placeholder">
-余裕があれば、ここに <b>並列転送中のログ</b>(複数ワーカーが同時に動いている数行)や、
-<b>逐次(Concurrency=1)と並列(=8)の所要時間比較</b>のグラフを入れると、
-速度メリットが直感的に伝わります。
-</div>
+<!--
+発表時の補足(画像素材スペース): 余裕があれば、並列転送中のログ
+(複数ワーカーが同時に動いている数行)や、逐次(Concurrency=1)と
+並列(=8)の所要時間比較のグラフを入れると、速度メリットが直感的に伝わります。
+※ 1 枚に収めるため、本スライドの画像枠はこの発表者ノートへ退避しています。
+-->
 
 ---
 
@@ -846,6 +864,11 @@ FtpTransferAgent は万能ではありません。以下は**別の手段**を�
 ---
 
 ## 付録 B: 用語集
+
+<style scoped>
+table { font-size: 0.62em; }
+table th, table td { padding: 0.12em 0.5em; }
+</style>
 
 | 用語 | 意味 |
 |---|---|
