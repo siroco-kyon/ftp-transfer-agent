@@ -118,7 +118,7 @@ local 追加のため `DestinationOptions.Host` / `Username` の `[Required]` �
 - 起動時に Info を出す: 「`local` は OS のファイルシステム（SMB/UNC 共有を含む）経由で書き込む。SMB1 は使用しない。盗聴対策が必要なら**サーバ側で SMB1 を無効化し、SMB 暗号化を有効化**すること」。
 - on-the-wire の暗号化を厳密に保証したい場合は、共有側に SFTP サーバを立てて `Mode=sftp` に寄せる方が確実（SMB 暗号化はサーバ設定依存で既定オフのことが多い）。
 
-参考: CIFS/SMB のセキュリティと SFTP との違いは、本リポジトリの会話・README の「動作環境」節も参照。
+参考: SMB1（CIFS）が非推奨である背景と SFTP との使い分けは、本資料の §4「セキュリティ」を参照。
 
 ---
 

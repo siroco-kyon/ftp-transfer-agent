@@ -204,16 +204,16 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 
 | 項目 | 型 | 必須 | 既定値 | 説明 |
 |---|---|---|---|---|
-| `Mode` | string | 必須 | `"ftp"` | `ftp` / `sftp` |
-| `Direction` | string | 必須 | `"put"` | `put` / `get` |
-| `Host` | string | 必須 | `""` | 接続先ホスト |
-| `Port` | int | 任意 | `21` | 接続ポート（SFTP は通常 22） |
-| `Username` | string | 必須 | `""` | 認証ユーザー |
-| `Password` | string | 条件付き | `null` | FTP では必須。SFTP は鍵認証のみなら省略可 |
+| `Mode` | string | 必須 | `"ftp"` | `ftp` / `sftp` / `local`。`local` はローカル / UNC（SMB 共有）への書き込み（**put 専用**、CIFS/SMB1 を実装せず OS のファイル I/O。詳細は [docs/local-destination.md](docs/local-destination.md)） |
+| `Direction` | string | 必須 | `"put"` | `put` / `get`（`local` は `put` のみ） |
+| `Host` | string | 条件付き | `""` | 接続先ホスト。`ftp` / `sftp` で必須、`local` では未使用 |
+| `Port` | int | 任意 | `21` | 接続ポート（SFTP は通常 22。`local` では未使用） |
+| `Username` | string | 条件付き | `""` | 認証ユーザー。`ftp` / `sftp` で必須、`local` では未使用（OS の実行ユーザー権限で書き込む） |
+| `Password` | string | 条件付き | `null` | FTP では必須。SFTP は鍵認証のみなら省略可。`local` では未使用 |
 | `PrivateKeyPath` | string | 条件付き | `null` | SFTP 秘密鍵パス（SFTP では Password かどちらか必須） |
 | `PrivateKeyPassphrase` | string | 任意 | `null` | 鍵のパスフレーズ |
 | `HostKeyFingerprint` | string | 任意 | `null` | SFTP サーバー鍵指紋（未設定だと検証スキップ警告）。`SHA256:` プレフィックス付きで OpenSSH 形式の SHA-256 指紋（`ssh-keygen -lf` の出力）、プレフィックス無しで MD5 16 進指紋として照合 |
-| `RemotePath` | string | 必須 | `""` | リモート基準パス |
+| `RemotePath` | string | 必須 | `""` | リモート基準パス。`local` では書き込み先ディレクトリの絶対パス / UNC パス（例: `\\server\share\in`、`D:\out`） |
 | `Concurrency` | int | 任意 | `1` | primary 宛先の並列転送数（1-16）。`get` と primary への `put` に適用。`AdditionalDestinations` は各要素の `Concurrency` を個別に使用 |
 | `PreserveFolderStructure` | bool | 任意 | `false` | サブフォルダ構造を維持して転送 |
 | `TimeoutSeconds` | int | 任意 | `120` | 接続・転送タイムアウト秒（1-3600） |
@@ -453,6 +453,31 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 - 順序は「データ -> END」を保証
 - 対応データがない END は転送しない
 - `TransferEndFiles: false` かつ `Cleanup.DeleteLocalSkippedEndFiles: true` のとき、転送成功したデータに対応する END ファイルをローカルから削除する
+
+## ローカル / UNC 共有への転送（Mode=local）
+
+`Mode: "local"` を指定すると、FTP/SFTP サーバーではなく**ローカルフォルダや LAN の共有フォルダ（UNC / SMB 共有）**へ、本ツールのアトミック転送・ハッシュ検証・複数宛先配信付きで書き込めます。旧ツールの「ローカル → 共有フォルダ書き込み」の用途を引き継ぐためのモードです。
+
+```json
+{
+  "Watch": { "Path": "C:\\export", "AllowedExtensions": [".csv"] },
+  "Transfer": {
+    "Mode": "local",
+    "Direction": "put",
+    "RemotePath": "\\\\fileserver\\share\\incoming"
+  },
+  "Cleanup": { "DeleteAfterVerify": true }
+}
+```
+
+- **put 専用**: `Direction: get` との併用は起動時エラー
+- `RemotePath` に書き込み先ディレクトリの**絶対パスまたは UNC パス**を指定する（例: `\\fileserver\share\in`、`D:\out`、`/mnt/share/in`）
+- `Host` / `Port` / `Username` / `Password` は**不要**。共有へのアクセスは OS の実行ユーザー権限で行う（事前に書き込み権限を付与しておく）
+- FTP/SFTP と同じく**一時名 → アトミックなリネーム**で書き込むため、相手のバッチが書きかけのファイルを拾わない
+- **CIFS / SMB1 は実装しない**。UNC への書き込みは OS が SMB を透過処理し、実際に使われるバージョンは OS が交渉する（現代環境では SMB2/3）。盗聴対策が必要な場合はサーバー側で SMB1 を無効化して SMB 暗号化を有効化する（通信路の暗号化を厳密に保証したいなら `Mode: sftp` を推奨）
+- 複数宛先（ファンアウト）の一宛先として混在できる（例: primary は SFTP、追加宛先は共有フォルダ）。その場合は全宛先で `Name` が必須かつ一意
+- `RemotePath` を `Watch.Path` と**同一・その配下・その祖先**にすることはできない（自己上書きによるデータ消失や再取り込みを防ぐため起動時エラー）
+- 設計・制約・テストの詳細は [docs/local-destination.md](docs/local-destination.md) を参照
 
 ## 二重起動防止（ロックファイル）
 
