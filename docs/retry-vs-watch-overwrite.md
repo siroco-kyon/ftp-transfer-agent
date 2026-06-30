@@ -5,7 +5,7 @@
 > 設計全体は [宛先別配信トラッキング 詳細解説](per-destination-delivery-tracking.md)（特に 3.4 / 3.4.3 / 6-8）を参照。
 
 - 対象バージョン: 3.2.1
-- 関連設定: `Transfer.RetryDirectory` / `Transfer.DeliverySignatureMode` / `Transfer.DeleteAfterVerify`
+- 関連設定: `Transfer.RetryDirectory` / `Transfer.DeliverySignatureMode` / `Cleanup.DeleteAfterVerify`
 - 関連検証項目: 手動検証リスト「再評価対象ファイルの上書き」「退避中の同名新規」「sizetime限界」
 
 ![既定（退避有効＝上書き未検出）と RetryDirectory 空（watch 保持＝全宛先再送）の対比](images/retry-vs-watch-overwrite.svg)
