@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 620" font-family="'BIZ UDPGothic','Yu Gothic','Meiryo',sans-serif" role="img" aria-label="retry退避中にwatchへ同名・別内容ファイルが来た場合の挙動を、既定（退避有効）とRetryDirectory空（watch保持）で対比する図">
+  <defs>
+    <marker id="arW" markerWidth="12" markerHeight="12" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#0b548c"/>
+    </marker>
+    <marker id="arBad" markerWidth="12" markerHeight="12" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#b5341f"/>
+    </marker>
+    <marker id="arGood" markerWidth="12" markerHeight="12" refX="9" refY="5" orient="auto" markerUnits="userSpaceOnUse">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#0f7a57"/>
+    </marker>
+    <filter id="shW" x="-10%" y="-10%" width="120%" height="140%">
+      <feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-color="#0b548c" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <text x="490" y="32" text-anchor="middle" font-size="20" font-weight="bold" fill="#0b548c">retry 退避中に「同名・別内容」が watch に来たら？</text>
+  <text x="490" y="54" text-anchor="middle" font-size="13" fill="#5a6b7b">Run1 で部分失敗（primary 済 / backup 未）→ 旧ファイルは retry へ退避・primary マーカー残存。その後 watch に同名・別内容が新規到着</text>
+
+  <!-- shared starting state -->
+  <g filter="url(#shW)"><rect x="320" y="74" width="340" height="92" rx="12" fill="#fff4e6" stroke="#e08e45" stroke-width="2.5"/></g>
+  <text x="490" y="100" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#9a5b1f">出発点（共通）</text>
+  <text x="336" y="122" font-size="12" fill="#1f2f3d">retry: report.csv = <tspan font-weight="bold">旧v1</tspan>（マーカー: primary, 指紋=v1）</text>
+  <text x="336" y="140" font-size="12" fill="#1f2f3d">watch: report.csv = <tspan font-weight="bold" fill="#b5341f">新v2</tspan>（新規到着・別内容）</text>
+  <text x="336" y="158" font-size="12" fill="#5a6b7b">同名（相対パス一致）の2ファイルが併存</text>
+
+  <!-- divider arrows -->
+  <path d="M460,166 L255,206" fill="none" stroke="#5a6b7b" stroke-width="2" marker-end="url(#arW)"/>
+  <path d="M520,166 L735,206" fill="none" stroke="#5a6b7b" stroke-width="2" marker-end="url(#arW)"/>
+
+  <!-- ======================= LEFT: default (retry enabled) = hole ======================= -->
+  <g filter="url(#shW)"><rect x="30" y="210" width="440" height="360" rx="14" fill="#fbecea" stroke="#b5341f" stroke-width="2"/></g>
+  <text x="250" y="238" text-anchor="middle" font-size="15" font-weight="bold" fill="#b5341f">既定：RetryDirectory 有効（退避する）</text>
+  <text x="250" y="258" text-anchor="middle" font-size="12" fill="#7d2a1a">＝ 上書きが検出されない既知の制限</text>
+
+  <g filter="url(#shW)"><rect x="56" y="276" width="388" height="70" rx="10" fill="#ffffff" stroke="#b5341f" stroke-width="1.6"/></g>
+  <text x="72" y="300" font-size="12.5" font-weight="bold" fill="#b5341f">① 列挙：ファイル名だけで照合</text>
+  <text x="72" y="320" font-size="12" fill="#1f2f3d">retry に同名あり → watch の新v2 を「先送り(deferred)」</text>
+  <text x="72" y="338" font-size="11.5" fill="#5a6b7b">警告ログ: Watch files are deferred until retry files finish</text>
+
+  <g filter="url(#shW)"><rect x="56" y="356" width="388" height="70" rx="10" fill="#ffffff" stroke="#b5341f" stroke-width="1.6"/></g>
+  <text x="72" y="380" font-size="12.5" font-weight="bold" fill="#b5341f">② 指紋照合の相手は「不変の retry 退避物」</text>
+  <text x="72" y="400" font-size="12" fill="#1f2f3d">退避物=旧v1 のまま → 指紋一致 → 陳腐化破棄されない</text>
+  <text x="72" y="418" font-size="11.5" fill="#5a6b7b">新v2 は指紋比較に渡らない（先送り済み）</text>
+
+  <g filter="url(#shW)"><rect x="56" y="436" width="388" height="74" rx="10" fill="#fbecea" stroke="#b5341f" stroke-width="1.6"/></g>
+  <text x="72" y="460" font-size="12.5" font-weight="bold" fill="#b5341f">③ 結果</text>
+  <text x="72" y="480" font-size="12" fill="#1f2f3d">retry の<tspan font-weight="bold">旧v1</tspan> が未配信先(backup)へ再送</text>
+  <text x="72" y="498" font-size="12" fill="#b5341f" font-weight="bold">新v2 はその回送られない／マーカーも破棄されない</text>
+
+  <path d="M250,346 L250,354" fill="none" stroke="#b5341f" stroke-width="2" marker-end="url(#arBad)"/>
+  <path d="M250,426 L250,434" fill="none" stroke="#b5341f" stroke-width="2" marker-end="url(#arBad)"/>
+
+  <text x="250" y="540" text-anchor="middle" font-size="12" fill="#7d2a1a">自動テスト Overwrite_AfterPartialFailure は</text>
+  <text x="250" y="558" text-anchor="middle" font-size="12" fill="#7d2a1a">「退避物そのものを書き換えた」経路を検証（この穴は別）</text>
+
+  <!-- ======================= RIGHT: RetryDirectory="" = works ======================= -->
+  <g filter="url(#shW)"><rect x="510" y="210" width="440" height="360" rx="14" fill="#eaf4ee" stroke="#0f7a57" stroke-width="2"/></g>
+  <text x="730" y="238" text-anchor="middle" font-size="15" font-weight="bold" fill="#0f7a57">回避策：RetryDirectory = ""（退避しない）</text>
+  <text x="730" y="258" text-anchor="middle" font-size="12" fill="#0c5e44">＝ ファイルを watch に残して再評価させる</text>
+
+  <g filter="url(#shW)"><rect x="536" y="276" width="388" height="70" rx="10" fill="#ffffff" stroke="#0f7a57" stroke-width="1.6"/></g>
+  <text x="552" y="300" font-size="12.5" font-weight="bold" fill="#0f7a57">① 退避しない</text>
+  <text x="552" y="320" font-size="12" fill="#1f2f3d">部分失敗ファイルは Watch.Path に残る（retry に複製なし）</text>
+  <text x="552" y="338" font-size="11.5" fill="#5a6b7b">同名は1つだけ → 先送り(deferred)が起きない</text>
+
+  <g filter="url(#shW)"><rect x="536" y="356" width="388" height="70" rx="10" fill="#ffffff" stroke="#0f7a57" stroke-width="1.6"/></g>
+  <text x="552" y="380" font-size="12.5" font-weight="bold" fill="#0f7a57">② 上書き = 同じ場所のファイル差し替え</text>
+  <text x="552" y="400" font-size="12" fill="#1f2f3d">そのファイル自身（新v2）が再評価され指紋を計算</text>
+  <text x="552" y="418" font-size="11.5" fill="#5a6b7b">マーカー指紋(v1) ≠ 現指紋(v2) → 不一致</text>
+
+  <g filter="url(#shW)"><rect x="536" y="436" width="388" height="74" rx="10" fill="#eaf4ee" stroke="#0f7a57" stroke-width="1.6"/></g>
+  <text x="552" y="460" font-size="12.5" font-weight="bold" fill="#0f7a57">③ 結果</text>
+  <text x="552" y="480" font-size="12" fill="#1f2f3d">古いマーカーを破棄し <tspan font-weight="bold">新v2 を全宛先へ再送</tspan></text>
+  <text x="552" y="498" font-size="12" fill="#0f7a57" font-weight="bold">旧内容を取りこぼさない（検証項目101 の期待どおり）</text>
+
+  <path d="M730,346 L730,354" fill="none" stroke="#0f7a57" stroke-width="2" marker-end="url(#arGood)"/>
+  <path d="M730,426 L730,434" fill="none" stroke="#0f7a57" stroke-width="2" marker-end="url(#arGood)"/>
+
+  <text x="730" y="540" text-anchor="middle" font-size="12" fill="#0c5e44">選択再送（未配信先だけ送る）は退避の有無に関係なく機能</text>
+  <text x="730" y="558" text-anchor="middle" font-size="12" fill="#0c5e44">厳密な内容検出が要るなら DeliverySignatureMode = "hash"</text>
+
+  <text x="30" y="600" font-size="11.5" fill="#5a6b7b">実装: Worker.cs（shadowedWatchCandidates による先送り判定 / GetRetryFilePath）, DeliveryStateStore.GetDeliveredDestinations（指紋一致での配信済み判定）。詳細は docs/per-destination-delivery-tracking.md 3.4.3 / 6-8</text>
+</svg>
