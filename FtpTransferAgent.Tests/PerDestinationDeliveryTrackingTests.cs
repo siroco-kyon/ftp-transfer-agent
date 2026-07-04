@@ -423,6 +423,56 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
     }
 
     [Fact]
+    public async Task DeleteAfterVerifyFalse_RestoreBlockedThenUnblocked_RestoresOnLaterRun()
+    {
+        // 全宛先完了時の watch.Path への復元が失敗 (復元先に同名ファイルが存在) した場合、
+        // ファイルは retry ディレクトリに残る。その後のバッチは「配信済みスキップ」経路を通るが、
+        // そこでも復元を再試行し、隠しフォルダにファイルが永久に取り残されないこと (回帰防止)。
+        var dataPath = Path.Combine(_watchDir, "report.txt");
+        await File.WriteAllTextAsync(dataPath, "the-payload");
+
+        var (transfer, additional) = BuildOptions();
+        var primaryStore = new DestinationStore();
+        var backupStore = new DestinationStore();
+
+        // --- Run 1: backup 全失敗 → 部分失敗で retry ディレクトリへ退避 ---
+        backupStore.FailUploads = true;
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(), deleteAfterVerify: false);
+
+        var retryPath = Path.Combine(_retryDir, "report.txt");
+        Assert.True(File.Exists(retryPath), "部分失敗時は retry ディレクトリへ退避する");
+
+        // 復元先 (watch.Path) に同名ファイルを置き、復元をブロックする
+        await File.WriteAllTextAsync(dataPath, "unrelated-blocker");
+
+        // --- Run 2: backup 復活 → 全宛先完了。しかし復元先が塞がっているため retry に残る ---
+        backupStore.FailUploads = false;
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(), deleteAfterVerify: false);
+
+        Assert.Equal(1, backupStore.UploadCount("/backup/report.txt"));
+        Assert.True(File.Exists(retryPath), "復元先が塞がっている間は retry に残る");
+        Assert.Equal(2, Directory.GetFiles(_stateDir, "*.marker").Length);
+
+        // ブロッカーを除去して復元先を空ける
+        File.Delete(dataPath);
+
+        // --- Run 3: 配信済みスキップ経路でも復元が再試行され、watch.Path へ戻る ---
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(), deleteAfterVerify: false);
+
+        Assert.True(File.Exists(dataPath), "配信済みスキップ時にも retry ディレクトリからの復元を再試行する");
+        Assert.Equal("the-payload", await File.ReadAllTextAsync(dataPath));
+        Assert.False(File.Exists(retryPath));
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt")); // 再送しない
+        Assert.Equal(1, backupStore.UploadCount("/backup/report.txt"));   // 再送しない
+
+        // --- Run 4: 復元後も配信済みスキップが維持される (復元で指紋が壊れない) ---
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(), deleteAfterVerify: false);
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt"));
+        Assert.Equal(1, backupStore.UploadCount("/backup/report.txt"));
+        Assert.True(File.Exists(dataPath));
+    }
+
+    [Fact]
     public async Task HashSignatureMode_SameSizeSameMtimeOverwrite_ResendsToAllDestinations()
     {
         // hash モードは、サイズも更新時刻も据え置きで内容だけ差し替えた上書き（sizetime では

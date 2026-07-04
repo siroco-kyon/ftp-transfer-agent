@@ -641,10 +641,14 @@ public class Worker : BackgroundService
 
     // 既に全宛先へ配信済み (マーカーが揃っている) ファイルの後始末。
     // DeleteAfterVerify=true なら削除しマーカーも掃除。false ならローカルを残し
-    // マーカーも保持して次回も送信をスキップさせる。
+    // マーカーも保持して次回も送信をスキップさせる。ローカルを残す場合、過去の部分失敗で
+    // リトライディレクトリへ退避したままのファイルは watch.Path への復元を再試行する
+    // (全宛先完了時の復元が同名ファイルの存在や一時的なロックで失敗していても、
+    // 後続バッチで隠しフォルダに取り残されたままにしない)。
     private bool HandleAlreadyDelivered(
         string sourcePath,
         IReadOnlyList<string> relatedEndFiles,
+        IReadOnlyList<string> relatedEndFileRelativePaths,
         DeliveryTrackingContext tracking)
     {
         _logger.LogInformation("All destinations already delivered for {File} (per delivery state); skipping send.", sourcePath);
@@ -661,6 +665,10 @@ public class Worker : BackgroundService
         if (deleted)
         {
             _deliveryStore?.RemoveAll(tracking.RelativePath);
+        }
+        else
+        {
+            RestoreFromRetryDirectoryIfNeeded(sourcePath, tracking.RelativePath, relatedEndFiles, relatedEndFileRelativePaths);
         }
 
         return true;
@@ -1464,7 +1472,7 @@ public class Worker : BackgroundService
                             if (pendingList.Count == 0)
                             {
                                 // 全宛先へ配信済み (前回までに完了)。残骸の後始末だけ行う。
-                                if (HandleAlreadyDelivered(file, related, tracking))
+                                if (HandleAlreadyDelivered(file, related, relatedRelativePaths, tracking))
                                 {
                                     skippedFullyDelivered++;
                                 }
