@@ -148,6 +148,8 @@ dotnet run --project FtpTransferAgent -- --Transfer:Concurrency=4 --Hash:Algorit
 | PreserveFolderStructure | bool | - | false | - | サブフォルダ構造を保持して転送 |
 | TimeoutSeconds | int | - | 120 | 1–3600 | 接続・転送タイムアウト秒 |
 | KeepAliveSeconds | int | - | 0 | 0–3600 | 接続再利用時にアイドル切断を防ぐ KeepAlive の間隔（秒）。`0` で無効。`>0` で SFTP は `KeepAliveInterval`、FTP は NOOP 送信 + TCP KeepAlive を有効化。各追加宛先にも個別適用 |
+| VerifyUploadedFileExists | bool | - | true | - | SFTP アップロードのリネーム完了後に宛先パスの存在確認（2 往復）を追加で行うか。リネームの成功応答（SSH_FX_OK）自体がサーバの完了確認のため、`false` でも転送完了の保証はプロトコルレベルで担保される。高レイテンシ回線で小ファイルを多数送る場合は `false` で往復数を削減できる。SFTP のみ使用。各追加宛先にも個別適用 |
+| BufferSizeKB | int | - | 32 | 1–64 | SFTP の 1 書き込み要求（SSH_FXP_WRITE）あたりのバッファサイズ（KB）。実際のチャンクサイズはサーバが告知するチャネルパケット上限との min になるため、OpenSSH 系（上限 32KB）では既定値から上げても効果がない。32KB 超を受け付けるサーバでは `64` でスループットが向上する（32KB 超の設定時は起動時に注意警告を出力）。SFTP のみ使用。各追加宛先にも個別適用 |
 | PerDestinationDeliveryTracking | bool | - | false | - | **単一宛先**で配信トラッキングを明示的に有効化する場合に使用。**複数宛先（ファンアウト）の put では常時有効**のため、このフラグに関わらず未配信の宛先だけへ再送する（put 方向のみ）。[5.9](#59-宛先別配信トラッキングput) 参照 |
 | StateDirectory | string | - | `""` | - | 配信トラッキングのマーカー保存先。空のとき `LocalApplicationData/FtpTransferAgent/delivery-state/<watch パスのハッシュ>` を使用。`Watch.Path` の外に置くことを推奨 |
 | RetryDirectory | string/null | - | `null` | - | 配信トラッキングで部分失敗したファイルの移動先。未指定/null は `LocalApplicationData/FtpTransferAgent/delivery-retry/<watch パスのハッシュ>` を使用。相対パスを明示した場合は `Watch.Path` 配下として解決。空文字で移動を無効化 |
@@ -494,8 +496,14 @@ END ファイルは「データファイル名 + END 拡張子」（例: `data.t
 
 ---
 
-**更新日**: 2026年6月24日
-**バージョン**: 3.3.0
+**更新日**: 2026年7月4日
+**バージョン**: 3.4.0
+**主な更新内容 (3.4.0)**:
+- **SFTP アップロードの往復数を 11 → 7〜9 回/ファイルに削減**（レイテンシ 10ms の回線で小ファイル多数の実測 1.4〜1.55 倍高速化）
+  - リモートディレクトリの存在確認結果を接続ごとにキャッシュし、2 ファイル目以降の確認（2 往復）を省略。転送失敗時はキャッシュを無効化し、リモート側でディレクトリが消された場合もリトライで再作成する（常時有効）
+  - `Transfer.VerifyUploadedFileExists`（既定 `true`）を追加。`false` でリネーム成功後の存在確認（2 往復）を省略可能
+- **`Transfer.BufferSizeKB`（既定 `32`、1–64）を追加**。SFTP の 1 書き込み要求あたりのバッファサイズ。32KB 超のパケットを受け付けるサーバでは `64` でスループット向上（OpenSSH 系は 32KB 上限のため効果なし。SSH.NET のトランスポート上限により 64 超は設定不可）
+
 **主な更新内容 (3.3.0)**:
 - **ローカル / UNC（SMB 共有）宛先モード（`Mode=local`）を追加**（[5.10](#510-ローカル--unc-共有への転送modelocal)）。FTP/SFTP サーバーではなくローカルフォルダや共有フォルダへ、アトミック転送・ハッシュ検証・複数宛先配信付きで書き込む（put 専用）。CIFS/SMB1 は実装せず OS のファイル I/O で完結し、旧ツールの「ローカル→共有フォルダ書き込み」用途を置き換える。`RemotePath` が `Watch.Path` と重なる（同一・配下・祖先）設定は起動時エラー。詳細は別冊 [docs/local-destination.md](docs/local-destination.md)
 - **`Transfer.KeepAliveSeconds` を追記**。接続再利用時のアイドル切断防止（SFTP は `KeepAliveInterval`、FTP は NOOP 送信 + TCP KeepAlive）。各追加宛先にも個別適用

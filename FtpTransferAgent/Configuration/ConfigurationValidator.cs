@@ -282,6 +282,15 @@ public class ConfigurationValidator
             {
                 result.Errors.Add($"{label} KeepAliveSeconds must be between 0 and 3600 (got {d.KeepAliveSeconds})");
             }
+            if (d.BufferSizeKB < 1 || d.BufferSizeKB > 64)
+            {
+                result.Errors.Add($"{label} BufferSizeKB must be between 1 and 64 (got {d.BufferSizeKB})");
+            }
+            else if (d.Mode == "sftp" && d.BufferSizeKB > 32)
+            {
+                // OpenSSH 系サーバはチャネルパケット上限 32KB を告知するため、それ以上は効果がない
+                result.Warnings.Add($"{label} BufferSizeKB={d.BufferSizeKB} takes effect only when the SFTP server accepts packets larger than 32KB (OpenSSH-based servers cap at 32KB)");
+            }
         }
 
         ValidateDuplicateDestinationTargets(transfer, result);
@@ -547,6 +556,12 @@ public class ConfigurationValidator
         if (transfer.Mode == "ftp" && transfer.Port == 22)
         {
             result.Warnings.Add("Mode is 'ftp' but Port is 22 (SSH/SFTP default). FTP typically uses port 21. Verify this is intentional.");
+        }
+
+        // 32KB 超はサーバがより大きいパケットを受け付ける場合のみ有効 (OpenSSH 系は 32KB 上限)
+        if (transfer.Mode == "sftp" && transfer.BufferSizeKB > 32)
+        {
+            result.Warnings.Add($"BufferSizeKB={transfer.BufferSizeKB} takes effect only when the SFTP server accepts packets larger than 32KB (OpenSSH-based servers cap at 32KB)");
         }
     }
 

@@ -35,6 +35,8 @@
         "PreserveFolderStructure": { "type": "boolean" },
         "TimeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 3600 },
         "KeepAliveSeconds": { "type": "integer", "minimum": 0, "maximum": 3600 },
+        "VerifyUploadedFileExists": { "type": "boolean" },
+        "BufferSizeKB": { "type": "integer", "minimum": 1, "maximum": 64 },
         "PerDestinationDeliveryTracking": { "type": "boolean" },
         "StateDirectory": { "type": "string" },
         "RetryDirectory": { "type": ["string", "null"] },
@@ -134,7 +136,9 @@
         "Concurrency": { "type": "integer", "minimum": 1, "maximum": 16 },
         "PreserveFolderStructure": { "type": "boolean" },
         "TimeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 3600 },
-        "KeepAliveSeconds": { "type": "integer", "minimum": 0, "maximum": 3600 }
+        "KeepAliveSeconds": { "type": "integer", "minimum": 0, "maximum": 3600 },
+        "VerifyUploadedFileExists": { "type": "boolean" },
+        "BufferSizeKB": { "type": "integer", "minimum": 1, "maximum": 64 }
       },
       "required": ["Mode", "Host", "Username", "RemotePath"]
     }
