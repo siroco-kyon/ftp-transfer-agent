@@ -63,4 +63,22 @@ public class DestinationOptions
     /// </summary>
     [Range(0, 3600)]
     public int KeepAliveSeconds { get; set; }
+
+    /// <summary>
+    /// SFTP アップロードのリネーム完了後に宛先パスの存在確認 (2 往復) を追加で行うか。
+    /// リネームの成功応答 (SSH_FX_OK) 自体がサーバによる完了確認のため、false にしても
+    /// 転送の完了保証はプロトコルレベルで担保される。高レイテンシ回線で小さいファイルを
+    /// 多数送る場合は false にすると往復数を削減できる。既定 true（従来動作）。SFTP のみ使用。
+    /// </summary>
+    public bool VerifyUploadedFileExists { get; set; } = true;
+
+    /// <summary>
+    /// SFTP の 1 書き込み要求 (SSH_FXP_WRITE) あたりのバッファサイズ (KB)。
+    /// 実際のチャンクサイズはサーバが告知するチャネルパケット上限との min になるため、
+    /// OpenSSH 系サーバ (上限 32KB) では既定値から上げても効果はない。32KB 超を受け付ける
+    /// サーバでは 64 に上げるとスループットが向上する。65 以上は SSH.NET のトランスポート
+    /// パケット上限 (約 68KB) を超え送信エラーになるため設定不可。SFTP のみ使用。
+    /// </summary>
+    [Range(1, 64)]
+    public int BufferSizeKB { get; set; } = 32;
 }

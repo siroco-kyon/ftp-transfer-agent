@@ -287,6 +287,39 @@ public class SftpClientWrapperTests : IDisposable
     }
 
     [Fact]
+    public void Constructor_ShouldApplyBufferSizeKBToClient()
+    {
+        // Arrange - BufferSizeKB が SftpClient.BufferSize (バイト単位) に反映されることを検証
+        var options = new TransferOptions
+        {
+            Mode = "sftp",
+            Host = "test.example.com",
+            Port = 22,
+            Username = "testuser",
+            Password = "testpass",
+            RemotePath = "/remote/path",
+            BufferSizeKB = 64
+        };
+        using var client = new Renci.SshNet.SftpClient("test.example.com", 22, "testuser", "testpass");
+
+        // Act
+        using var wrapper = new SftpClientWrapper(options, _mockLogger.Object, client);
+
+        // Assert
+        Assert.Equal(64u * 1024, client.BufferSize);
+    }
+
+    [Fact]
+    public void DestinationOptions_ShouldDefaultToSafeTransferSettings()
+    {
+        // 既定値が従来動作 (リネーム後の存在確認あり・32KB バッファ) であることを検証
+        var options = new DestinationOptions();
+
+        Assert.True(options.VerifyUploadedFileExists);
+        Assert.Equal(32, options.BufferSizeKB);
+    }
+
+    [Fact]
     public void Dispose_ShouldNotThrow()
     {
         // Arrange

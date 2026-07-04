@@ -511,6 +511,73 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         Assert.Contains(result.Errors, e => e.Contains("TimeoutSeconds must be between 1 and 3600"));
     }
 
+    [Theory]
+    [InlineData(0)]
+    [InlineData(65)]
+    public void ValidateConfiguration_WithOutOfRangeBufferSizeKB_ShouldReportError(int bufferSizeKB)
+    {
+        // BufferSizeKB は 64 超で SSH.NET のトランスポートパケット上限 (約 68KB) を超え
+        // 送信時に例外となるため、バリデーターで拒否されることを検証する
+        var watch = new WatchOptions { Path = _testDirectory };
+        var transfer = new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "example.com",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            AdditionalDestinations = new List<DestinationOptions>
+            {
+                new()
+                {
+                    Mode = "sftp",
+                    Host = "second.example.com",
+                    Port = 22,
+                    Username = "user2",
+                    Password = "pass2",
+                    RemotePath = "/remote2",
+                    BufferSizeKB = bufferSizeKB
+                }
+            }
+        };
+        var retry = new RetryOptions();
+        var hash = new HashOptions { Algorithm = "SHA256" };
+        var cleanup = new CleanupOptions();
+
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(result.Errors, e => e.Contains("BufferSizeKB must be between 1 and 64"));
+    }
+
+    [Fact]
+    public void ValidateConfiguration_WithLargeBufferSizeKBOnSftp_ShouldWarnButRemainValid()
+    {
+        // 32KB 超はサーバがより大きいパケットを受け付ける場合のみ有効なため、
+        // エラーにはせず警告のみ出すことを検証する
+        var watch = new WatchOptions { Path = _testDirectory };
+        var transfer = new TransferOptions
+        {
+            Mode = "sftp",
+            Direction = "put",
+            Host = "example.com",
+            Port = 22,
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            BufferSizeKB = 64
+        };
+        var retry = new RetryOptions();
+        var hash = new HashOptions { Algorithm = "SHA256" };
+        var cleanup = new CleanupOptions();
+
+        ConfigurationValidationResult result = _validator.ValidateConfiguration(watch, transfer, retry, hash, cleanup);
+
+        Assert.True(result.IsValid, string.Join("; ", result.Errors));
+        Assert.Contains(result.Warnings, w => w.Contains("BufferSizeKB=64"));
+    }
+
     public void Dispose()
     {
         try

@@ -22,6 +22,13 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     // posix-rename 拡張のサポート状況 (接続先サーバごと)。null = 未判定
     private bool? _posixRenameSupported;
 
+    // 存在を確認 (または作成) 済みのリモートディレクトリ。SFTP の Exists は
+    // REALPATH + LSTAT の 2 往復を要するため、アップロードごとの再確認を省略して
+    // 高レイテンシ回線での往復数を削減する。転送失敗時はエントリを無効化し、
+    // リモート側でディレクトリが消された場合もリトライで再作成できるようにする。
+    // (この接続は同時に 1 ワーカーしか使用しないため排他制御は不要)
+    private readonly HashSet<string> _verifiedRemoteDirs = new();
+
     // テスト用に既存の SftpClient を渡せるようにする
     public SftpClientWrapper(DestinationOptions options, ILogger<SftpClientWrapper> logger, SftpClient? client = null)
     {
@@ -94,6 +101,10 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
             _client.OperationTimeout = TimeSpan.FromSeconds(options.TimeoutSeconds);
         }
 
+        // 1 書き込み要求 (SSH_FXP_WRITE) あたりのバッファサイズ。実際のチャンクサイズは
+        // サーバが告知するチャネルパケット上限との min になる (OpenSSH 系は 32KB)。
+        _client.BufferSize = (uint)(options.BufferSizeKB * 1024);
+
         // 接続をワーカー間で再利用する際、アイドルタイムアウトでサーバに切断されないよう
         // 定期的に KeepAlive を送る（0 で無効）。
         if (options.KeepAliveSeconds > 0)
@@ -143,8 +154,13 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         {
             return;
         }
+        if (_verifiedRemoteDirs.Contains(dir))
+        {
+            return;
+        }
         if (await _client.ExistsAsync(dir, ct).ConfigureAwait(false))
         {
+            _verifiedRemoteDirs.Add(dir);
             return;
         }
 
@@ -179,6 +195,8 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
                 }
             }
         }
+
+        _verifiedRemoteDirs.Add(dir);
     }
 
     private static IReadOnlyList<string> GetDirectoryCreationPaths(string directory)
@@ -236,18 +254,30 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         }
         catch
         {
+            // 転送失敗時はディレクトリキャッシュを無効化する (リモート側でディレクトリが
+            // 消された場合にリトライで再作成できるようにするため)
+            var dir = Path.GetDirectoryName(remotePath)?.Replace('\\', '/');
+            if (!string.IsNullOrEmpty(dir))
+            {
+                _verifiedRemoteDirs.Remove(dir);
+            }
             // リネーム失敗時にリモートの一時ファイルが蓄積しないよう削除を試みる
             try { if (_client.Exists(temp)) _client.DeleteFile(temp); } catch { }
             throw;
         }
 
-        // リネーム後の存在確認
-        if (!await _client.ExistsAsync(remotePath, ct).ConfigureAwait(false))
+        // リネーム後の存在確認。リネームの成功応答 (SSH_FX_OK) 自体がサーバによる完了確認の
+        // ため冗長だが、従来動作の互換のため既定で実施する。高レイテンシ回線では
+        // VerifyUploadedFileExists=false で 1 ファイルあたり 2 往復を節約できる。
+        if (_options.VerifyUploadedFileExists)
         {
-            throw new InvalidOperationException(
-                $"SFTP RenameFile completed without error but destination file not found: {remotePath}.");
+            if (!await _client.ExistsAsync(remotePath, ct).ConfigureAwait(false))
+            {
+                throw new InvalidOperationException(
+                    $"SFTP RenameFile completed without error but destination file not found: {remotePath}.");
+            }
+            _logger.LogDebug("SFTP upload confirmed at: {RemotePath}", remotePath);
         }
-        _logger.LogDebug("SFTP upload confirmed at: {RemotePath}", remotePath);
     }
 
     /// <summary>
