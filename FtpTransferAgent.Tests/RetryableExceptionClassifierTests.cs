@@ -59,6 +59,39 @@ public class RetryableExceptionClassifierTests
     public void IsConnectionBroken_WrappedSocketException_True()
         => Assert.True(RetryableExceptionClassifier.IsConnectionBroken(new Exception("wrapper", new SocketException())));
 
+    // --- IsRetryable: SSH/SFTP 例外の分類 ---
+    // 汎用 SshException (SSH_FX_FAILURE 等) はサーバ側の一時要因の可能性があるためリトライする。
+    // 恒久的な要因 (認証・権限・パス不在) はリトライしない。
+
+    [Fact]
+    public void IsRetryable_GenericSshException_True()
+        => Assert.True(RetryableExceptionClassifier.IsRetryable(new SshException("Failure")));
+
+    [Fact]
+    public void IsRetryable_SshConnectionException_True()
+        => Assert.True(RetryableExceptionClassifier.IsRetryable(new SshConnectionException("disconnected")));
+
+    [Fact]
+    public void IsRetryable_SshOperationTimeoutException_True()
+        => Assert.True(RetryableExceptionClassifier.IsRetryable(new SshOperationTimeoutException("timeout")));
+
+    [Fact]
+    public void IsRetryable_SshAuthenticationException_False()
+        => Assert.False(RetryableExceptionClassifier.IsRetryable(new SshAuthenticationException("bad credentials")));
+
+    [Fact]
+    public void IsRetryable_SftpPermissionDeniedException_False()
+        => Assert.False(RetryableExceptionClassifier.IsRetryable(new SftpPermissionDeniedException("denied")));
+
+    [Fact]
+    public void IsRetryable_SftpPathNotFoundException_False()
+        => Assert.False(RetryableExceptionClassifier.IsRetryable(new SftpPathNotFoundException("no such file")));
+
+    // 汎用 SshException は接続自体は生きている扱い (プールの接続は再利用してよい)
+    [Fact]
+    public void IsConnectionBroken_GenericSshException_False()
+        => Assert.False(RetryableExceptionClassifier.IsConnectionBroken(new SshException("Failure")));
+
     [Fact]
     public void IsConnectionBroken_FtpConnectionMessage_True()
         => Assert.True(RetryableExceptionClassifier.IsConnectionBroken(new FtpException("connection reset by peer")));

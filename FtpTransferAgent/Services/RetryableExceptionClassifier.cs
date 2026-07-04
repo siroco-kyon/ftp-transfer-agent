@@ -28,6 +28,14 @@ public static class RetryableExceptionClassifier
             SshConnectionException => true,
             // SshOperationTimeoutException は SshException を継承しており TimeoutException ではないため個別に指定
             SshOperationTimeoutException => true,
+            // 恒久的な要因 (認証・権限・パス不在) の SSH 例外はリトライしない。
+            // 汎用 SshException より先に判定すること
+            SshAuthenticationException => false,
+            SftpPermissionDeniedException => false,
+            SftpPathNotFoundException => false,
+            // その他の SshException (SSH_FX_FAILURE 等) はサーバ側の一時要因 (ビジー・一時領域不足など)
+            // の可能性があるためリトライする。FTP 側の「不明なエラーは安全のためリトライ」と整合させる
+            SshException => true,
             // ハッシュ不一致は転送中の一過性破損で起きるため再転送で回復し得る
             HashMismatchException => true,
             FtpException ftpEx when IsRetryableFtpException(ftpEx) => true,
