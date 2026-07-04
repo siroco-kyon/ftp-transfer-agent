@@ -473,6 +473,61 @@ public class PerDestinationDeliveryTrackingTests : IDisposable
     }
 
     [Fact]
+    public async Task DeleteAfterVerifyFalse_RestorePartiallyBlocked_KeepsDataAndEndPairTogetherInRetry()
+    {
+        // 復元は all-or-nothing であること。データ側の復元先だけが塞がっている場合に END だけ
+        // 復元してしまうと、データ/END ペアが watch と retry に分断され、RequireEndFile 構成では
+        // retry 側に残ったデータが以降の列挙フィルタ (END 不在) で候補から外れ、復元も再試行
+        // されないまま隠しフォルダに取り残される (回帰防止)。
+        var dataPath = Path.Combine(_watchDir, "report.txt");
+        var endPath = Path.Combine(_watchDir, "report.txt.END");
+        await File.WriteAllTextAsync(dataPath, "the-payload");
+        await File.WriteAllTextAsync(endPath, "end-marker");
+
+        var (transfer, additional) = BuildOptions();
+        var primaryStore = new DestinationStore();
+        var backupStore = new DestinationStore();
+
+        // --- Run 1: backup 全失敗 → データ + END を retry ディレクトリへ退避 ---
+        backupStore.FailUploads = true;
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(),
+            requireEndFile: true, deleteAfterVerify: false);
+
+        var retryDataPath = Path.Combine(_retryDir, "report.txt");
+        var retryEndPath = Path.Combine(_retryDir, "report.txt.END");
+        Assert.True(File.Exists(retryDataPath));
+        Assert.True(File.Exists(retryEndPath));
+
+        // データ側の復元先だけを塞ぐ (END 側の復元先は空いている)
+        await File.WriteAllTextAsync(dataPath, "unrelated-blocker");
+
+        // --- Run 2: backup 復活 → 全宛先完了。復元は一部が塞がっているためペアごと retry に残る ---
+        backupStore.FailUploads = false;
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(),
+            requireEndFile: true, deleteAfterVerify: false);
+
+        Assert.Equal(1, backupStore.UploadCount("/backup/report.txt"));
+        Assert.True(File.Exists(retryDataPath), "復元先が塞がっている間はデータが retry に残る");
+        Assert.True(File.Exists(retryEndPath), "END だけ先に復元せず、ペアごと retry に残す");
+        Assert.False(File.Exists(endPath), "END が watch 側へ部分復元されない");
+
+        // ブロッカーを除去して復元先を空ける
+        File.Delete(dataPath);
+
+        // --- Run 3: 配信済みスキップ経路で復元が再試行され、ペアごと watch.Path へ戻る ---
+        await RunWorkerAsync(transfer, additional, primaryStore, backupStore, new ApplicationExitCode(),
+            requireEndFile: true, deleteAfterVerify: false);
+
+        Assert.True(File.Exists(dataPath), "データが watch へ復元される");
+        Assert.True(File.Exists(endPath), "END も watch へ復元される");
+        Assert.Equal("the-payload", await File.ReadAllTextAsync(dataPath));
+        Assert.False(File.Exists(retryDataPath));
+        Assert.False(File.Exists(retryEndPath));
+        Assert.Equal(1, primaryStore.UploadCount("/primary/report.txt")); // 再送しない
+        Assert.Equal(1, backupStore.UploadCount("/backup/report.txt"));   // 再送しない
+    }
+
+    [Fact]
     public async Task HashSignatureMode_SameSizeSameMtimeOverwrite_ResendsToAllDestinations()
     {
         // hash モードは、サイズも更新時刻も据え置きで内容だけ差し替えた上書き（sizetime では
