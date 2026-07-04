@@ -235,6 +235,34 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         await EnsureConnectedAsync(ct).ConfigureAwait(false);
         await EnsureDirectoryAsync(remotePath, ct).ConfigureAwait(false);
 
+        var dir = Path.GetDirectoryName(remotePath)?.Replace('\\', '/');
+        try
+        {
+            await UploadCoreAsync(localPath, remotePath, ct).ConfigureAwait(false);
+        }
+        catch (SftpPathNotFoundException) when (!string.IsNullOrEmpty(dir) && _verifiedRemoteDirs.Remove(dir))
+        {
+            // 存在確認済みのはずのディレクトリが外部要因で消されている。キャッシュを無効化した上で
+            // 再作成し、このアップロードを 1 回だけやり直す (キャッシュ導入前の毎回確認と同じ回復性を保つ)。
+            _logger.LogWarning("Remote directory {Dir} disappeared. Recreating it and retrying the upload once: {RemotePath}", dir, remotePath);
+            await EnsureDirectoryAsync(remotePath, ct).ConfigureAwait(false);
+            await UploadCoreAsync(localPath, remotePath, ct).ConfigureAwait(false);
+        }
+        catch
+        {
+            // 転送失敗時はディレクトリキャッシュを無効化する (リモート側でディレクトリが
+            // 消された場合にリトライで再作成できるようにするため)
+            if (!string.IsNullOrEmpty(dir))
+            {
+                _verifiedRemoteDirs.Remove(dir);
+            }
+            throw;
+        }
+    }
+
+    // 一時名でアップロード → 宛先名へリネーム → (設定に応じて) 存在確認
+    private async Task UploadCoreAsync(string localPath, string remotePath, CancellationToken ct)
+    {
         // 一意な一時ファイル名で衝突防止
         var temp = $"{remotePath}.tmp.{Guid.NewGuid():N}";
         _logger.LogDebug("SFTP upload: {LocalPath} -> temp={TempPath}", localPath, temp);
@@ -254,13 +282,6 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         }
         catch
         {
-            // 転送失敗時はディレクトリキャッシュを無効化する (リモート側でディレクトリが
-            // 消された場合にリトライで再作成できるようにするため)
-            var dir = Path.GetDirectoryName(remotePath)?.Replace('\\', '/');
-            if (!string.IsNullOrEmpty(dir))
-            {
-                _verifiedRemoteDirs.Remove(dir);
-            }
             // リネーム失敗時にリモートの一時ファイルが蓄積しないよう削除を試みる
             try { if (_client.Exists(temp)) _client.DeleteFile(temp); } catch { }
             throw;
@@ -295,12 +316,21 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
                 _posixRenameSupported = true;
                 return;
             }
-            catch (Exception ex) when (ex is NotSupportedException or SshException && SafeExists(tempPath))
+            catch (NotSupportedException ex)
             {
-                // 一時ファイルが残ったまま失敗した場合のみ「拡張未対応」とみなしフォールバックする。
-                // (接続断など本物の障害では SafeExists も失敗し、ここには入らず元の例外が伝播する)
+                // サーバが posix-rename 拡張を告知していない (SSH.NET が送信前にクライアント側で
+                // 検出する)。この接続では恒久的に未対応とみなしフォールバックする。
                 _posixRenameSupported = false;
                 _logger.LogDebug("posix-rename is not supported by the server, falling back to delete+rename: {Error}", ex.Message);
+            }
+            catch (SshException ex) when (SafeExists(tempPath))
+            {
+                // サーバ側の失敗応答。一時的な失敗 (ビジー等) と実装上の非対応を区別できないため、
+                // このファイルに限り削除 + リネームでフォールバックし、posix-rename 自体は次の
+                // ファイルでも引き続き試す (一時失敗を恒久的な非対応と誤判定して以降の転送の
+                // 原子性を失わないため)。
+                // (接続断など本物の障害では SafeExists も失敗し、ここには入らず元の例外が伝播する)
+                _logger.LogDebug("posix-rename failed, falling back to delete+rename for this file: {Error}", ex.Message);
             }
         }
 
