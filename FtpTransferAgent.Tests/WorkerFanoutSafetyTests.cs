@@ -489,7 +489,7 @@ public class WorkerFanoutSafetyTests
 
             var handled = (bool)typeof(Worker)
                 .GetMethod("HandleAlreadyDelivered", BindingFlags.Instance | BindingFlags.NonPublic)!
-                .Invoke(worker, new[] { dataPath, Array.Empty<string>(), tracking })!;
+                .Invoke(worker, new[] { dataPath, Array.Empty<string>(), Array.Empty<string>(), tracking })!;
 
             Assert.False(handled);
             Assert.True(File.Exists(dataPath));

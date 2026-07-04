@@ -641,10 +641,14 @@ public class Worker : BackgroundService
 
     // 既に全宛先へ配信済み (マーカーが揃っている) ファイルの後始末。
     // DeleteAfterVerify=true なら削除しマーカーも掃除。false ならローカルを残し
-    // マーカーも保持して次回も送信をスキップさせる。
+    // マーカーも保持して次回も送信をスキップさせる。ローカルを残す場合、過去の部分失敗で
+    // リトライディレクトリへ退避したままのファイルは watch.Path への復元を再試行する
+    // (全宛先完了時の復元が同名ファイルの存在や一時的なロックで失敗していても、
+    // 後続バッチで隠しフォルダに取り残されたままにしない)。
     private bool HandleAlreadyDelivered(
         string sourcePath,
         IReadOnlyList<string> relatedEndFiles,
+        IReadOnlyList<string> relatedEndFileRelativePaths,
         DeliveryTrackingContext tracking)
     {
         _logger.LogInformation("All destinations already delivered for {File} (per delivery state); skipping send.", sourcePath);
@@ -661,6 +665,10 @@ public class Worker : BackgroundService
         if (deleted)
         {
             _deliveryStore?.RemoveAll(tracking.RelativePath);
+        }
+        else
+        {
+            RestoreFromRetryDirectoryIfNeeded(sourcePath, tracking.RelativePath, relatedEndFiles, relatedEndFileRelativePaths);
         }
 
         return true;
@@ -1115,8 +1123,13 @@ public class Worker : BackgroundService
 
     // DeleteAfterVerify=false かつ全宛先配信完了時に、過去の部分失敗でリトライディレクトリへ
     // 退避していたデータ/END ファイルを watch.Path の元の相対位置へ戻す。
-    // 退避していない (既に watch 配下にある) 場合は何もしない。ベストエフォートで、
-    // 失敗してもマーカーは記録されるため再送は起きない (ファイルがリトライ側に残るだけ)。
+    // 退避していない (既に watch 配下にある) 場合は何もしない。
+    // 復元は退避 (MovePartialFailureToRetryDirectory) と対称の all-or-nothing で行う:
+    // 1 つでも復元できないファイルがあれば何も動かさず、途中失敗時は完了分を巻き戻す。
+    // 部分復元でデータ/END ペアが watch と retry に分断されると、RequireEndFile 構成では
+    // retry 側に残った半端なファイルが以降の列挙フィルタで候補から外れ、復元も再試行
+    // されないまま取り残されるため。ベストエフォートで、失敗してもマーカーは記録される
+    // ため再送は起きない (ペアごと retry 側に残り、次回の配信済みスキップ時に復元を再試行する)。
     private void RestoreFromRetryDirectoryIfNeeded(
         string sourcePath,
         string relativePath,
@@ -1128,34 +1141,55 @@ public class Worker : BackgroundService
             return;
         }
 
-        var moves = new List<(string Source, string Target, string Kind)>();
-        for (var i = 0; i < relatedEndFiles.Count; i++)
+        var plannedMoves = new List<(string Source, string Target, string Kind)>();
+        try
         {
-            var endFile = relatedEndFiles[i];
-            var endRelative = i < relatedEndFileRelativePaths.Count
-                ? relatedEndFileRelativePaths[i]
-                : Path.GetFileName(endFile);
-            moves.Add((endFile, GetWatchFilePath(endRelative), "END file"));
-        }
-        moves.Add((sourcePath, GetWatchFilePath(relativePath), "file"));
-
-        foreach (var move in moves)
-        {
-            try
+            var requests = new List<(string Source, string RelativePath, string Kind)>();
+            for (var i = 0; i < relatedEndFiles.Count; i++)
             {
-                if (!File.Exists(move.Source)
-                    || string.Equals(Path.GetFullPath(move.Source), move.Target, StringComparison.OrdinalIgnoreCase))
+                var endFile = relatedEndFiles[i];
+                var endRelative = i < relatedEndFileRelativePaths.Count
+                    ? relatedEndFileRelativePaths[i]
+                    : Path.GetFileName(endFile);
+                requests.Add((endFile, endRelative, "END file"));
+            }
+            requests.Add((sourcePath, relativePath, "file"));
+
+            foreach (var request in requests)
+            {
+                // 成功時削除の構成で既に消えている END ファイルなどは復元対象外
+                if (!File.Exists(request.Source))
                 {
                     continue;
                 }
 
-                if (File.Exists(move.Target))
+                var target = GetWatchFilePath(request.RelativePath);
+                if (string.Equals(Path.GetFullPath(request.Source), target, StringComparison.OrdinalIgnoreCase))
                 {
-                    _logger.LogWarning("Cannot restore {Kind} {File} to watch directory because target already exists: {Target}. File remains in retry directory.",
-                        move.Kind, move.Source, move.Target);
                     continue;
                 }
 
+                if (File.Exists(target))
+                {
+                    _logger.LogWarning("Cannot restore {Kind} {File} to watch directory because target already exists: {Target}. All related files remain in the retry directory; restore will be retried on a later run.",
+                        request.Kind, request.Source, target);
+                    return;
+                }
+
+                plannedMoves.Add((request.Source, target, request.Kind));
+            }
+        }
+        catch (Exception ex) when (IsRetryFileSystemException(ex) || ex is InvalidOperationException)
+        {
+            _logger.LogWarning(ex, "Cannot plan restore from retry directory; files remain there: {Error}", ex.Message);
+            return;
+        }
+
+        var completedMoves = new List<(string Source, string Target, string Kind)>();
+        try
+        {
+            foreach (var move in plannedMoves)
+            {
                 var targetDirectory = Path.GetDirectoryName(move.Target);
                 if (!string.IsNullOrEmpty(targetDirectory))
                 {
@@ -1170,6 +1204,7 @@ public class Worker : BackgroundService
                 catch (Exception ex) when (IsRetryFileSystemException(ex)) { /* best-effort */ }
 
                 File.Move(move.Source, move.Target);
+                completedMoves.Add(move);
 
                 if (originalWriteTimeUtc is { } writeTimeUtc)
                 {
@@ -1180,11 +1215,11 @@ public class Worker : BackgroundService
                 _logger.LogInformation("Restored {Kind} {File} from retry directory to watch directory: {Target}",
                     move.Kind, move.Source, move.Target);
             }
-            catch (Exception ex) when (IsRetryFileSystemException(ex))
-            {
-                _logger.LogWarning(ex, "Failed to restore {Kind} {File} from retry directory; it remains there: {Error}",
-                    move.Kind, move.Source, ex.Message);
-            }
+        }
+        catch (Exception ex) when (IsRetryFileSystemException(ex))
+        {
+            _logger.LogWarning(ex, "Failed to restore file(s) from retry directory; they remain there and restore will be retried on a later run: {Error}", ex.Message);
+            RollBackRetryMoves(completedMoves);
         }
     }
 
@@ -1464,7 +1499,7 @@ public class Worker : BackgroundService
                             if (pendingList.Count == 0)
                             {
                                 // 全宛先へ配信済み (前回までに完了)。残骸の後始末だけ行う。
-                                if (HandleAlreadyDelivered(file, related, tracking))
+                                if (HandleAlreadyDelivered(file, related, relatedRelativePaths, tracking))
                                 {
                                     skippedFullyDelivered++;
                                 }
