@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>FtpTransferAgent ユーザーガイド</title>
+<style>
+:root{
+  --blue:#0b548c; --teal:#15729e; --green:#0f7a57; --orange:#b35c12; --red:#b3261e;
+  --ink:#1f2f3d; --muted:#5a6b7a; --line:#d4e0ea; --bg:#f4f8fb; --card:#ffffff;
+  --code-bg:#eef3f8;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;color:var(--ink);background:var(--bg);
+  font-family:"BIZ UDPGothic","Yu Gothic UI","Hiragino Sans","Meiryo",sans-serif;
+  line-height:1.85;font-size:15.5px}
+.hero{background:linear-gradient(135deg,#0f7a57 0%,#15729e 75%,#0b548c 130%);color:#fff;padding:44px 24px 36px}
+.hero .inner{max-width:980px;margin:0 auto}
+.hero h1{margin:0 0 6px;font-size:30px;letter-spacing:.02em}
+.hero p{margin:4px 0;opacity:.92}
+.hero .meta{display:flex;gap:14px;flex-wrap:wrap;margin-top:14px;font-size:13px}
+.hero .meta span{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:2px 14px}
+main{max-width:980px;margin:0 auto;padding:28px 20px 80px}
+nav.toc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 26px;margin-bottom:34px;box-shadow:0 1px 4px rgba(15,50,80,.06)}
+nav.toc h2{margin:0 0 10px;font-size:16px;color:var(--green);border:none;padding:0}
+nav.toc ol{margin:0;padding-left:1.4em;columns:2;column-gap:2.5em}
+nav.toc li{margin:3px 0;break-inside:avoid}
+nav.toc a{color:var(--teal);text-decoration:none}
+nav.toc a:hover{text-decoration:underline}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:30px 34px;margin-bottom:30px;box-shadow:0 1px 4px rgba(15,50,80,.06)}
+h2{color:var(--green);font-size:23px;margin:0 0 18px;padding-bottom:10px;border-bottom:3px solid var(--green)}
+h3{color:var(--teal);font-size:18px;margin:30px 0 10px;padding-left:12px;border-left:5px solid var(--teal)}
+h4{color:var(--blue);font-size:16px;margin:22px 0 8px}
+p{margin:10px 0}
+strong{color:#0d3f66}
+code{background:var(--code-bg);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:.86em;font-family:Consolas,"Cascadia Code",Menlo,monospace;color:#0d3f66;overflow-wrap:anywhere}
+pre{background:#102a3c;color:#e6eef5;border-radius:10px;padding:16px 20px;overflow-x:auto;font-size:13.5px;line-height:1.65}
+pre code{background:none;border:none;color:inherit;padding:0;font-size:inherit}
+table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.5px;background:#fff}
+th,td{border:1px solid var(--line);padding:7px 11px;text-align:left;vertical-align:top}
+th{background:linear-gradient(180deg,#eaf6ef,#dcefe4);color:var(--green);white-space:nowrap}
+tr:nth-child(even) td{background:#f7fafc}
+td code{white-space:nowrap}
+ul,ol{padding-left:1.6em}
+li{margin:4px 0}
+.note,.warn,.danger,.tip{border-radius:10px;padding:14px 18px;margin:16px 0;border-left:6px solid}
+.note{background:#eef5fc;border-color:var(--teal)}
+.warn{background:#fdf3e7;border-color:var(--orange)}
+.danger{background:#fdeeee;border-color:var(--red)}
+.tip{background:#edf8f2;border-color:var(--green)}
+.note::before{content:"ℹ️ 補足";display:block;font-weight:bold;color:var(--teal);margin-bottom:4px}
+.warn::before{content:"⚠️ 注意";display:block;font-weight:bold;color:var(--orange);margin-bottom:4px}
+.danger::before{content:"🚫 重要";display:block;font-weight:bold;color:var(--red);margin-bottom:4px}
+.tip::before{content:"✅ 推奨";display:block;font-weight:bold;color:var(--green);margin-bottom:4px}
+figure.fig{margin:22px 0;text-align:center;background:#fbfdff;border:1px solid var(--line);border-radius:12px;padding:18px 12px 10px}
+figure.fig svg{max-width:100%;height:auto}
+figcaption{font-size:13px;color:var(--muted);margin-top:8px}
+.steps{counter-reset:step;list-style:none;padding-left:0}
+.steps>li{position:relative;padding:2px 0 14px 52px;margin:0}
+.steps>li::before{counter-increment:step;content:counter(step);position:absolute;left:0;top:2px;width:34px;height:34px;border-radius:50%;background:var(--green);color:#fff;font-weight:bold;display:flex;align-items:center;justify-content:center}
+footer{max-width:980px;margin:0 auto;padding:0 20px 50px;color:var(--muted);font-size:13px;text-align:center}
+a{color:var(--teal)}
+@media (max-width:720px){nav.toc ol{columns:1} section{padding:22px 18px} h2{font-size:20px}}
+@media print{body{background:#fff}section,nav.toc{box-shadow:none;border-color:#bbb;break-inside:avoid-page}.hero{background:var(--green)}}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="inner">
+    <h1>FtpTransferAgent ユーザーガイド</h1>
+    <p>導入・設定・運用のためのガイド ─ フォルダのファイルを FTP / SFTP / 共有フォルダへ「確実に」届ける</p>
+    <div class="meta">
+      <span>対象バージョン 3.4.x</span>
+      <span>更新日 2026-07-06</span>
+      <span>関連: <a href="spec.html" style="color:#fff">詳細仕様書</a> / <a href="internal-overview.html" style="color:#fff">社内説明資料</a></span>
+    </div>
+  </div>
+</header>
+<main>
+
+<nav class="toc">
+  <h2>目次</h2>
+  <ol>
+    <li><a href="#intro">はじめに ─ このツールでできること</a></li>
+    <li><a href="#env">動作環境</a></li>
+    <li><a href="#quick">クイックスタート</a></li>
+    <li><a href="#files">設定ファイルの構成と読み込み順</a></li>
+    <li><a href="#ref">設定リファレンス</a></li>
+    <li><a href="#templates">推奨設定テンプレート</a></li>
+    <li><a href="#end">END ファイル制御</a></li>
+    <li><a href="#fanout">複数宛先配信と配信トラッキング</a></li>
+    <li><a href="#local">ローカル / UNC 共有への転送</a></li>
+    <li><a href="#lock">二重起動防止とログ保持</a></li>
+    <li><a href="#ops">運用 ─ 終了コード・監視・トラブル対応</a></li>
+    <li><a href="#security">セキュリティ推奨事項</a></li>
+    <li><a href="#test">テストの実行（開発者向け）</a></li>
+  </ol>
+</nav>
+
+<section id="intro">
+<h2>1. はじめに ─ このツールでできること</h2>
+<p>FtpTransferAgent は .NET 10 で動作する<strong>バッチ型のファイル転送ツール</strong>です。指定ディレクトリ内のファイルを FTP / SFTP / ローカル（UNC 共有）で転送し、転送後にハッシュ検証を行います。</p>
+<ul>
+  <li>起動時に 1 回だけ処理して終了します（常駐監視はしません）</li>
+  <li><code>put</code>（アップロード）/ <code>get</code>（ダウンロード）に対応します</li>
+  <li>並列転送、再試行、END ファイル制御、転送後クリーンアップに対応します</li>
+</ul>
+
+<figure class="fig">
+<svg viewBox="0 0 900 300" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
+  <defs>
+    <marker id="ua1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0f7a57"/>
+    </marker>
+    <marker id="ua2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#15729e"/>
+    </marker>
+  </defs>
+  <g font-size="12.5">
+    <rect x="24" y="80" width="190" height="140" rx="10" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.5"/>
+    <text x="119" y="106" text-anchor="middle" font-weight="bold" fill="#7a5a1e">watch フォルダ</text>
+    <rect x="44" y="120" width="150" height="24" rx="4" fill="#fff" stroke="#c9a35a"/>
+    <text x="119" y="137" text-anchor="middle" font-size="11">data_0001.csv</text>
+    <rect x="44" y="150" width="150" height="24" rx="4" fill="#fff" stroke="#c9a35a"/>
+    <text x="119" y="167" text-anchor="middle" font-size="11">data_0002.csv</text>
+    <rect x="44" y="180" width="150" height="24" rx="4" fill="#fff" stroke="#c9a35a"/>
+    <text x="119" y="197" text-anchor="middle" font-size="11">report.pdf</text>
+    <rect x="300" y="80" width="280" height="140" rx="12" fill="#f2f8fd" stroke="#0b548c" stroke-width="2"/>
+    <text x="440" y="112" text-anchor="middle" font-size="14" font-weight="bold" fill="#0b548c">FtpTransferAgent</text>
+    <text x="440" y="138" text-anchor="middle" font-size="11.5" fill="#4b6478">スケジューラから起動 → 転送 → 検証 → 終了</text>
+    <text x="440" y="160" text-anchor="middle" font-size="11.5" fill="#4b6478">並列転送（最大 16）／自動リトライ</text>
+    <text x="440" y="182" text-anchor="middle" font-size="11.5" fill="#4b6478">ハッシュ検証（SHA256 / SHA512）</text>
+    <text x="440" y="204" text-anchor="middle" font-size="11.5" fill="#4b6478">ログ・エラーメール・終了コード</text>
+    <line x1="214" y1="128" x2="300" y2="128" stroke="#0f7a57" stroke-width="2.4" marker-end="url(#ua1)"/>
+    <text x="257" y="118" text-anchor="middle" font-size="11" fill="#0f7a57" font-weight="bold">put</text>
+    <line x1="300" y1="176" x2="214" y2="176" stroke="#15729e" stroke-width="2.4" marker-end="url(#ua2)"/>
+    <text x="257" y="196" text-anchor="middle" font-size="11" fill="#15729e" font-weight="bold">get</text>
+    <rect x="668" y="26" width="212" height="64" rx="10" fill="#eef7f1" stroke="#0f7a57" stroke-width="1.6"/>
+    <text x="774" y="52" text-anchor="middle" font-weight="bold" fill="#0f7a57">SFTP サーバー（推奨）</text>
+    <text x="774" y="74" text-anchor="middle" font-size="11" fill="#40605a">暗号化・鍵認証・ホスト鍵検証</text>
+    <rect x="668" y="118" width="212" height="64" rx="10" fill="#eef4fa" stroke="#15729e" stroke-width="1.6"/>
+    <text x="774" y="144" text-anchor="middle" font-weight="bold" fill="#0b548c">FTP サーバー</text>
+    <text x="774" y="166" text-anchor="middle" font-size="11" fill="#4b6478">既存連携との互換用</text>
+    <rect x="668" y="210" width="212" height="64" rx="10" fill="#f6f1fa" stroke="#7b5aa6" stroke-width="1.6"/>
+    <text x="774" y="236" text-anchor="middle" font-weight="bold" fill="#5d4380">ローカル / UNC 共有</text>
+    <text x="774" y="258" text-anchor="middle" font-size="11" fill="#6a5a80">Mode=local（put 専用）</text>
+    <line x1="580" y1="120" x2="668" y2="62" stroke="#0f7a57" stroke-width="2" marker-end="url(#ua1)"/>
+    <line x1="580" y1="150" x2="668" y2="150" stroke="#15729e" stroke-width="2" marker-end="url(#ua2)"/>
+    <line x1="580" y1="180" x2="668" y2="238" stroke="#15729e" stroke-width="2" marker-end="url(#ua2)"/>
+  </g>
+</svg>
+<figcaption>図 1. FtpTransferAgent の役割：watch フォルダと各種宛先の間でファイルを検証付きで転送する</figcaption>
+</figure>
+
+<h3>主な機能</h3>
+<ul>
+  <li>FTP / SFTP 転送、<strong>ローカル / UNC (SMB 共有) への転送</strong>（<code>Mode=local</code>、put 専用）</li>
+  <li>SFTP のパスワード認証・秘密鍵認証、ホスト鍵フィンガープリント検証</li>
+  <li>ハッシュ検証（<code>SHA256</code> / <code>SHA512</code>）、指数バックオフ再試行（Polly）</li>
+  <li>最大 16 並列転送、END ファイル制御（Put/Get 両対応、データファイル先行転送）</li>
+  <li>ローリングファイルログ + エラーメール通知、ログ保持日数指定（古いログの自動削除）</li>
+  <li><strong>二重起動防止</strong>（PID ロックファイル方式）、ファイル名ワイルドカード指定（<code>*.txt</code>、<code>data_*.csv</code> など）</li>
+  <li><strong>複数宛先への同時配信</strong>（put 方向のファンアウト）+ 宛先別配信トラッキング</li>
+</ul>
+</section>
+
+<section id="env">
+<h2>2. 動作環境</h2>
+<h3>自己完結・単一ファイル発行時（--self-contained）</h3>
+<p>自己完結で発行した場合、サーバへの <strong>.NET ランタイムのインストールは不要</strong>です。ただし OS レベルの依存ライブラリは必要です。</p>
+<h4>Linux (x64 / arm64)</h4>
+<table>
+<tr><th>依存ライブラリ</th><th>用途</th><th>備考</th></tr>
+<tr><td><strong>glibc 2.27 以上</strong></td><td>.NET 10 の動作基盤</td><td>Ubuntu 22.04 以降 / RHEL 8 以降が対象（CentOS 7 は対象外）</td></tr>
+<tr><td><strong>libssl (OpenSSL 1.1 または 3.x)</strong></td><td>FTP over TLS / SFTP (SSH.NET)</td><td>このアプリでは必須</td></tr>
+<tr><td><strong>libicu</strong></td><td>グローバリゼーション処理</td><td><code>DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1</code> で無効化可能</td></tr>
+<tr><td><strong>libz (zlib)</strong></td><td>圧縮処理</td><td>ほぼ全ディストロに標準搭載</td></tr>
+</table>
+<div class="note">Alpine Linux など <strong>musl-libc</strong> ベースのディストロは glibc と互換性がありません。使用する場合は <code>-r linux-musl-x64</code> でビルドが必要です。</div>
+<h4>Windows</h4>
+<ul>
+  <li><strong>Windows 10 (1809) / Windows Server 2016 以降</strong></li>
+  <li>Windows 7/8.1 は .NET 10 の対象外のため非対応（Windows Server 2012/2012 R2 は ESU 環境でのみ対応）</li>
+</ul>
+<h4>macOS</h4>
+<ul><li><strong>macOS 14 (Sonoma) 以降</strong></li></ul>
+<h3>発行コマンド例</h3>
+<pre><code># Linux (x64)
+dotnet publish -c Release -r linux-x64 --self-contained /p:PublishSingleFile=true
+
+# Windows (x64)
+dotnet publish -c Release -r win-x64 --self-contained /p:PublishSingleFile=true
+
+# macOS (x64)
+dotnet publish -c Release -r osx-x64 --self-contained /p:PublishSingleFile=true</code></pre>
+</section>
+
+<section id="quick">
+<h2>3. クイックスタート</h2>
+
+<figure class="fig">
+<svg viewBox="0 0 900 150" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
+  <defs>
+    <marker id="ua3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0f7a57"/>
+    </marker>
+  </defs>
+  <g font-size="12.5">
+    <rect x="20" y="34" width="180" height="82" rx="10" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.8"/>
+    <text x="110" y="62" text-anchor="middle" font-weight="bold" fill="#0f7a57">① 前提を準備</text>
+    <text x="110" y="84" text-anchor="middle" font-size="11" fill="#40605a">.NET 10 SDK（ビルド時）</text>
+    <text x="110" y="101" text-anchor="middle" font-size="11" fill="#40605a">転送先サーバーの情報</text>
+    <rect x="248" y="34" width="180" height="82" rx="10" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.8"/>
+    <text x="338" y="62" text-anchor="middle" font-weight="bold" fill="#0f7a57">② 設定を書く</text>
+    <text x="338" y="84" text-anchor="middle" font-size="11" fill="#40605a">appsettings.json に</text>
+    <text x="338" y="101" text-anchor="middle" font-size="11" fill="#40605a">接続先・フォルダ・検証方法</text>
+    <rect x="476" y="34" width="180" height="82" rx="10" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.8"/>
+    <text x="566" y="62" text-anchor="middle" font-weight="bold" fill="#0f7a57">③ 実行して確認</text>
+    <text x="566" y="84" text-anchor="middle" font-size="11" fill="#40605a">dotnet run または</text>
+    <text x="566" y="101" text-anchor="middle" font-size="11" fill="#40605a">発行済みバイナリを実行</text>
+    <rect x="704" y="34" width="180" height="82" rx="10" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.8"/>
+    <text x="794" y="62" text-anchor="middle" font-weight="bold" fill="#0f7a57">④ 定期実行に登録</text>
+    <text x="794" y="84" text-anchor="middle" font-size="11" fill="#40605a">タスクスケジューラ / cron</text>
+    <text x="794" y="101" text-anchor="middle" font-size="11" fill="#40605a">（5 分おきなど）</text>
+    <line x1="200" y1="75" x2="248" y2="75" stroke="#0f7a57" stroke-width="2" marker-end="url(#ua3)"/>
+    <line x1="428" y1="75" x2="476" y2="75" stroke="#0f7a57" stroke-width="2" marker-end="url(#ua3)"/>
+    <line x1="656" y1="75" x2="704" y2="75" stroke="#0f7a57" stroke-width="2" marker-end="url(#ua3)"/>
+  </g>
+</svg>
+<figcaption>図 2. 導入は 4 ステップ：設定を書いて実行し、スケジューラに載せるだけ</figcaption>
+</figure>
+
+<h3>3.1 前提</h3>
+<ul>
+  <li><strong>開発・ビルド時</strong>: .NET 10 SDK</li>
+  <li><strong>本番サーバ</strong>: 自己完結発行（<code>--self-contained</code>）であれば .NET ランタイム不要（OS 依存ライブラリのみ必要、<a href="#env">2 章</a>参照）</li>
+  <li>転送先/転送元の FTP または SFTP サーバー</li>
+</ul>
+
+<h3>3.2 設定例（最小）</h3>
+<p><code>FtpTransferAgent/appsettings.json</code>:</p>
+<pre><code>{
+  "Watch": {
+    "Path": "./watch",
+    "IncludeSubfolders": false,
+    "AllowedExtensions": [".txt"]
+  },
+  "Transfer": {
+    "Mode": "ftp",
+    "Direction": "put",
+    "Host": "ftp.example.com",
+    "Port": 21,
+    "Username": "user",
+    "Password": "password",
+    "RemotePath": "/upload",
+    "Concurrency": 1,
+    "PreserveFolderStructure": false,
+    "TimeoutSeconds": 120
+  },
+  "Retry": { "MaxAttempts": 3, "DelaySeconds": 5 },
+  "Hash": { "Enabled": true, "Algorithm": "SHA256", "UseServerCommand": false },
+  "Cleanup": {
+    "DeleteAfterVerify": true,
+    "DeleteRemoteAfterDownload": false,
+    "DeleteRemoteEndFiles": false
+  },
+  "Smtp": {
+    "Enabled": false,
+    "RelayHost": "localhost",
+    "RelayPort": 25,
+    "UseTls": false,
+    "Username": "",
+    "Password": "",
+    "From": "noreply@example.com",
+    "To": ["ops@example.com"]
+  },
+  "Logging": {
+    "Level": "Information",
+    "RollingFilePath": "logs/ftp-transfer-.log",
+    "MaxBytes": 10485760
+  }
+}</code></pre>
+
+<h3>3.3 実行</h3>
+<pre><code>dotnet restore
+dotnet build --configuration Release
+dotnet run --project FtpTransferAgent</code></pre>
+
+<h3>3.4 定期実行（推奨）</h3>
+<p>バッチ型のため、継続運用はスケジューラ実行を推奨します。</p>
+<p>Linux/macOS (<code>cron</code>) 例:</p>
+<pre><code>*/5 * * * * /path/to/FtpTransferAgent</code></pre>
+<p>Windows（タスクスケジューラ）例:</p>
+<pre><code>schtasks /create /tn "FtpTransferAgent" /tr "C:\path\to\FtpTransferAgent.exe" /sc minute /mo 5</code></pre>
+
+<h3>3.5 コマンドライン上書き</h3>
+<p><code>dotnet run</code> 時に設定を上書きできます。</p>
+<pre><code>dotnet run --project FtpTransferAgent -- --Transfer:Concurrency=4 --Hash:Algorithm=SHA512</code></pre>
+</section>
+
+<section id="files">
+<h2>4. 設定ファイルの構成と読み込み順</h2>
+<p>プロジェクトには複数の appsettings ファイルが存在しますが、役割はそれぞれ異なります。</p>
+<table>
+<tr><th>ファイル</th><th>自動読み込み</th><th>役割</th></tr>
+<tr><td><code>appsettings.json</code></td><td>常時</td><td>ベース設定。全環境共通の設定値を定義する<strong>必須ファイル</strong></td></tr>
+<tr><td><code>appsettings.Development.json</code></td><td>開発時のみ</td><td><code>DOTNET_ENVIRONMENT=Development</code> のときだけ <code>appsettings.json</code> に上書きされる。開発用の接続先など</td></tr>
+<tr><td><code>appsettings.backup.json</code></td><td>されない</td><td><code>appsettings.json</code> のバックアップコピー。アプリは参照せず、ビルド出力・publish にもコピーされない</td></tr>
+<tr><td><code>appsettings.invalid.json</code></td><td>されない</td><td>意図的に不正な JSON を含む設定バリデーションのテスト用サンプル。ビルド出力・publish にもコピーされない</td></tr>
+</table>
+
+<h3>環境による読み込み挙動</h3>
+<figure class="fig">
+<svg viewBox="0 0 900 190" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
+  <defs>
+    <marker id="ua4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0b548c"/>
+    </marker>
+  </defs>
+  <g font-size="12.5">
+    <rect x="40" y="50" width="230" height="80" rx="10" fill="#eef4fa" stroke="#0b548c" stroke-width="1.8"/>
+    <text x="155" y="82" text-anchor="middle" font-weight="bold" fill="#0b548c">appsettings.json</text>
+    <text x="155" y="106" text-anchor="middle" font-size="11" fill="#4b6478">常に読み込まれる（ベース）</text>
+    <rect x="340" y="50" width="270" height="80" rx="10" fill="#fdf3e7" stroke="#b35c12" stroke-width="1.6" stroke-dasharray="6 4"/>
+    <text x="475" y="82" text-anchor="middle" font-weight="bold" fill="#b35c12">appsettings.{環境名}.json</text>
+    <text x="475" y="106" text-anchor="middle" font-size="11" fill="#9a6b3a">DOTNET_ENVIRONMENT 一致時のみ上書き</text>
+    <rect x="680" y="50" width="190" height="80" rx="10" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.8"/>
+    <text x="775" y="82" text-anchor="middle" font-weight="bold" fill="#0f7a57">実行時の設定</text>
+    <text x="775" y="106" text-anchor="middle" font-size="11" fill="#40605a">CLI の --Key=Value が最優先</text>
+    <line x1="270" y1="90" x2="340" y2="90" stroke="#0b548c" stroke-width="2" marker-end="url(#ua4)"/>
+    <line x1="610" y1="90" x2="680" y2="90" stroke="#0b548c" stroke-width="2" marker-end="url(#ua4)"/>
+    <text x="305" y="78" text-anchor="middle" font-size="11" fill="#5a6b7a">上書き</text>
+    <text x="645" y="78" text-anchor="middle" font-size="11" fill="#5a6b7a">上書き</text>
+    <text x="450" y="166" text-anchor="middle" font-size="11.5" fill="#5a6b7a">dotnet run では launchSettings.json により自動的に DOTNET_ENVIRONMENT=Development が設定される</text>
+  </g>
+</svg>
+<figcaption>図 3. 設定の読み込み順：ベース → 環境別 → コマンドライン引数の順に上書きされる</figcaption>
+</figure>
+
+<div class="danger"><strong>本番デプロイ時は <code>appsettings.json</code> のみを配置</strong>してください。接続先ホスト名・パスワードなどの実環境の値に書き換えてから配置します。<code>appsettings.Development.json</code>・<code>appsettings.backup.json</code>・<code>appsettings.invalid.json</code> は不要です。</div>
+</section>
+
+<section id="ref">
+<h2>5. 設定リファレンス</h2>
+
+<h3>Watch</h3>
+<table>
+<tr><th>項目</th><th>型</th><th>必須</th><th>既定値</th><th>説明</th></tr>
+<tr><td><code>Path</code></td><td>string</td><td>必須</td><td><code>""</code></td><td>監視/保存ディレクトリ</td></tr>
+<tr><td><code>IncludeSubfolders</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td>サブフォルダも対象にする</td></tr>
+<tr><td><code>AllowedExtensions</code></td><td>string[]</td><td>任意</td><td><code>[]</code></td><td>対象ファイルのフィルタ。拡張子 (<code>"txt"</code> / <code>".txt"</code>) またはワイルドカード (<code>"*.txt"</code> / <code>"data_*.csv"</code>) を指定可能。空配列は全ファイル対象（起動時警告あり）</td></tr>
+<tr><td><code>RequireEndFile</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td>対応する END ファイルがあるデータのみ転送</td></tr>
+<tr><td><code>EndFileExtensions</code></td><td>string[]</td><td>任意</td><td><code>[".END", ".end"]</code></td><td>END 拡張子一覧</td></tr>
+<tr><td><code>TransferEndFiles</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td>対応するデータ転送の成功後に END ファイル自体も転送する</td></tr>
+</table>
+
+<h3>Transfer</h3>
+<table>
+<tr><th>項目</th><th>型</th><th>必須</th><th>既定値</th><th>説明</th></tr>
+<tr><td><code>Mode</code></td><td>string</td><td>必須</td><td><code>"ftp"</code></td><td><code>ftp</code> / <code>sftp</code> / <code>local</code>。<code>local</code> はローカル / UNC（SMB 共有）への書き込み（<strong>put 専用</strong>、CIFS/SMB1 を実装せず OS のファイル I/O。<a href="#local">9 章</a>参照）</td></tr>
+<tr><td><code>Direction</code></td><td>string</td><td>必須</td><td><code>"put"</code></td><td><code>put</code> / <code>get</code>（<code>local</code> は <code>put</code> のみ）</td></tr>
+<tr><td><code>Host</code></td><td>string</td><td>条件付き</td><td><code>""</code></td><td>接続先ホスト。<code>ftp</code> / <code>sftp</code> で必須、<code>local</code> では未使用</td></tr>
+<tr><td><code>Port</code></td><td>int</td><td>任意</td><td><code>21</code></td><td>接続ポート（SFTP は通常 22。<code>local</code> では未使用）</td></tr>
+<tr><td><code>Username</code></td><td>string</td><td>条件付き</td><td><code>""</code></td><td>認証ユーザー。<code>ftp</code> / <code>sftp</code> で必須、<code>local</code> では未使用（OS の実行ユーザー権限で書き込む）</td></tr>
+<tr><td><code>Password</code></td><td>string</td><td>条件付き</td><td><code>null</code></td><td>FTP では必須。SFTP は鍵認証のみなら省略可。<code>local</code> では未使用</td></tr>
+<tr><td><code>PrivateKeyPath</code></td><td>string</td><td>条件付き</td><td><code>null</code></td><td>SFTP 秘密鍵パス（SFTP では Password かどちらか必須）</td></tr>
+<tr><td><code>PrivateKeyPassphrase</code></td><td>string</td><td>任意</td><td><code>null</code></td><td>鍵のパスフレーズ</td></tr>
+<tr><td><code>HostKeyFingerprint</code></td><td>string</td><td>任意</td><td><code>null</code></td><td>SFTP サーバー鍵指紋（未設定だと検証スキップ警告）。<code>SHA256:</code> プレフィックス付きで OpenSSH 形式の SHA-256 指紋（<code>ssh-keygen -lf</code> の出力）、プレフィックス無しで MD5 16 進指紋として照合</td></tr>
+<tr><td><code>RemotePath</code></td><td>string</td><td>必須</td><td><code>""</code></td><td>リモート基準パス。<code>local</code> では書き込み先ディレクトリの絶対パス / UNC パス（例: <code>\\server\share\in</code>、<code>D:\out</code>）</td></tr>
+<tr><td><code>Concurrency</code></td><td>int</td><td>任意</td><td><code>1</code></td><td>primary 宛先の並列転送数（1–16）。<code>get</code> と primary への <code>put</code> に適用。<code>AdditionalDestinations</code> は各要素の <code>Concurrency</code> を個別に使用</td></tr>
+<tr><td><code>PreserveFolderStructure</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td>サブフォルダ構造を維持して転送</td></tr>
+<tr><td><code>TimeoutSeconds</code></td><td>int</td><td>任意</td><td><code>120</code></td><td>接続・転送タイムアウト秒（1–3600）</td></tr>
+<tr><td><code>KeepAliveSeconds</code></td><td>int</td><td>任意</td><td><code>0</code></td><td>接続再利用時のアイドル切断防止（秒、0–3600、<code>0</code>=無効）。<code>&gt;0</code> で SFTP は <code>KeepAliveInterval</code>、FTP は NOOP 送信 + TCP KeepAlive を有効化。各追加宛先にも個別適用</td></tr>
+<tr><td><code>VerifyUploadedFileExists</code></td><td>bool</td><td>任意</td><td><code>true</code></td><td>SFTP アップロードのリネーム完了後に宛先パスの存在確認（2 往復）を追加で行うか。<code>false</code> でも転送の完了保証は変わらない。高レイテンシ回線で小ファイル多数なら <code>false</code> で往復数を削減できる。SFTP のみ使用</td></tr>
+<tr><td><code>BufferSizeKB</code></td><td>int</td><td>任意</td><td><code>32</code></td><td>SFTP の 1 書き込み要求あたりのバッファサイズ（KB、1–64）。実際のチャンクサイズはサーバが告知するパケット上限との min（OpenSSH 系は 32KB 上限のため既定から上げても効果なし）。SFTP のみ使用</td></tr>
+<tr><td><code>Name</code></td><td>string</td><td>複数宛先で必須</td><td><code>null</code></td><td>宛先の安定識別子。<strong>複数宛先（ファンアウト）の put では primary・追加宛先すべてで必須かつ一意</strong>（配信トラッキングのマーカーキー）。接続情報と独立した名前にする</td></tr>
+<tr><td><code>AdditionalDestinations</code></td><td>object[]</td><td>任意</td><td><code>[]</code></td><td>put 方向の追加送信先。各要素は Transfer と同じ接続系プロパティを持つ（<code>Direction</code> / <code>AdditionalDestinations</code> を除く）。<code>Name</code> / <code>Concurrency</code> / <code>TimeoutSeconds</code> / 認証はその宛先に個別適用。<strong>複数宛先では配信トラッキングが常時有効</strong>（<a href="#fanout">8 章</a>参照）</td></tr>
+<tr><td><code>PerDestinationDeliveryTracking</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td><strong>単一宛先</strong>で配信トラッキングを明示的に有効化する場合に使用。複数宛先では常時有効のためこのフラグに関わらずトラッキングされる（put 方向のみ）</td></tr>
+<tr><td><code>StateDirectory</code></td><td>string</td><td>任意</td><td><code>""</code></td><td>配信トラッキングのマーカー保存先。空なら <code>LocalApplicationData/FtpTransferAgent/delivery-state/&lt;hash&gt;</code> を使用</td></tr>
+<tr><td><code>RetryDirectory</code></td><td>string/null</td><td>任意</td><td><code>null</code></td><td>配信トラッキングで部分失敗したファイルの移動先。未指定/null は <code>LocalApplicationData/FtpTransferAgent/delivery-retry/&lt;watch hash&gt;</code> を使う。相対パスは <code>Watch.Path</code> 配下として解決、空文字で移動を無効化</td></tr>
+<tr><td><code>DeliverySignatureMode</code></td><td>string</td><td>任意</td><td><code>"sizetime"</code></td><td>配信トラッキングの上書き検出方式。<code>sizetime</code>（サイズ+更新時刻）または <code>hash</code>（ファイルハッシュ、厳密）</td></tr>
+<tr><td><code>EnableUploadSnapshot</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td>転送前にデータ/関連 END ファイルを一時スナップショットへ複製する。既定 <code>false</code> はライブのソースを直接読み一時コピーの I/O を避ける（転送中の変更は転送後に検出して保持・次回持ち越し）。トラッキング有効時のみ作用</td></tr>
+</table>
+
+<h3>App</h3>
+<table>
+<tr><th>項目</th><th>型</th><th>必須</th><th>既定値</th><th>説明</th></tr>
+<tr><td><code>LockFilePath</code></td><td>string</td><td>任意</td><td><code>""</code></td><td>二重起動防止用のロックファイルパス。空の場合は <code>Watch.Path</code> ごとに分離した既定パス（<code>LocalApplicationData/FtpTransferAgent/locks/&lt;watch パスのハッシュ&gt;/ftp-transfer-agent.lock</code>、取得できない環境ではテンポラリ配下）を使用。異なる監視フォルダを別スケジュールで並走させても相互ブロックしない</td></tr>
+</table>
+
+<h3>Retry</h3>
+<table>
+<tr><th>項目</th><th>型</th><th>必須</th><th>既定値</th><th>説明</th></tr>
+<tr><td><code>MaxAttempts</code></td><td>int</td><td>任意</td><td><code>3</code></td><td>再試行回数（0 以上）</td></tr>
+<tr><td><code>DelaySeconds</code></td><td>int</td><td>任意</td><td><code>5</code></td><td>初回再試行待ち秒（指数バックオフの基準。5 → 10 → 20 秒…、上限 300 秒）</td></tr>
+</table>
+
+<h3>Hash</h3>
+<table>
+<tr><th>項目</th><th>型</th><th>必須</th><th>既定値</th><th>説明</th></tr>
+<tr><td><code>Enabled</code></td><td>bool</td><td>任意</td><td><code>true</code></td><td>ハッシュ検証を有効にする。<code>false</code> にするとリモートへのハッシュ取得通信が省略されネットワーク負荷が約半分になる</td></tr>
+<tr><td><code>Algorithm</code></td><td>string</td><td>必須</td><td><code>"SHA256"</code></td><td><code>SHA256</code> / <code>SHA512</code></td></tr>
+<tr><td><code>UseServerCommand</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td>FTP: サーバー側ハッシュコマンドを試行。SFTP: 無効扱いでローカル計算</td></tr>
+</table>
+<div class="warn">
+・<code>Enabled: false</code> と <code>DeleteAfterVerify: true</code> は併用できます。この場合ハッシュ検証は行われず、転送（一時名→本番名へのリネーム）成功後にローカルファイルが削除されます。FTP など転送レイヤーで整合性保証のない経路では、ハッシュ検証の有効化または SFTP の利用を推奨します。<br>
+・<code>MD5</code> は使用できません。<code>Hash.Algorithm</code> は <code>SHA256</code> / <code>SHA512</code> のみ受け付け、それ以外は起動時バリデーションでエラー終了します。<br>
+・SFTP は転送レイヤーで HMAC による整合性保証があるため、<code>Enabled: false</code> にしても実用上の問題は少ないです。
+</div>
+
+<h3>Cleanup</h3>
+<table>
+<tr><th>項目</th><th>型</th><th>必須</th><th>既定値</th><th>説明</th></tr>
+<tr><td><code>DeleteAfterVerify</code></td><td>bool</td><td>任意</td><td><code>true</code></td><td><code>put</code> 成功後（複数宛先では全宛先成功後）、ローカルファイルを削除。<code>false</code> で元ファイルを保持</td></tr>
+<tr><td><code>DeleteRemoteAfterDownload</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td><code>get</code> 成功後、リモートファイルを削除</td></tr>
+<tr><td><code>DeleteRemoteEndFiles</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td>END ファイル成功時のリモート END ファイル削除</td></tr>
+<tr><td><code>DeleteLocalSkippedEndFiles</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td><code>put</code> で <code>TransferEndFiles=false</code> のとき、転送成功したデータに対応する未転送 END ファイルをローカルから削除する</td></tr>
+</table>
+
+<h3>Smtp</h3>
+<p>接続・宛先の必須チェックは <code>Enabled: true</code> の場合のみ行われます。メール通知を使わない場合は <code>Smtp</code> セクションを省略しても起動できます。</p>
+<table>
+<tr><th>項目</th><th>型</th><th>必須</th><th>既定値</th><th>説明</th></tr>
+<tr><td><code>Enabled</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td>エラーメール通知有効化</td></tr>
+<tr><td><code>RelayHost</code></td><td>string</td><td>Enabled 時必須</td><td><code>""</code></td><td>SMTP リレー先</td></tr>
+<tr><td><code>RelayPort</code></td><td>int</td><td>任意</td><td><code>25</code></td><td>SMTP ポート（1–65535）</td></tr>
+<tr><td><code>UseTls</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td>TLS 使用</td></tr>
+<tr><td><code>Username</code> / <code>Password</code></td><td>string</td><td>任意</td><td><code>""</code></td><td>SMTP 認証情報</td></tr>
+<tr><td><code>From</code></td><td>string</td><td>Enabled 時必須</td><td><code>""</code></td><td>送信元メールアドレス</td></tr>
+<tr><td><code>To</code></td><td>string[]</td><td>Enabled 時必須</td><td><code>[]</code></td><td>宛先（1 件以上）</td></tr>
+<tr><td><code>MaxEmailsPerRun</code></td><td>int</td><td>任意</td><td><code>100</code></td><td>1 回のバッチ実行で送信するエラーメールの上限（メール洪水防止）。0 以下で無制限</td></tr>
+<tr><td><code>SuppressPerDestinationFailureDetailEmails</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td>複数宛先で、個々の宛先への転送失敗の<strong>詳細メールだけ</strong>を抑制する。ファイル単位の部分配信サマリ通知・他種のエラーメールは送信され続け、ファイルログと終了コードにも影響しない</td></tr>
+</table>
+<p>エラーメールは非同期送信ですが、プロセス終了時には送信中のメールの完了を最大 15 秒待機するため、バッチ終了直前のエラー通知も失われません。</p>
+
+<h3>Logging</h3>
+<table>
+<tr><th>項目</th><th>型</th><th>必須</th><th>既定値</th><th>説明</th></tr>
+<tr><td><code>Level</code></td><td>string</td><td>必須</td><td><code>"Information"</code></td><td><code>Trace</code>〜<code>None</code></td></tr>
+<tr><td><code>RollingFilePath</code></td><td>string</td><td>任意</td><td><code>""</code></td><td>ログファイル基準名（例: <code>logs/ftp-transfer-.log</code>）。空にするとファイルログ無効（コンソールのみ）</td></tr>
+<tr><td><code>MaxBytes</code></td><td>long</td><td>任意</td><td><code>10485760</code></td><td>ローテーション上限バイト（1024 以上）</td></tr>
+<tr><td><code>Retention.Enabled</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td>起動時に古いログを削除する。<code>false</code> なら削除しない</td></tr>
+<tr><td><code>Retention.RetentionDays</code></td><td>int</td><td>任意</td><td><code>30</code></td><td>保持日数（1–3650）。この日数より古いログファイルと、空になった年/月フォルダを起動時に削除する</td></tr>
+</table>
+<p>ログファイル名の日付・ローテーション・保持期間の判定は、ログ行のタイムスタンプと同じローカル時刻基準です。</p>
+</section>
+
+<section id="templates">
+<h2>6. 推奨設定テンプレート</h2>
+
+<h3>6.1 サブフォルダを安全にアップロード</h3>
+<pre><code>{
+  "Watch": { "IncludeSubfolders": true },
+  "Transfer": {
+    "Direction": "put",
+    "PreserveFolderStructure": true,
+    "Concurrency": 4
+  }
+}</code></pre>
+
+<h3>6.2 SFTP 鍵認証 + ホスト鍵検証</h3>
+<pre><code>{
+  "Transfer": {
+    "Mode": "sftp",
+    "Port": 22,
+    "Username": "user",
+    "PrivateKeyPath": "./id_ed25519",
+    "HostKeyFingerprint": "SHA256:ohD8VZEXGWo6Ez8GSEJQ9WpafgLFsOfLOtGGQCQo6Og"
+  }
+}</code></pre>
+<div class="tip"><code>HostKeyFingerprint</code> は <code>ssh-keygen -lf &lt;ホスト鍵ファイル&gt;</code> で表示される SHA-256 形式 (<code>SHA256:...</code>) を推奨します。従来の MD5 16 進指紋（コロン区切り可）も後方互換として使用できます。</div>
+
+<h3>6.3 END ファイル必須（END 自体は転送しない）</h3>
+<pre><code>{
+  "Watch": {
+    "RequireEndFile": true,
+    "TransferEndFiles": false,
+    "EndFileExtensions": [".END", ".TRG"]
+  },
+  "Cleanup": { "DeleteLocalSkippedEndFiles": true }
+}</code></pre>
+<ul>
+  <li><code>TransferEndFiles: false</code> のとき、END ファイルは転送されずローカルに残る</li>
+  <li><code>DeleteLocalSkippedEndFiles: true</code> を併用すると、対応するデータ転送が成功した後に END ファイルもローカルから削除される</li>
+</ul>
+
+<h3>6.4 ワイルドカードでファイル指定</h3>
+<pre><code>{
+  "Watch": { "AllowedExtensions": ["*.txt", "data_*.csv", "log"] }
+}</code></pre>
+<ul>
+  <li><code>*.txt</code> / <code>data_*.csv</code> のようなグロブと、従来の拡張子指定 (<code>"log"</code> / <code>".log"</code>) を混在可能</li>
+  <li>大文字小文字は区別しない</li>
+</ul>
+
+<h3>6.5 複数宛先への同時配信（put のみ）</h3>
+<pre><code>{
+  "Transfer": {
+    "Name": "primary",
+    "Mode": "sftp",
+    "Direction": "put",
+    "Host": "primary.example.com",
+    "Port": 22,
+    "Username": "user",
+    "PrivateKeyPath": "./id_ed25519",
+    "RemotePath": "/in",
+    "AdditionalDestinations": [
+      {
+        "Name": "backup",
+        "Mode": "ftp",
+        "Host": "backup.example.com",
+        "Port": 21,
+        "Username": "user",
+        "Password": "pass",
+        "RemotePath": "/inbox",
+        "Concurrency": 2,
+        "TimeoutSeconds": 60
+      }
+    ]
+  }
+}</code></pre>
+<p>挙動の詳細は <a href="#fanout">8 章</a>を参照してください。</p>
+</section>
+
+<section id="end">
+<h2>7. END ファイル制御</h2>
+<p>ファイル連携の定番プロトコル「<strong>データを置き終わったら、目印ファイル（END）を置く</strong>」に対応しています。<code>RequireEndFile: true</code> の場合、<code>data.txt.END</code> のように「データファイル名 + END 拡張子」が必要です。</p>
+
+<figure class="fig">
+<svg viewBox="0 0 900 250" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
+  <defs>
+    <marker id="ub1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0f7a57"/>
+    </marker>
+  </defs>
+  <g font-size="12.5">
+    <rect x="20" y="20" width="320" height="210" rx="10" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.5"/>
+    <text x="180" y="46" text-anchor="middle" font-weight="bold" fill="#7a5a1e">watch フォルダ（RequireEndFile: true）</text>
+    <rect x="42" y="60" width="180" height="26" rx="5" fill="#fff" stroke="#0f7a57" stroke-width="1.4"/>
+    <text x="132" y="78" text-anchor="middle" font-size="11.5">A.csv + A.csv.END ✓</text>
+    <rect x="42" y="98" width="180" height="26" rx="5" fill="#fff" stroke="#b35c12" stroke-width="1.4"/>
+    <text x="132" y="116" text-anchor="middle" font-size="11.5">B.csv（END なし）</text>
+    <rect x="42" y="136" width="180" height="26" rx="5" fill="#fff" stroke="#b3261e" stroke-width="1.4" stroke-dasharray="4 3"/>
+    <text x="132" y="154" text-anchor="middle" font-size="11.5">C.csv.END（データなし）</text>
+    <text x="180" y="204" text-anchor="middle" font-size="11" fill="#8a7a4a">END = 「書き終わった」の合図（0 バイトで OK）</text>
+    <rect x="450" y="42" width="430" height="52" rx="9" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.8"/>
+    <text x="665" y="64" text-anchor="middle" font-weight="bold" fill="#0f7a57">✅ 転送（必ず「データ → END」の順を保証）</text>
+    <text x="665" y="84" text-anchor="middle" font-size="11" fill="#40605a">受け手側も同じ END 方式を安全に使える</text>
+    <rect x="450" y="112" width="430" height="42" rx="9" fill="#fdf3e7" stroke="#b35c12" stroke-width="1.6"/>
+    <text x="665" y="130" text-anchor="middle" font-weight="bold" fill="#b35c12">⏸ スキップ（まだ書き込み中かもしれない）</text>
+    <text x="665" y="148" text-anchor="middle" font-size="11" fill="#9a6b3a">END が置かれた後の実行で転送される</text>
+    <rect x="450" y="172" width="430" height="42" rx="9" fill="#fdeeee" stroke="#b3261e" stroke-width="1.6"/>
+    <text x="665" y="190" text-anchor="middle" font-weight="bold" fill="#b3261e">⏸ スキップ（対応データのない END は転送しない）</text>
+    <text x="665" y="208" text-anchor="middle" font-size="11" fill="#b3261e">誤配置の END を相手に送らない</text>
+    <line x1="222" y1="73" x2="450" y2="68" stroke="#0f7a57" stroke-width="2" marker-end="url(#ub1)"/>
+    <line x1="222" y1="111" x2="450" y2="133" stroke="#b35c12" stroke-width="2" stroke-dasharray="6 4"/>
+    <line x1="222" y1="149" x2="450" y2="193" stroke="#b3261e" stroke-width="2" stroke-dasharray="6 4"/>
+  </g>
+</svg>
+<figcaption>図 4. END ファイル制御：書きかけのデータを拾わず、揃ったものだけを順序保証付きで転送する</figcaption>
+</figure>
+
+<pre><code>{
+  "Watch": {
+    "RequireEndFile": true,
+    "EndFileExtensions": [".END", ".TRG"],
+    "TransferEndFiles": true
+  }
+}</code></pre>
+<p><strong>挙動</strong>:</p>
+<ul>
+  <li>データファイルは END 存在時のみ転送</li>
+  <li><code>TransferEndFiles: true</code> のとき END ファイルも転送（転送成功後にローカルの END ファイルを削除）</li>
+  <li>順序は「データ → END」を保証</li>
+  <li>対応データがない END は転送しない</li>
+  <li>END ファイル名はディスク上の実際の大文字小文字を保持して転送される</li>
+  <li><code>TransferEndFiles: false</code> かつ <code>Cleanup.DeleteLocalSkippedEndFiles: true</code> のとき、転送成功したデータに対応する END ファイルをローカルから削除する</li>
+</ul>
+</section>
+
+<section id="fanout">
+<h2>8. 複数宛先配信と配信トラッキング</h2>
+<p><code>Transfer.AdditionalDestinations</code> を設定すると、1 つのファイルを<strong>メイン + 追加宛先の全宛先</strong>へ同時に送信できます（put のみ）。設定例は <a href="#templates">6.5</a> を参照してください。</p>
+
+<figure class="fig">
+<svg viewBox="0 0 900 340" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
+  <defs>
+    <marker id="ub2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0b548c"/>
+    </marker>
+  </defs>
+  <g font-size="12">
+    <!-- run 1 -->
+    <rect x="20" y="18" width="418" height="230" rx="12" fill="#f7fafd" stroke="#0b548c" stroke-width="1.8"/>
+    <text x="229" y="44" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#0b548c">今回の実行 ─ 1 宛先だけ失敗</text>
+    <rect x="40" y="64" width="120" height="44" rx="8" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.4"/>
+    <text x="100" y="90" text-anchor="middle" font-size="11.5">data.csv</text>
+    <rect x="230" y="60" width="188" height="30" rx="7" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.4"/>
+    <text x="324" y="80" text-anchor="middle" font-size="11.5" fill="#0f7a57">tokyo ✅ 成功</text>
+    <rect x="230" y="98" width="188" height="30" rx="7" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.4"/>
+    <text x="324" y="118" text-anchor="middle" font-size="11.5" fill="#0f7a57">nagoya ✅ 成功</text>
+    <rect x="230" y="136" width="188" height="30" rx="7" fill="#fdeeee" stroke="#b3261e" stroke-width="1.4"/>
+    <text x="324" y="156" text-anchor="middle" font-size="11.5" fill="#b3261e">osaka ❌ メンテ中</text>
+    <line x1="160" y1="76" x2="230" y2="74" stroke="#0f7a57" stroke-width="1.8" marker-end="url(#ub2)"/>
+    <line x1="160" y1="86" x2="230" y2="112" stroke="#0f7a57" stroke-width="1.8" marker-end="url(#ub2)"/>
+    <line x1="160" y1="96" x2="230" y2="150" stroke="#b3261e" stroke-width="1.8" marker-end="url(#ub2)"/>
+    <rect x="40" y="188" width="378" height="44" rx="8" fill="#e6f0f8" stroke="#15729e" stroke-width="1.5"/>
+    <text x="229" y="206" text-anchor="middle" font-size="11" fill="#0b548c">「tokyo・nagoya へ配信済み」をマーカーに記録し、</text>
+    <text x="229" y="223" text-anchor="middle" font-size="11" fill="#0b548c">data.csv を retry フォルダへ退避（ローカルは消さない）</text>
+    <!-- run 2 -->
+    <rect x="462" y="18" width="418" height="230" rx="12" fill="#f7fafd" stroke="#0b548c" stroke-width="1.8"/>
+    <text x="671" y="44" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#0b548c">次回の実行 ─ 未配信の宛先にだけ再送</text>
+    <rect x="482" y="64" width="120" height="44" rx="8" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.4"/>
+    <text x="542" y="84" text-anchor="middle" font-size="11">retry/data.csv</text>
+    <text x="542" y="99" text-anchor="middle" font-size="9.5" fill="#8a7a4a">指紋が一致するか照合</text>
+    <rect x="672" y="60" width="188" height="30" rx="7" fill="#f0f2f5" stroke="#5a6b7a" stroke-width="1.4" stroke-dasharray="5 3"/>
+    <text x="766" y="80" text-anchor="middle" font-size="11.5" fill="#5a6b7a">tokyo ⏭ スキップ</text>
+    <rect x="672" y="98" width="188" height="30" rx="7" fill="#f0f2f5" stroke="#5a6b7a" stroke-width="1.4" stroke-dasharray="5 3"/>
+    <text x="766" y="118" text-anchor="middle" font-size="11.5" fill="#5a6b7a">nagoya ⏭ スキップ</text>
+    <rect x="672" y="136" width="188" height="30" rx="7" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.4"/>
+    <text x="766" y="156" text-anchor="middle" font-size="11.5" fill="#0f7a57">osaka ✅ 復旧 → 再送成功</text>
+    <line x1="602" y1="76" x2="672" y2="74" stroke="#5a6b7a" stroke-width="1.6" stroke-dasharray="5 3"/>
+    <line x1="602" y1="86" x2="672" y2="112" stroke="#5a6b7a" stroke-width="1.6" stroke-dasharray="5 3"/>
+    <line x1="602" y1="96" x2="672" y2="150" stroke="#0f7a57" stroke-width="1.8" marker-end="url(#ub2)"/>
+    <rect x="482" y="188" width="378" height="44" rx="8" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.5"/>
+    <text x="671" y="206" text-anchor="middle" font-size="11" fill="#0f7a57">全宛先そろったので完了 ─ DeleteAfterVerify: true なら削除、</text>
+    <text x="671" y="223" text-anchor="middle" font-size="11" fill="#0f7a57">false なら watch の元の位置へ復元</text>
+    <text x="450" y="292" text-anchor="middle" font-size="12" fill="#5a6b7a">・配信済みの宛先へは二重配信しない（重複送信事故を防ぐ）</text>
+    <text x="450" y="314" text-anchor="middle" font-size="12" fill="#5a6b7a">・元ファイルが差し替わったら指紋（サイズ+更新時刻 / ハッシュ）で検知し、全宛先へ送り直す</text>
+  </g>
+</svg>
+<figcaption>図 5. 配信トラッキング：どの宛先まで送れたかをファイル単位で記録し、未配信の宛先だけ再送する</figcaption>
+</figure>
+
+<h3>挙動のポイント</h3>
+<ul>
+  <li>メイン + 追加宛先の<strong>全宛先</strong>へ同時に送信。宛先ごとにプロトコル・認証・並列数を個別設定できる（SFTP / FTP / local の混在可）</li>
+  <li><strong>複数宛先では宛先別配信トラッキングが常時有効</strong>: 各宛先に<strong>一意な <code>Name</code> が必須</strong>で、配信済みの宛先を記録し、次回バッチでは<strong>未配信の宛先だけ</strong>へ再送する（成功済み宛先への一括再送はしない）</li>
+  <li>既定ではライブのソースを直接読む。<code>EnableUploadSnapshot: true</code> で、各宛先へ同一内容を送るために列挙時のデータ/関連 END ファイルを一時スナップショット化してから転送する（転送中の変更でも宛先間で内容が割れない）</li>
+  <li><strong>全宛先成功時に</strong>ローカルファイルを削除（<code>Cleanup.DeleteAfterVerify: true</code>、既定）。<code>false</code> の場合は元ファイルを保持</li>
+  <li>一部宛先だけ失敗した場合、対象ファイルは <code>RetryDirectory</code> へ退避し、未配信宛先へ再送し続ける。全宛先完了後、<code>DeleteAfterVerify: false</code> なら <code>Watch.Path</code> の元の位置へ戻す（関連 END ファイルも含めた all-or-nothing で復元。その時点で復元できなかった場合も後続バッチが再試行する）</li>
+  <li>転送完了処理前に元ファイルや関連 END ファイルが変更された場合は、ローカル削除・retry 退避を行わず、終了コード <code>1</code> で次回実行に持ち越す</li>
+  <li>同一の mode/host/port/remote path に複数宛先が向く設定は、同時上書きや END ファイル重複配信の恐れがあるため起動時に警告される</li>
+  <li><code>Direction: get</code> では追加宛先は使用されず、警告が表示される</li>
+  <li><code>sizetime</code> 署名は退避・復元でファイルの更新時刻が変わらないよう、移動時に元の更新時刻を保持する。<code>DeleteAfterVerify: false</code> でローカルを残す場合、保持マーカーの指紋は次回列挙時に再計算される指紋に合わせて記録するため、成功後に END ファイルを削除する構成でも配信済みファイルが毎回再送されることはない</li>
+</ul>
+<div class="note"><strong>一時ファイルの掃除について</strong>: 正常終了・例外終了では一時ファイル（アップロードスナップショット、ダウンロードの検証用一時ファイル）はその実行内で削除されます。強制終了・電源断で残った一時ファイルは次回起動時に掃除しますが、エージェント専用ディレクトリ（<code>&lt;TEMP&gt;/FtpTransferAgent/upload-snapshots/…</code>、watch 配下の <code>.ftptransferagent-tmp</code>）の残骸だけを対象にするため、<strong>利用者ファイルには一切触れません</strong>。</div>
+<p>詳細設計は <a href="../per-destination-delivery-tracking.md">宛先別配信トラッキング</a>、実装（キュー構成・並列処理・マーカー保存先）は <a href="../fanout-and-parallelism.md">ファンアウトと並列処理 実装詳細</a> を参照してください。</p>
+</section>
+
+<section id="local">
+<h2>9. ローカル / UNC 共有への転送（Mode=local）</h2>
+<p><code>Mode: "local"</code> を指定すると、FTP/SFTP サーバーではなく<strong>ローカルフォルダや LAN の共有フォルダ（UNC / SMB 共有）</strong>へ、本ツールのアトミック転送・ハッシュ検証・複数宛先配信付きで書き込めます。旧ツールの「ローカル → 共有フォルダ書き込み」の用途を引き継ぐためのモードです。</p>
+<pre><code>{
+  "Watch": { "Path": "C:\\export", "AllowedExtensions": [".csv"] },
+  "Transfer": {
+    "Mode": "local",
+    "Direction": "put",
+    "RemotePath": "\\\\fileserver\\share\\incoming"
+  },
+  "Cleanup": { "DeleteAfterVerify": true }
+}</code></pre>
+<ul>
+  <li><strong>put 専用</strong>: <code>Direction: get</code> との併用は起動時エラー</li>
+  <li><code>RemotePath</code> に書き込み先ディレクトリの<strong>絶対パスまたは UNC パス</strong>を指定する（例: <code>\\fileserver\share\in</code>、<code>D:\out</code>、<code>/mnt/share/in</code>）</li>
+  <li><code>Host</code> / <code>Port</code> / <code>Username</code> / <code>Password</code> は<strong>不要</strong>。共有へのアクセスは OS の実行ユーザー権限で行う（事前に書き込み権限を付与しておく）</li>
+  <li>FTP/SFTP と同じく<strong>一時名 → アトミックなリネーム</strong>で書き込むため、相手のバッチが書きかけのファイルを拾わない</li>
+  <li><strong>CIFS / SMB1 は実装しない</strong>。UNC への書き込みは OS が SMB を透過処理し、実際に使われるバージョンは OS が交渉する（現代環境では SMB2/3）。盗聴対策が必要な場合はサーバー側で SMB1 を無効化して SMB 暗号化を有効化する（通信路の暗号化を厳密に保証したいなら <code>Mode: sftp</code> を推奨）</li>
+  <li>複数宛先（ファンアウト）の一宛先として混在できる（例: primary は SFTP、追加宛先は共有フォルダ）。その場合は全宛先で <code>Name</code> が必須かつ一意</li>
+  <li><code>RemotePath</code> を <code>Watch.Path</code> と<strong>同一・その配下・その祖先</strong>にすることはできない（自己上書きによるデータ消失や再取り込みを防ぐため起動時エラー）</li>
+</ul>
+<p>設計・制約・テストの詳細は <a href="../local-destination.md">docs/local-destination.md</a> を参照してください。</p>
+</section>
+
+<section id="lock">
+<h2>10. 二重起動防止とログ保持</h2>
+<h3>10.1 二重起動防止（ロックファイル）</h3>
+<p>タスクスケジューラから短い間隔で実行する場合、前回実行分と重ならないよう PID ロックファイルで二重起動を防止します。</p>
+
+<figure class="fig">
+<svg viewBox="0 0 900 180" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
+  <g font-size="12.5">
+    <line x1="60" y1="136" x2="870" y2="136" stroke="#5a6b7a" stroke-width="2"/>
+    <circle cx="150" cy="136" r="6" fill="#0f7a57"/>
+    <text x="150" y="164" text-anchor="middle" fill="#3d4c5a">8:00</text>
+    <rect x="72" y="28" width="230" height="60" rx="9" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.6"/>
+    <text x="187" y="52" text-anchor="middle" font-weight="bold" fill="#0f7a57">起動 → ロック取得 → 転送中…</text>
+    <text x="187" y="72" text-anchor="middle" font-size="11" fill="#40605a">大きいファイルでまだ終わらない</text>
+    <line x1="150" y1="88" x2="150" y2="130" stroke="#0f7a57" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <circle cx="450" cy="136" r="6" fill="#b3261e"/>
+    <text x="450" y="164" text-anchor="middle" fill="#3d4c5a">8:05</text>
+    <rect x="336" y="28" width="230" height="60" rx="9" fill="#fdeeee" stroke="#b3261e" stroke-width="1.6"/>
+    <text x="451" y="52" text-anchor="middle" font-weight="bold" fill="#b3261e">ロックあり + 前プロセス生存</text>
+    <text x="451" y="72" text-anchor="middle" font-size="11" fill="#b3261e">→ 何もせず終了（終了コード 2）</text>
+    <line x1="450" y1="88" x2="450" y2="130" stroke="#b3261e" stroke-width="1.5" stroke-dasharray="4 3"/>
+    <circle cx="750" cy="136" r="6" fill="#0f7a57"/>
+    <text x="750" y="164" text-anchor="middle" fill="#3d4c5a">8:10</text>
+    <rect x="636" y="28" width="230" height="60" rx="9" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.6"/>
+    <text x="751" y="52" text-anchor="middle" font-weight="bold" fill="#0f7a57">前回終了済み → 通常実行</text>
+    <text x="751" y="72" text-anchor="middle" font-size="11" fill="#40605a">クラッシュ後のロックも自動で引き継ぐ</text>
+    <line x1="750" y1="88" x2="750" y2="130" stroke="#0f7a57" stroke-width="1.5" stroke-dasharray="4 3"/>
+  </g>
+</svg>
+<figcaption>図 6. 5 分間隔実行と二重起動防止：同じファイルを 2 プロセスが同時に送る事故を防ぐ</figcaption>
+</figure>
+
+<ul>
+  <li>起動時に <code>App.LockFilePath</code>（未指定なら <code>Watch.Path</code> ごとに分離した既定パス <code>LocalApplicationData/FtpTransferAgent/locks/&lt;watch ハッシュ&gt;/ftp-transfer-agent.lock</code>、取得できない環境ではテンポラリ配下）を確認</li>
+  <li>既存ロックがあり、書かれている PID のプロセスが<strong>生存中</strong>なら終了コード <code>2</code> で即終了</li>
+  <li>死んだ PID のロックは自動的に上書きして起動を継続（運用者がロックファイルを手で消す必要はない）</li>
+  <li>正常終了・異常終了のいずれでも <code>Dispose</code> でロックファイルは削除される</li>
+</ul>
+<pre><code>{
+  "App": { "LockFilePath": "C:/ProgramData/FtpTransferAgent/agent.lock" }
+}</code></pre>
+
+<h3>10.2 ログ保持日数</h3>
+<p>ローリングログは <code>logs/yyyy/MM/</code> 配下に日次蓄積されるため、長期運用ではディスク圧迫の要因になります。<code>Logging.Retention</code> で起動時の自動削除を有効化できます。</p>
+<pre><code>{
+  "Logging": {
+    "RollingFilePath": "logs/ftp-transfer-.log",
+    "Retention": { "Enabled": true, "RetentionDays": 30 }
+  }
+}</code></pre>
+<ul>
+  <li>起動時、ファイル名中の <code>YYYYMMDD</code> をパースして保持日数より古いファイルを削除</li>
+  <li>パース不能なファイル名や、プレフィックスが異なるファイルはスキップ</li>
+  <li>削除により空になった月・年フォルダも併せて除去</li>
+  <li><code>Enabled: false</code>（既定）なら従来どおり削除せず蓄積を継続</li>
+</ul>
+</section>
+
+<section id="ops">
+<h2>11. 運用 ─ 終了コード・監視・トラブル対応</h2>
+<h3>11.1 起動時バリデーションと終了コード</h3>
+<ul>
+  <li>DataAnnotations + 独自 <code>ConfigurationValidator</code> を起動時に実施</li>
+  <li>エラーがある場合は内容を標準出力して終了コード <code>1</code> で終了</li>
+  <li>警告のみの場合は処理継続（警告を表示）</li>
+  <li>転送処理で 1 件でも失敗が記録された場合は終了コード <code>1</code> で終了</li>
+  <li>二重起動検出時は終了コード <code>2</code> で終了</li>
+</ul>
+<table>
+<tr><th>終了コード</th><th>意味</th><th>対応</th></tr>
+<tr><td><code>0</code></td><td>全件成功（または対象なし）</td><td>対応不要</td></tr>
+<tr><td><code>1</code></td><td>設定エラー、または転送失敗あり</td><td><strong>ログを確認して原因対応</strong></td></tr>
+<tr><td><code>2</code></td><td>二重起動を検出してスキップ</td><td>頻発するなら実行間隔を見直し</td></tr>
+</table>
+<div class="tip">日常の確認は 3 点です: ① ジョブの終了コード（ジョブ管理基盤のアラート）、② エラー通知メール（Smtp 有効時）、③ ログファイル（<code>logs/yyyy/MM/</code> 配下）。</div>
+
+<h3>11.2 重要な警告: 同名ファイル衝突</h3>
+<p><code>Watch.IncludeSubfolders: true</code> かつ <code>Transfer.PreserveFolderStructure: false</code> では、サブフォルダを無視してファイル名だけで転送されるため、上書き衝突が起きます。</p>
+
+<figure class="fig">
+<svg viewBox="0 0 900 190" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
+  <defs>
+    <marker id="ub3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#b3261e"/>
+    </marker>
+  </defs>
+  <g font-size="12.5">
+    <rect x="40" y="30" width="230" height="44" rx="8" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.5"/>
+    <text x="155" y="57" text-anchor="middle" font-size="12">watch/<tspan font-weight="bold">A</tspan>/result.csv</text>
+    <rect x="40" y="110" width="230" height="44" rx="8" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.5"/>
+    <text x="155" y="137" text-anchor="middle" font-size="12">watch/<tspan font-weight="bold">B</tspan>/result.csv</text>
+    <rect x="480" y="70" width="240" height="48" rx="8" fill="#fdeeee" stroke="#b3261e" stroke-width="1.8"/>
+    <text x="600" y="90" text-anchor="middle" font-weight="bold" fill="#b3261e">/remote/result.csv</text>
+    <text x="600" y="108" text-anchor="middle" font-size="11" fill="#b3261e">← 後勝ちで上書き!</text>
+    <line x1="270" y1="52" x2="480" y2="86" stroke="#b3261e" stroke-width="2" marker-end="url(#ub3)"/>
+    <line x1="270" y1="132" x2="480" y2="102" stroke="#b3261e" stroke-width="2" marker-end="url(#ub3)"/>
+    <text x="790" y="94" text-anchor="middle" font-size="11.5" fill="#5a6b7a">この組み合わせは</text>
+    <text x="790" y="112" text-anchor="middle" font-size="11.5" fill="#5a6b7a">起動時エラーで検出</text>
+  </g>
+</svg>
+<figcaption>図 7. 同名ファイル衝突：フォルダ構造を保たない転送では、別フォルダの同名ファイルが上書きし合う</figcaption>
+</figure>
+
+<p>起動時の設定エラーとして次が出ます。</p>
+<pre><code>IncludeSubfolders cannot be enabled for upload when any destination has
+PreserveFolderStructure=false (...). Local files with the same name in
+different subdirectories may overwrite each other remotely.
+
+IncludeSubfolders cannot be enabled for download when PreserveFolderStructure
+is false. Remote files from different subdirectories may overwrite the same
+local file.</code></pre>
+<div class="tip">サブフォルダを扱うなら <code>PreserveFolderStructure: true</code>、もしくは全体でファイル名が重複しない命名規約にしてください。</div>
+<p>関連警告: <code>TransferEndFiles: true</code> かつ <code>RequireEndFile: false</code> の組み合わせでは、起動時に警告が表示されます。対応するデータが転送対象になった END ファイルだけが転送されます。</p>
+
+<h3>11.3 よくある問題</h3>
+<h4>ファイルが転送されない</h4>
+<ul>
+  <li><code>Watch.Path</code> が正しいか</li>
+  <li><code>AllowedExtensions</code> に対象拡張子が含まれるか</li>
+  <li><code>RequireEndFile: true</code> で対応 END が存在するか</li>
+  <li>ファイルが他プロセスでロックされていないか</li>
+</ul>
+<h4>接続エラー</h4>
+<ul>
+  <li><code>Mode</code> と <code>Port</code> の組み合わせ（FTP: 21 / SFTP: 22 が一般的）</li>
+  <li>認証情報（FTP は Password 必須、SFTP は Password か鍵）</li>
+  <li>ファイアウォール/ネットワーク疎通</li>
+</ul>
+<h4>ハッシュ不一致</h4>
+<ul>
+  <li><code>UseServerCommand: false</code> で再確認</li>
+  <li>同名ファイル衝突設定になっていないか確認</li>
+  <li>転送中の上書き競合がないか確認</li>
+</ul>
+<h4>すぐに終了して何も転送されない（終了コード 2）</h4>
+<ul>
+  <li>二重起動防止ロックが取得できていない可能性。前回プロセスが生存中か、<code>App.LockFilePath</code> の権限を確認</li>
+</ul>
+<h4>デバッグ</h4>
+<p><code>DOTNET_ENVIRONMENT=Development</code> の設定、または <code>--Logging:Level=Debug</code> でより詳細なログを出力できます。</p>
+</section>
+
+<section id="security">
+<h2>12. セキュリティ推奨事項</h2>
+<ul>
+  <li>可能な限り <code>sftp</code> を使用（FTP は認証情報・データが平文で流れる。起動時に警告が出ます）</li>
+  <li><code>HostKeyFingerprint</code> を設定して MITM（なりすましサーバー）リスクを下げる</li>
+  <li>秘密情報は <code>appsettings.json</code> 直書きより環境変数やシークレット管理を推奨</li>
+  <li>設定ファイル・秘密鍵は <code>chmod 600</code> 等でアクセス権を絞る</li>
+  <li>メール通知は <code>Smtp.UseTls: true</code> を推奨</li>
+</ul>
+</section>
+
+<section id="test">
+<h2>13. テストの実行（開発者向け）</h2>
+<h3>通常テスト</h3>
+<pre><code>dotnet test FtpTransferAgent.sln --verbosity normal</code></pre>
+<h3>FTP 統合テスト（ローカル FTP サーバー）</h3>
+<pre><code>python -m pip install pyftpdlib
+dotnet test FtpTransferAgent.Tests/FtpTransferAgent.Tests.csproj --verbosity normal</code></pre>
+<h3>SFTP 統合テスト（Docker）</h3>
+<p>Docker Desktop 起動後に実行:</p>
+<pre><code>dotnet test FtpTransferAgent.Tests/FtpTransferAgent.Tests.csproj --filter "FullyQualifiedName~SftpClientDockerIntegrationTests"</code></pre>
+<div class="note">Docker が使えない環境では SFTP Docker テストは自動で Skip されます。</div>
+<h3>依存ライブラリ</h3>
+<ul>
+  <li>FluentFTP / SSH.NET / Polly / Microsoft.Extensions.Hosting・Options・Logging</li>
+</ul>
+</section>
+
+</main>
+<footer>FtpTransferAgent ユーザーガイド ・ 2026-07-06 ・ MIT License</footer>
+</body>
+</html>

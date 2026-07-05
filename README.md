@@ -9,6 +9,16 @@
 - `put`（アップロード）/`get`（ダウンロード）に対応します
 - 並列転送、再試行、ENDファイル制御、転送後クリーンアップに対応します
 
+## ドキュメント（HTML 版）
+
+ブラウザで読める単一ファイルの HTML 資料（図はインライン SVG）を `docs/html/` に用意しています。
+
+| 資料 | 対象 |
+|---|---|
+| [詳細仕様書](docs/html/spec.html) | 機能仕様・設定・動作仕様の全量（[Markdown 版](ftp-transfer-agent-spec.md)） |
+| [ユーザーガイド](docs/html/user-guide.html) | 導入・設定リファレンス・運用手順 |
+| [社内説明資料](docs/html/internal-overview.html) | 置き換えの背景・機能概要・移行の進め方（非エンジニア向け） |
+
 ## 主な機能
 
 - FTP / SFTP 転送
