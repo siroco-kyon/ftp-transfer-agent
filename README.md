@@ -218,6 +218,8 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `PreserveFolderStructure` | bool | 任意 | `false` | サブフォルダ構造を維持して転送 |
 | `TimeoutSeconds` | int | 任意 | `120` | 接続・転送タイムアウト秒（1-3600） |
 | `KeepAliveSeconds` | int | 任意 | `0` | 接続再利用時のアイドル切断防止（秒、0-3600、`0`=無効）。`>0` で SFTP は `KeepAliveInterval`、FTP は NOOP 送信（`NoopInterval`）+ TCP KeepAlive を有効化。`AdditionalDestinations` の各宛先にも個別適用 |
+| `VerifyUploadedFileExists` | bool | 任意 | `true` | SFTP アップロードのリネーム完了後に宛先パスの存在確認（2 往復）を追加で行うか。リネームの成功応答自体がサーバによる完了確認のため、`false` でも転送の完了保証は変わらない。高レイテンシ回線で小ファイル多数なら `false` で往復数を削減できる。SFTP のみ使用 |
+| `BufferSizeKB` | int | 任意 | `32` | SFTP の 1 書き込み要求あたりのバッファサイズ（KB、1-64）。実際のチャンクサイズはサーバが告知するパケット上限との min（OpenSSH 系は 32KB 上限のため既定から上げても効果なし）。SFTP のみ使用 |
 | `Name` | string | 複数宛先で必須 | `null` | 宛先の安定識別子。**複数宛先（ファンアウト）の put では primary・追加宛先すべてで必須かつ一意**（配信トラッキングのマーカーキー）。接続情報と独立した名前にする |
 | `AdditionalDestinations` | object[] | 任意 | `[]` | put 方向の追加送信先。各要素は Transfer と同じ接続系プロパティを持つ（`Direction` / `AdditionalDestinations` を除く）。各宛先の `Name` / `Concurrency` / `TimeoutSeconds` / 認証設定はその宛先に個別適用される。1 ファイルをメイン + 追加宛先の全てへ同時に送信する。**複数宛先では配信トラッキングが常時有効**で、部分失敗時は成功済み宛先を記録し、次回は未配信の宛先だけへ再送する（成功済み宛先への一括再送はしない）。同一の mode/host/port/remote path に複数宛先が向く設定は起動時に警告される |
 | `PerDestinationDeliveryTracking` | bool | 任意 | `false` | **単一宛先**で配信トラッキングを明示的に有効化する場合に使用。複数宛先では常時有効のためこのフラグに関わらずトラッキングされる（put 方向のみ） |
@@ -226,7 +228,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `DeliverySignatureMode` | string | 任意 | `"sizetime"` | 配信トラッキングの上書き検出方式。`sizetime`（サイズ+更新時刻）または `hash`（ファイルハッシュ、厳密） |
 | `EnableUploadSnapshot` | bool | 任意 | `false` | 各宛先へ確実に同一内容を届けるため、転送前にデータ/関連 END ファイルを一時スナップショットへ複製する。既定 `false` ではライブのソースを直接読み一時コピーの I/O を避ける（転送中の変更は転送後に検出して保持・次回持ち越し）。トラッキング有効時のみ作用する |
 
-複数宛先の put、または単一宛先で `PerDestinationDeliveryTracking: true` のとき、一部宛先だけ失敗すると成功済み宛先のマーカーを残したうえで対象ファイルを `RetryDirectory` へ退避します。関連 END ファイルも同時に扱い、移動途中で失敗した場合は完了済みの移動を Watch 側へ戻します。全宛先への配信が完了したら、`DeleteAfterVerify: true`（既定）ではファイルを削除し、`false` では `Watch.Path` の元の位置へ復元します（隠しフォルダに取り残しません）。`sizetime` 署名は退避・復元でファイルの更新時刻が変わらないよう、移動時に元の更新時刻を保持します。`DeleteAfterVerify: false` でローカルを残す場合、保持マーカーの指紋は次回列挙時に再計算される指紋に合わせて記録するため、成功後に END ファイルを削除する構成（`TransferEndFiles` / `DeleteLocalSkippedEndFiles`）でも配信済みファイルが毎回再送されることはありません。
+複数宛先の put、または単一宛先で `PerDestinationDeliveryTracking: true` のとき、一部宛先だけ失敗すると成功済み宛先のマーカーを残したうえで対象ファイルを `RetryDirectory` へ退避します。関連 END ファイルも同時に扱い、移動途中で失敗した場合は完了済みの移動を Watch 側へ戻します。全宛先への配信が完了したら、`DeleteAfterVerify: true`（既定）ではファイルを削除し、`false` では `Watch.Path` の元の位置へ復元します（隠しフォルダに取り残しません）。復元は関連 END ファイルも含めた all-or-nothing で行われ、その時点で復元できなかった場合も後続バッチの配信済みスキップ時に再試行されます。`sizetime` 署名は退避・復元でファイルの更新時刻が変わらないよう、移動時に元の更新時刻を保持します。`DeleteAfterVerify: false` でローカルを残す場合、保持マーカーの指紋は次回列挙時に再計算される指紋に合わせて記録するため、成功後に END ファイルを削除する構成（`TransferEndFiles` / `DeleteLocalSkippedEndFiles`）でも配信済みファイルが毎回再送されることはありません。
 
 既定では各宛先はライブのソースを直接読みます。`EnableUploadSnapshot: true` を設定すると、各宛先へ確実に同一内容を届けるために列挙時のデータ/関連 END ファイルを一時スナップショット化してからアップロードします（転送中にソースが変更されても宛先間で内容が割れません）。関連 END ファイルがある場合は END 側の指紋も配信トラッキングの判定に含めます。スナップショットの有無にかかわらず、転送完了処理前、または全宛先配信済みとして送信をスキップした後の cleanup 前に、元ファイルや関連 END ファイルが変更された場合、その実行ではローカル削除や retry 退避を行わず、終了コード `1` で次回実行に持ち越します（スナップショット無効時は、その回に限り宛先間で内容が割れ得ます）。マーカー書き込みなど完了処理の失敗も転送失敗として扱われます。
 
@@ -388,6 +390,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `From` | string | Enabled 時必須 | `""` | 送信元メールアドレス |
 | `To` | string[] | Enabled 時必須 | `[]` | 宛先（1件以上） |
 | `MaxEmailsPerRun` | int | 任意 | `100` | 1 回のバッチ実行で送信するエラーメールの上限（メール洪水防止）。0 以下で無制限 |
+| `SuppressPerDestinationFailureDetailEmails` | bool | 任意 | `false` | 複数宛先（`AdditionalDestinations` あり）で、個々の宛先への転送失敗の**詳細メールだけ**を抑制する。ある宛先がメンテ等で継続的に失敗する場合の通知過多対策。ファイル単位の部分配信サマリ通知・他種のエラーメールは送信され続け、ファイルログと終了コードにも影響しない |
 
 エラーメールは非同期送信ですが、プロセス終了時には送信中のメールの完了を最大 15 秒待機するため、バッチ終了直前のエラー通知も失われません。
 

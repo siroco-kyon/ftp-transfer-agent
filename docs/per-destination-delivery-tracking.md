@@ -157,6 +157,13 @@ watch/
 
 - **実装**: `Worker.cs`（`shadowedWatchCandidates` による先送り判定 / `GetRetryFilePath` / `RestoreFromRetryDirectoryIfNeeded`）、`DeliveryStateStore.GetDeliveredDestinations`（指紋一致での配信済み判定）。
 
+### 3.4.4 復元は all-or-nothing + 配信済みスキップ時にも再試行（3.4.2 で修正）
+
+- **問題 1**: 全宛先完了時の `Watch.Path` への復元が失敗（復元先に同名ファイルが存在・一時的なロック等）すると、以降のバッチは「全宛先配信済み」として `HandleAlreadyDelivered` を通り、復元を**再試行しなかった**。阻害要因が解消されてもファイルが隠しの retry ディレクトリへ永久に取り残される。
+- **問題 2**: 復元がファイル単位のベストエフォートだったため、END の復元に成功した後にデータ本体の復元が失敗すると、ペアが watch と retry に**分断**される。`RequireEndFile` 構成では retry 側に残ったデータが列挙フィルタ（END 不在）で候補から外れ、復元も再試行されないまま取り残される。
+- **対策**: ① 配信済みスキップ経路でもローカルを残す場合は復元を再試行する。② 復元を退避と対称の「計画 → 一括移動 → 途中失敗時ロールバック」（all-or-nothing）に変更し、1 つでも復元できない場合はペアごと retry に残す。①②の組で、阻害要因が解消され次第、後続バッチで自動回復する。
+- **実装**: `Worker.HandleAlreadyDelivered` / `RestoreFromRetryDirectoryIfNeeded`。回帰テスト: `DeleteAfterVerifyFalse_RestoreBlockedThenUnblocked_RestoresOnLaterRun` / `DeleteAfterVerifyFalse_RestorePartiallyBlocked_KeepsDataAndEndPairTogetherInRetry`（`PerDestinationDeliveryTrackingTests`）。
+
 ### 3.5 完了判定（次回はキューに未送先しか入らない）→ 「今回成功 ∪ 既存マーカー」で判定
 
 - **問題**: Run2 では未配信の宛先（B）だけをキューへ入れるため、ファンアウトのグループは {B} だけになる。それだけ見て「全部成功」を判断すると、A の状態を取りこぼす。
