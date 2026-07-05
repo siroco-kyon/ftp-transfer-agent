@@ -427,6 +427,7 @@ flowchart TB
 ```jsonc
 {
   "Transfer": {
+    "Name": "primary",                // ← 複数宛先では primary 含む全宛先で Name が必須・一意（マーカーの宛先キー）
     "Direction": "put",
     "Mode": "ftp",
     "Host": "honban.example.co.jp",   // ← これが primary（本番）宛先

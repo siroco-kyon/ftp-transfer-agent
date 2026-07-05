@@ -52,6 +52,33 @@
         {
           "if": { "properties": { "Mode": { "enum": ["ftp", "sftp"] } } },
           "then": { "required": ["Host", "Username"] }
+        },
+        {
+          "if": {
+            "required": ["AdditionalDestinations"],
+            "properties": {
+              "Direction": { "const": "put" },
+              "AdditionalDestinations": { "minItems": 1 }
+            }
+          },
+          "then": {
+            "required": ["Name"],
+            "properties": {
+              "AdditionalDestinations": {
+                "items": { "required": ["Name"] }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["PerDestinationDeliveryTracking"],
+            "properties": {
+              "Direction": { "const": "put" },
+              "PerDestinationDeliveryTracking": { "const": true }
+            }
+          },
+          "then": { "required": ["Name"] }
         }
       ]
     },
