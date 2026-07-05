@@ -21,7 +21,7 @@
       "additionalProperties": false,
       "properties": {
         "Name": { "type": "string" },
-        "Mode": { "enum": ["ftp", "sftp"] },
+        "Mode": { "enum": ["ftp", "sftp", "local"] },
         "Direction": { "enum": ["get", "put"] },
         "Host": { "type": "string" },
         "Port": { "type": "integer", "minimum": 1, "maximum": 65535 },
@@ -47,7 +47,40 @@
           "items": { "$ref": "#/definitions/Destination" }
         }
       },
-      "required": ["Mode", "Direction", "Host", "Username", "RemotePath"]
+      "required": ["Mode", "Direction", "RemotePath"],
+      "allOf": [
+        {
+          "if": { "properties": { "Mode": { "enum": ["ftp", "sftp"] } } },
+          "then": { "required": ["Host", "Username"] }
+        },
+        {
+          "if": {
+            "required": ["AdditionalDestinations"],
+            "properties": {
+              "Direction": { "const": "put" },
+              "AdditionalDestinations": { "minItems": 1 }
+            }
+          },
+          "then": {
+            "required": ["Name"],
+            "properties": {
+              "AdditionalDestinations": {
+                "items": { "required": ["Name"] }
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "required": ["PerDestinationDeliveryTracking"],
+            "properties": {
+              "Direction": { "const": "put" },
+              "PerDestinationDeliveryTracking": { "const": true }
+            }
+          },
+          "then": { "required": ["Name"] }
+        }
+      ]
     },
     "App": {
       "type": "object",
@@ -124,7 +157,7 @@
       "additionalProperties": false,
       "properties": {
         "Name": { "type": "string" },
-        "Mode": { "enum": ["ftp", "sftp"] },
+        "Mode": { "enum": ["ftp", "sftp", "local"] },
         "Host": { "type": "string" },
         "Port": { "type": "integer", "minimum": 1, "maximum": 65535 },
         "Username": { "type": "string" },
@@ -140,7 +173,13 @@
         "VerifyUploadedFileExists": { "type": "boolean" },
         "BufferSizeKB": { "type": "integer", "minimum": 1, "maximum": 64 }
       },
-      "required": ["Mode", "Host", "Username", "RemotePath"]
+      "required": ["Mode", "RemotePath"],
+      "allOf": [
+        {
+          "if": { "properties": { "Mode": { "enum": ["ftp", "sftp"] } } },
+          "then": { "required": ["Host", "Username"] }
+        }
+      ]
     }
   }
 }
