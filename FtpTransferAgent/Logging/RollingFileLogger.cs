@@ -239,6 +239,9 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
 
         var prefix = Path.GetFileNameWithoutExtension(rollingFilePath);
         var ext = Path.GetExtension(rollingFilePath);
+        var pathComparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
         // ファイル名の日付 (ローカル時刻基準) と同じ基準で保持期間を判定する
         var cutoff = DateTime.Now.Date.AddDays(-retentionDays);
         var cleanupDirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -247,7 +250,7 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
         foreach (var file in Directory.EnumerateFiles(baseDir, "*" + ext, SearchOption.AllDirectories))
         {
             var name = Path.GetFileNameWithoutExtension(file);
-            if (!name.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            if (!name.StartsWith(prefix, StringComparison.Ordinal))
             {
                 continue;
             }
@@ -264,6 +267,25 @@ internal sealed class RollingFileLogger : ILogger, IDisposable
                 System.Globalization.CultureInfo.InvariantCulture,
                 System.Globalization.DateTimeStyles.None,
                 out var fileDate))
+            {
+                continue;
+            }
+
+            var suffix = remainder.Substring(8);
+            if (suffix.Length > 0
+                && (suffix.Length < 2
+                    || suffix[0] != '_'
+                    || suffix.Skip(1).Any(c => !char.IsAsciiDigit(c))))
+            {
+                continue;
+            }
+
+            var actualDirectory = Path.GetFullPath(Path.GetDirectoryName(file)!);
+            var expectedDirectory = Path.GetFullPath(Path.Combine(
+                baseDir,
+                fileDate.ToString("yyyy", System.Globalization.CultureInfo.InvariantCulture),
+                fileDate.ToString("MM", System.Globalization.CultureInfo.InvariantCulture)));
+            if (!string.Equals(actualDirectory, expectedDirectory, pathComparison))
             {
                 continue;
             }

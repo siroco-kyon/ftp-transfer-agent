@@ -62,6 +62,59 @@ public class WorkerTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WhenSourceChangesAfterUpload_RetainsNewVersionAndMarksFailure()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        var file = Path.Combine(dir, "sample.txt");
+        await File.WriteAllTextAsync(file, "original");
+        var originalHash = await HashUtil.ComputeHashAsync(file, "SHA256", CancellationToken.None);
+
+        var watch = Options.Create(new WatchOptions { Path = dir });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "put",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 1
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+        var hash = Options.Create(new HashOptions { Algorithm = "SHA256" });
+        var cleanup = Options.Create(new CleanupOptions { DeleteAfterVerify = true });
+
+        var mock = new Mock<IFileTransferClient>();
+        mock.Setup(c => c.UploadAsync(file, "/remote/sample.txt", It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        mock.Setup(c => c.GetRemoteHashAsync("/remote/sample.txt", "SHA256", It.IsAny<CancellationToken>(), false))
+            .Returns(async () =>
+            {
+                await File.WriteAllTextAsync(file, "replacement-with-a-different-size");
+                return originalHash;
+            });
+        mock.Setup(c => c.Dispose());
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        using var provider = services.BuildServiceProvider();
+        using var lifetime = new DummyLifetime();
+        var exitCode = new ApplicationExitCode();
+        var worker = new TestWorker(
+            watch, transfer, retry, hash, cleanup, provider,
+            provider.GetRequiredService<ILogger<Worker>>(), lifetime,
+            new NoDisposeClient(mock.Object), exitCode);
+
+        await worker.RunAsync(CancellationToken.None);
+
+        Assert.Equal(1, exitCode.Code);
+        Assert.True(File.Exists(file));
+        Assert.Equal("replacement-with-a-different-size", await File.ReadAllTextAsync(file));
+        Directory.Delete(dir, true);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_PreservesFolderStructure()
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
@@ -397,8 +450,8 @@ public class WorkerTests
     private class TestWorker : Worker
     {
         private readonly IFileTransferClient _client;
-        public TestWorker(IOptions<WatchOptions> w, IOptions<TransferOptions> t, IOptions<RetryOptions> r, IOptions<HashOptions> h, IOptions<CleanupOptions> c, IServiceProvider sp, ILogger<Worker> l, IHostApplicationLifetime lifetime, IFileTransferClient client)
-            : base(w, t, r, h, c, sp, l, lifetime)
+        public TestWorker(IOptions<WatchOptions> w, IOptions<TransferOptions> t, IOptions<RetryOptions> r, IOptions<HashOptions> h, IOptions<CleanupOptions> c, IServiceProvider sp, ILogger<Worker> l, IHostApplicationLifetime lifetime, IFileTransferClient client, ApplicationExitCode? exitCode = null)
+            : base(w, t, r, h, c, sp, l, lifetime, exitCode)
         {
             _client = client;
         }

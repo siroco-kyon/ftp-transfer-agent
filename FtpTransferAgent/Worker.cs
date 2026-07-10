@@ -303,6 +303,17 @@ public class Worker : BackgroundService
         directoryPrefix is not null
         && Path.GetFullPath(path).StartsWith(directoryPrefix, StringComparison.OrdinalIgnoreCase);
 
+    private static IEnumerable<string> EnumerateTransferFiles(string root, bool includeSubdirectories)
+    {
+        var options = new EnumerationOptions
+        {
+            RecurseSubdirectories = includeSubdirectories,
+            IgnoreInaccessible = false,
+            AttributesToSkip = FileAttributes.ReparsePoint
+        };
+        return Directory.EnumerateFiles(root, "*", options);
+    }
+
     // 宛先別配信トラッキングのファイル単位コンテキスト。
     private sealed record DeliveryTrackingContext(
         string RelativePath,
@@ -318,6 +329,15 @@ public class Worker : BackgroundService
         IReadOnlyList<string> RelatedEndFilePaths,
         IReadOnlyList<string> RelatedEndFileRelativePaths,
         bool FromRetryDirectory);
+
+    private sealed record LightweightFileVersion(
+        long Length,
+        long LastWriteTimeUtcTicks,
+        long CreationTimeUtcTicks);
+
+    private sealed record LocalCleanupGuard(
+        LightweightFileVersion DataVersion,
+        IReadOnlyList<LightweightFileVersion> RelatedEndFileVersions);
 
     private sealed record UploadSnapshot(
         string DataPath,
@@ -533,8 +553,55 @@ public class Worker : BackgroundService
     private string EnsureDownloadTempDirectory()
     {
         var dir = GetDownloadTempDirectory();
+        EnsureNoReparsePointBelowWatch(dir);
         Directory.CreateDirectory(dir);
+        EnsureNoReparsePointBelowWatch(dir);
         return dir;
+    }
+
+    private void EnsureNoReparsePointBelowWatch(string targetPath)
+    {
+        var watchFullPath = NormalizeDirectoryPath(_watch.Path);
+        var targetFullPath = Path.GetFullPath(targetPath);
+        if (!IsUnderDirectory(targetFullPath, watchFullPath))
+        {
+            throw new InvalidOperationException($"Path is outside Watch.Path: {targetFullPath}");
+        }
+
+        var pathsToCheck = new Stack<string>();
+        var current = targetFullPath;
+        if (!Directory.Exists(current) && !File.Exists(current))
+        {
+            current = Path.GetDirectoryName(current) ?? string.Empty;
+        }
+
+        while (!string.IsNullOrEmpty(current)
+               && !string.Equals(NormalizeDirectoryPath(current), watchFullPath, StringComparison.OrdinalIgnoreCase))
+        {
+            pathsToCheck.Push(current);
+            current = Path.GetDirectoryName(NormalizeDirectoryPath(current)) ?? string.Empty;
+        }
+
+        if (string.IsNullOrEmpty(current))
+        {
+            throw new InvalidOperationException($"Could not verify path below Watch.Path: {targetFullPath}");
+        }
+
+        foreach (var path in pathsToCheck)
+        {
+            if ((Directory.Exists(path) || File.Exists(path))
+                && (File.GetAttributes(path) & FileAttributes.ReparsePoint) != 0)
+            {
+                throw new InvalidOperationException(
+                    $"Refusing to access a reparse point below Watch.Path: {path}");
+            }
+        }
+    }
+
+    private void MoveDownloadIntoPlace(string temporaryPath, string localPath)
+    {
+        EnsureNoReparsePointBelowWatch(localPath);
+        File.Move(temporaryPath, localPath, true);
     }
 
     // 前回の異常終了で残ったダウンロード検証用一時ファイルを掃除する。
@@ -550,6 +617,7 @@ public class Worker : BackgroundService
             {
                 return;
             }
+            EnsureNoReparsePointBelowWatch(tempDir);
             leftovers = Directory.EnumerateFileSystemEntries(tempDir).Count();
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or DirectoryNotFoundException)
@@ -566,6 +634,104 @@ public class Worker : BackgroundService
         TryDeleteDirectory(tempDir);
         _logger.LogInformation("Cleaned up {Count} orphaned download temp file(s) left by a previously interrupted run in {Dir}.",
             leftovers, tempDir);
+    }
+
+    private LocalCleanupGuard? TryCreateLocalCleanupGuard(UploadCandidate candidate)
+    {
+        try
+        {
+            var relatedVersions = candidate.RelatedEndFilePaths
+                .Select(CaptureLightweightFileVersion)
+                .ToArray();
+            return new LocalCleanupGuard(
+                CaptureLightweightFileVersion(candidate.PhysicalPath),
+                relatedVersions);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _exitCode?.MarkFailure();
+            _logger.LogError(ex,
+                "Skipping file {File} because its cleanup version could not be captured: {Error}",
+                candidate.PhysicalPath, ex.Message);
+            return null;
+        }
+    }
+
+    private static LightweightFileVersion CaptureLightweightFileVersion(string path)
+    {
+        var info = new FileInfo(path);
+        info.Refresh();
+        if (!info.Exists)
+        {
+            throw new FileNotFoundException("File disappeared before transfer cleanup metadata was captured.", path);
+        }
+
+        return new LightweightFileVersion(
+            info.Length,
+            info.LastWriteTimeUtc.Ticks,
+            info.CreationTimeUtc.Ticks);
+    }
+
+    private bool AreLocalFilesStillCleanupVersion(
+        string sourcePath,
+        IReadOnlyList<string> relatedEndFiles,
+        LocalCleanupGuard guard)
+    {
+        if (!IsLocalFileStillCleanupVersion(sourcePath, guard.DataVersion, "source file"))
+        {
+            return false;
+        }
+
+        if (relatedEndFiles.Count != guard.RelatedEndFileVersions.Count)
+        {
+            _exitCode?.MarkFailure();
+            _logger.LogWarning(
+                "Related END-file cleanup metadata changed for {File}. Local cleanup was skipped.",
+                sourcePath);
+            return false;
+        }
+
+        for (var i = 0; i < relatedEndFiles.Count; i++)
+        {
+            if (!IsLocalFileStillCleanupVersion(
+                    relatedEndFiles[i],
+                    guard.RelatedEndFileVersions[i],
+                    "related END file"))
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private bool IsLocalFileStillCleanupVersion(
+        string path,
+        LightweightFileVersion expected,
+        string description)
+    {
+        try
+        {
+            var current = CaptureLightweightFileVersion(path);
+            if (current == expected)
+            {
+                return true;
+            }
+
+            _exitCode?.MarkFailure();
+            _logger.LogWarning(
+                "{Description} {File} changed after it was queued. Local cleanup was skipped so the new content can be sent on the next run.",
+                description, path);
+            return false;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            _exitCode?.MarkFailure();
+            _logger.LogWarning(ex,
+                "Could not verify {Description} {File} before cleanup. Local cleanup was skipped: {Error}",
+                description, path, ex.Message);
+            return false;
+        }
     }
 
     private bool AreLocalFilesStillPlannedVersion(
@@ -691,12 +857,31 @@ public class Worker : BackgroundService
             {
                 _logger.LogWarning("Failed to delete local file {File}: {Error}", sourcePath, ex.Message);
                 dataFileDeleted = !File.Exists(sourcePath);
+                if (!dataFileDeleted)
+                {
+                    _exitCode?.MarkFailure();
+                }
             }
             catch (UnauthorizedAccessException ex)
             {
                 _logger.LogWarning("Access denied deleting local file {File}: {Error}", sourcePath, ex.Message);
                 dataFileDeleted = !File.Exists(sourcePath);
+                if (!dataFileDeleted)
+                {
+                    _exitCode?.MarkFailure();
+                }
             }
+        }
+
+        if (_cleanup.DeleteAfterVerify && !dataFileDeleted)
+        {
+            if (localEndFilesToDelete.Count > 0)
+            {
+                _logger.LogWarning(
+                    "Related END files for {File} were retained because the data file could not be deleted.",
+                    sourcePath);
+            }
+            return false;
         }
 
         foreach (var endFile in localEndFilesToDelete.Distinct(StringComparer.OrdinalIgnoreCase))
@@ -709,10 +894,12 @@ public class Worker : BackgroundService
             catch (IOException ex)
             {
                 _logger.LogWarning("Failed to delete local END file {File}: {Error}", endFile, ex.Message);
+                _exitCode?.MarkFailure();
             }
             catch (UnauthorizedAccessException ex)
             {
                 _logger.LogWarning("Access denied deleting local END file {File}: {Error}", endFile, ex.Message);
+                _exitCode?.MarkFailure();
             }
         }
 
@@ -814,11 +1001,17 @@ public class Worker : BackgroundService
         IReadOnlyList<string> localEndFilesToDeleteOnSuccess,
         IReadOnlyList<string> relatedEndFiles,
         IReadOnlyList<string> relatedEndFileRelativePaths,
-        DeliveryTrackingContext? tracking)
+        DeliveryTrackingContext? tracking,
+        LocalCleanupGuard? cleanupGuard)
     {
         if (tracking is null || _deliveryStore is null)
         {
-            HandleFanoutCompletionAllOrNothing(sourcePath, results, localEndFilesToDeleteOnSuccess);
+            HandleFanoutCompletionAllOrNothing(
+                sourcePath,
+                results,
+                localEndFilesToDeleteOnSuccess,
+                relatedEndFiles,
+                cleanupGuard);
             return;
         }
 
@@ -829,7 +1022,9 @@ public class Worker : BackgroundService
     private void HandleFanoutCompletionAllOrNothing(
         string sourcePath,
         IReadOnlyList<FanoutCoordinator.DestinationResult> results,
-        IReadOnlyList<string> localEndFilesToDeleteOnSuccess)
+        IReadOnlyList<string> localEndFilesToDeleteOnSuccess,
+        IReadOnlyList<string> relatedEndFiles,
+        LocalCleanupGuard? cleanupGuard)
     {
         var total = results.Count;
         var succeeded = results.Count(r => r.Success);
@@ -839,6 +1034,15 @@ public class Worker : BackgroundService
             var failed = results.Where(r => !r.Success).Select(r => r.DestinationLabel);
             _logger.LogError("Partial failure for {File}: {Ok}/{Total} destinations succeeded. Failed: {Failed}. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.",
                 sourcePath, succeeded, total, string.Join(", ", failed));
+            return;
+        }
+
+        if (cleanupGuard is not null
+            && !AreLocalFilesStillCleanupVersion(sourcePath, relatedEndFiles, cleanupGuard))
+        {
+            _logger.LogWarning(
+                "All {Total} destinations succeeded for {File}, but local files changed before cleanup. Local files were retained for the next run.",
+                total, sourcePath);
             return;
         }
 
@@ -1319,7 +1523,6 @@ public class Worker : BackgroundService
             if (_transfer.Direction is "put")
             {
                 var patterns = _watch.AllowedExtensions ?? System.Array.Empty<string>();
-                var option = _watch.IncludeSubfolders ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
                 try
                 {
                     // 状態ディレクトリが watch 配下に置かれていてもマーカーを転送しないよう除外する
@@ -1334,7 +1537,7 @@ public class Worker : BackgroundService
                     var downloadTempPrefix = DirectoryPrefix(GetDownloadTempDirectory());
 
                     // ファイル順序を安定化するためファイル名でソート (END ファイルの振り分けは後段で行う)
-                    var files = Directory.EnumerateFiles(_watch.Path, "*", option)
+                    var files = EnumerateTransferFiles(_watch.Path, _watch.IncludeSubfolders)
                         .Where(f => !IsUnderDirectoryPrefix(f, stateDirPrefix)
                                     && !IsUnderDirectoryPrefix(f, retryDirPrefix)
                                     && !IsUnderDirectoryPrefix(f, downloadTempPrefix))
@@ -1400,7 +1603,7 @@ public class Worker : BackgroundService
                         && _retryDirectoryFullPath is not null
                         && Directory.Exists(_retryDirectoryFullPath))
                     {
-                        var retryFiles = Directory.EnumerateFiles(_retryDirectoryFullPath, "*", SearchOption.AllDirectories)
+                        var retryFiles = EnumerateTransferFiles(_retryDirectoryFullPath, includeSubdirectories: true)
                             .OrderBy(f => Path.GetFileName(f), StringComparer.OrdinalIgnoreCase)
                             .ToList();
                         retryCandidates.AddRange(BuildUploadCandidates(retryFiles, ToRetryRelativeKey, fromRetryDirectory: true));
@@ -1534,11 +1737,29 @@ public class Worker : BackgroundService
                             snapshot = new UploadSnapshot(file, related);
                         }
 
-                        var groupId = Guid.NewGuid().ToString("N");
                         var endFilesToDeleteOnSuccess = EndFilesToDeleteOnSuccess(related);
+                        LocalCleanupGuard? cleanupGuard = null;
+                        if (tracking is null
+                            && (_cleanup.DeleteAfterVerify || endFilesToDeleteOnSuccess.Count > 0))
+                        {
+                            cleanupGuard = TryCreateLocalCleanupGuard(candidate);
+                            if (cleanupGuard is null)
+                            {
+                                continue;
+                            }
+                        }
+
+                        var groupId = Guid.NewGuid().ToString("N");
                         _fanout.Register(groupId, file, pending.Count, (source, results) =>
                         {
-                            HandleFanoutCompletion(source, results, endFilesToDeleteOnSuccess, related, relatedRelativePaths, tracking);
+                            HandleFanoutCompletion(
+                                source,
+                                results,
+                                endFilesToDeleteOnSuccess,
+                                related,
+                                relatedRelativePaths,
+                                tracking,
+                                cleanupGuard);
                         });
                         plans.Add(new FanoutPlan(groupId, file, snapshot.DataPath, relativeKey, pending, related, snapshot.RelatedEndFilePaths, relatedRelativePaths));
                         queuedItems += pending.Count;
@@ -1943,7 +2164,8 @@ public class Worker : BackgroundService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning("[{Id}] Failed to delete remote END file {Remote} at {Dest}: {Error}", id, remotePath, destLabel, ex.Message);
+            _logger.LogWarning("[{Id}] Failed to delete remote END file {Remote} at {Dest}; the transfer will be retried: {Error}", id, remotePath, destLabel, ex.Message);
+            throw;
         }
     }
 
@@ -2036,7 +2258,9 @@ public class Worker : BackgroundService
             var localDir = Path.GetDirectoryName(localPath);
             if (!string.IsNullOrEmpty(localDir) && !Directory.Exists(localDir))
             {
+                EnsureNoReparsePointBelowWatch(localDir);
                 Directory.CreateDirectory(localDir);
+                EnsureNoReparsePointBelowWatch(localDir);
                 _logger.LogDebug("[{Id}] Created directory: {Directory}", id, localDir);
             }
         }
@@ -2081,6 +2305,8 @@ public class Worker : BackgroundService
             localPath = safePath;
         }
 
+        EnsureNoReparsePointBelowWatch(localPath);
+
         _logger.LogInformation("[{Id}] Starting download {Remote} to {Local}", id, item.Path, localPath);
 
         long fileSize;
@@ -2113,7 +2339,7 @@ public class Worker : BackgroundService
                     throw new HashMismatchException(error);
                 }
 
-                File.Move(verifiedDownloadPath, localPath, true);
+                MoveDownloadIntoPlace(verifiedDownloadPath, localPath);
                 _logger.LogInformation("[{Id}] Download completed for {Remote} ({Size})", id, item.Path, FormatBytes(fileSize));
             }
             catch
@@ -2135,7 +2361,7 @@ public class Worker : BackgroundService
             {
                 await client.DownloadAsync(item.Path, downloadTempPath, token).ConfigureAwait(false);
                 fileSize = new FileInfo(downloadTempPath).Length;
-                File.Move(downloadTempPath, localPath, true);
+                MoveDownloadIntoPlace(downloadTempPath, localPath);
             }
             catch
             {
@@ -2172,7 +2398,6 @@ public class Worker : BackgroundService
 
         if (shouldDeleteRemote)
         {
-            // ダウンロード後のリモートファイル削除は失敗しても転送全体を失敗させないようにtry/catchで処理します。
             try
             {
                 await client.DeleteAsync(item.Path, token).ConfigureAwait(false);
@@ -2181,8 +2406,8 @@ public class Worker : BackgroundService
             }
             catch (Exception ex)
             {
-                // 削除に失敗した場合は警告ログのみ出力し、以後の処理を継続します。
-                _logger.LogWarning("[{Id}] Failed to delete remote file {Remote}: {Error}", id, item.Path, ex.Message);
+                _logger.LogWarning("[{Id}] Failed to delete remote file {Remote}; the transfer will be retried: {Error}", id, item.Path, ex.Message);
+                throw;
             }
         }
 
@@ -2263,7 +2488,8 @@ public class Worker : BackgroundService
                 var endFileExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
                 var endFilePath = Path.Combine(directory, fileName + endFileExt);
 
-                if (File.Exists(endFilePath))
+                if (File.Exists(endFilePath)
+                    && (File.GetAttributes(endFilePath) & FileAttributes.ReparsePoint) == 0)
                 {
                     return true;
                 }
