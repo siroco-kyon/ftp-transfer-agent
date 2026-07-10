@@ -122,6 +122,32 @@ public class RollingFileLoggerRetentionTests : IDisposable
     }
 
     [Fact]
+    public void KeepsFilesWithNonRotationSuffixes()
+    {
+        var old = WriteLogAt(DateTime.Now.Date.AddDays(-40), "_1_backup");
+
+        var deleted = CleanupOldLogs(_rollingPath, 30);
+
+        Assert.Equal(0, deleted);
+        Assert.True(File.Exists(old));
+    }
+
+    [Fact]
+    public void KeepsMatchingFilenameOutsideDateFolders()
+    {
+        var oldDate = DateTime.Now.Date.AddDays(-40);
+        var unrelatedDirectory = Path.Combine(_dir, "scratch");
+        Directory.CreateDirectory(unrelatedDirectory);
+        var unrelatedFile = Path.Combine(unrelatedDirectory, $"ftp-transfer-{oldDate:yyyyMMdd}.log");
+        File.WriteAllText(unrelatedFile, "keep");
+
+        var deleted = CleanupOldLogs(_rollingPath, 30);
+
+        Assert.Equal(0, deleted);
+        Assert.True(File.Exists(unrelatedFile));
+    }
+
+    [Fact]
     public void DoesNotRemoveUnrelatedEmptyDirectories()
     {
         WriteLogAt(DateTime.Now.Date.AddDays(-40));

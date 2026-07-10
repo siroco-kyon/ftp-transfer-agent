@@ -87,6 +87,129 @@ public class WorkerDownloadTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_WhenRemoteDeletionFails_MarksFailureAndKeepsDownloadedFile()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var remoteFile = "/remote/sample.txt";
+            var watch = Options.Create(new WatchOptions { Path = dir });
+            var transfer = Options.Create(new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "get",
+                Host = "host",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/remote",
+                Concurrency = 1
+            });
+            var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+            var hash = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+            var cleanup = Options.Create(new CleanupOptions { DeleteRemoteAfterDownload = true });
+
+            var mock = new Mock<IFileTransferClient>();
+            mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
+                .ReturnsAsync(new[] { remoteFile });
+            mock.Setup(c => c.DownloadAsync(remoteFile, It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Callback<string, string, CancellationToken>((_, path, _) => File.WriteAllText(path, "downloaded"))
+                .Returns(Task.CompletedTask);
+            mock.Setup(c => c.DeleteAsync(remoteFile, It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new TimeoutException("remote delete failed"));
+            mock.Setup(c => c.Dispose());
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            using var provider = services.BuildServiceProvider();
+            using var lifetime = new DummyLifetime();
+            var exitCode = new ApplicationExitCode();
+            var worker = new TestWorker(
+                watch, transfer, retry, hash, cleanup, provider,
+                provider.GetRequiredService<ILogger<Worker>>(), lifetime,
+                new NoDisposeClient(mock.Object), exitCode);
+
+            await worker.RunAsync(CancellationToken.None);
+
+            Assert.Equal(1, exitCode.Code);
+            Assert.Equal("downloaded", await File.ReadAllTextAsync(Path.Combine(dir, "sample.txt")));
+            mock.Verify(c => c.DeleteAsync(remoteFile, It.IsAny<CancellationToken>()), Times.Once);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_DownloadIntoDirectorySymlink_IsRejected()
+    {
+        var root = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var watchDirectory = Path.Combine(root, "watch");
+        var outsideDirectory = Path.Combine(root, "outside");
+        Directory.CreateDirectory(watchDirectory);
+        Directory.CreateDirectory(outsideDirectory);
+        var link = Path.Combine(watchDirectory, "linked");
+
+        try
+        {
+            try
+            {
+                Directory.CreateSymbolicLink(link, outsideDirectory);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+            {
+                return;
+            }
+
+            var remoteFile = "/remote/linked/outside.txt";
+            var watch = Options.Create(new WatchOptions { Path = watchDirectory, IncludeSubfolders = true });
+            var transfer = Options.Create(new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "get",
+                Host = "host",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/remote",
+                PreserveFolderStructure = true,
+                Concurrency = 1
+            });
+            var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+            var hash = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+            var cleanup = Options.Create(new CleanupOptions());
+
+            var mock = new Mock<IFileTransferClient>();
+            mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), true))
+                .ReturnsAsync(new[] { remoteFile });
+            mock.Setup(c => c.Dispose());
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            using var provider = services.BuildServiceProvider();
+            using var lifetime = new DummyLifetime();
+            var exitCode = new ApplicationExitCode();
+            var worker = new TestWorker(
+                watch, transfer, retry, hash, cleanup, provider,
+                provider.GetRequiredService<ILogger<Worker>>(), lifetime,
+                new NoDisposeClient(mock.Object), exitCode);
+
+            await worker.RunAsync(CancellationToken.None);
+
+            Assert.Equal(1, exitCode.Code);
+            Assert.False(File.Exists(Path.Combine(outsideDirectory, "outside.txt")));
+            mock.Verify(c => c.DownloadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        }
+        finally
+        {
+            if (Directory.Exists(root))
+            {
+                Directory.Delete(root, true);
+            }
+        }
+    }
+
+    [Fact]
     public async Task ExecuteAsync_DownloadHashMismatch_DoesNotReplaceExistingLocalFile()
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());

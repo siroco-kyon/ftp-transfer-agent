@@ -18,6 +18,7 @@
   <ItemGroup>
     <!-- バックアップ (実環境の認証情報を含み得る) とバリデーションテスト用の不正サンプルは
          ビルド出力・公開物に含めない -->
+    <Content Update="appsettings.Development.json" CopyToPublishDirectory="Never" />
     <Content Update="appsettings.backup.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
     <Content Update="appsettings.invalid.json" CopyToOutputDirectory="Never" CopyToPublishDirectory="Never" />
   </ItemGroup>

@@ -139,6 +139,81 @@ public class WorkerLocalDestinationTests : IDisposable
         Assert.False(Directory.Exists(stateDir) && Directory.GetFiles(stateDir, "*.marker").Length > 0);
     }
 
+    [Fact]
+    public async Task Put_WhenDataDeletionFails_RetainsEndFileAndMarksFailure()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return;
+        }
+
+        var data = Path.Combine(_watchDir, "batch.csv");
+        var end = data + ".END";
+        await File.WriteAllTextAsync(data, "rows");
+        await File.WriteAllTextAsync(end, string.Empty);
+
+        var transfer = new TransferOptions
+        {
+            Mode = "local",
+            Direction = "put",
+            RemotePath = _destDir,
+        };
+        var exitCode = new ApplicationExitCode();
+
+        using (File.Open(data, FileMode.Open, FileAccess.Read, FileShare.Read))
+        {
+            await RunAsync(
+                transfer,
+                hashEnabled: true,
+                deleteAfterVerify: true,
+                configureWatch: watch =>
+                {
+                    watch.RequireEndFile = true;
+                    watch.TransferEndFiles = true;
+                    watch.EndFileExtensions = new[] { ".END" };
+                },
+                exitCode: exitCode);
+        }
+
+        Assert.Equal(1, exitCode.Code);
+        Assert.True(File.Exists(data));
+        Assert.True(File.Exists(end));
+        Assert.True(File.Exists(Path.Combine(_destDir, "batch.csv")));
+        Assert.True(File.Exists(Path.Combine(_destDir, "batch.csv.END")));
+    }
+
+    [Fact]
+    public async Task Put_WithSubfolders_SkipsDirectorySymlinks()
+    {
+        var outside = Path.Combine(_root, "outside");
+        Directory.CreateDirectory(outside);
+        var outsideFile = Path.Combine(outside, "outside.txt");
+        await File.WriteAllTextAsync(outsideFile, "must-not-transfer");
+        var link = Path.Combine(_watchDir, "linked");
+
+        try
+        {
+            Directory.CreateSymbolicLink(link, outside);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+        {
+            return;
+        }
+
+        var transfer = new TransferOptions
+        {
+            Mode = "local",
+            Direction = "put",
+            RemotePath = _destDir,
+            PreserveFolderStructure = true,
+        };
+
+        await RunAsync(transfer, hashEnabled: true, deleteAfterVerify: true, includeSubfolders: true);
+
+        Assert.True(File.Exists(outsideFile));
+        Assert.False(File.Exists(Path.Combine(_destDir, "linked", "outside.txt")));
+    }
+
     private async Task RunAsync(
         TransferOptions transfer,
         bool hashEnabled,
