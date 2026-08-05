@@ -3,982 +3,778 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>FtpTransferAgent のご紹介 ─ 社内説明資料</title>
+<title>FtpTransferAgent 仕様確認資料</title>
 <style>
 :root{
-  --blue:#0b548c; --teal:#15729e; --green:#0f7a57; --orange:#b35c12; --red:#b3261e;
-  --ink:#1f2f3d; --muted:#5a6b7a; --line:#d4e0ea; --bg:#f4f8fb; --card:#ffffff;
-  --code-bg:#eef3f8;
+  --blue:#0b548c; --teal:#15729e; --green:#0f7a57; --orange:#b35c12; --red:#b3261e; --purple:#5d4380;
+  --ink:#1f2f3d; --muted:#5a6b7a; --line:#d4e0ea; --bg:#f4f8fb; --card:#ffffff; --code-bg:#eef3f8;
 }
 *{box-sizing:border-box}
 html{scroll-behavior:smooth}
 body{margin:0;color:var(--ink);background:var(--bg);
   font-family:"BIZ UDPGothic","Yu Gothic UI","Hiragino Sans","Meiryo",sans-serif;
-  line-height:1.9;font-size:15.5px}
-.hero{background:linear-gradient(135deg,#0b548c 0%,#15729e 55%,#0f7a57 130%);color:#fff;padding:56px 24px 44px;text-align:center}
+  line-height:1.85;font-size:15.5px}
+.hero{background:linear-gradient(135deg,#0b548c 0%,#15729e 55%,#0f7a57 130%);color:#fff;padding:44px 24px 36px;text-align:center}
 .hero .inner{max-width:880px;margin:0 auto}
-.hero h1{margin:0 0 10px;font-size:34px;letter-spacing:.02em}
-.hero .sub{font-size:17px;opacity:.95;margin:0 0 4px}
-.hero .meta{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;margin-top:18px;font-size:13px}
+.hero h1{margin:0 0 8px;font-size:31px;letter-spacing:.02em}
+.hero .sub{font-size:16px;opacity:.95;margin:0}
+.hero .meta{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:16px;font-size:12.5px}
 .hero .meta span{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:2px 14px}
-main{max-width:920px;margin:0 auto;padding:28px 20px 80px}
-nav.toc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px 26px;margin-bottom:34px;box-shadow:0 1px 4px rgba(15,50,80,.06)}
-nav.toc h2{margin:0 0 10px;font-size:16px;color:var(--blue);border:none;padding:0}
+main{max-width:920px;margin:0 auto;padding:26px 20px 70px}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:26px 32px;margin-bottom:26px;box-shadow:0 1px 4px rgba(15,50,80,.06)}
+nav.toc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 26px;margin-bottom:26px;box-shadow:0 1px 4px rgba(15,50,80,.06)}
+nav.toc h2{margin:0 0 8px;font-size:15px;color:var(--blue);border:none;padding:0}
 nav.toc ol{margin:0;padding-left:1.4em;columns:2;column-gap:2.5em}
-nav.toc li{margin:3px 0;break-inside:avoid}
+nav.toc li{margin:2px 0;break-inside:avoid}
 nav.toc a{color:var(--teal);text-decoration:none}
 nav.toc a:hover{text-decoration:underline}
-section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:30px 34px;margin-bottom:30px;box-shadow:0 1px 4px rgba(15,50,80,.06)}
-.chapter{display:flex;align-items:center;gap:14px;margin:0 0 20px;padding-bottom:12px;border-bottom:3px solid var(--blue)}
-.chapter .num{flex:none;width:44px;height:44px;border-radius:12px;background:linear-gradient(135deg,var(--blue),var(--teal));color:#fff;font-size:20px;font-weight:bold;display:flex;align-items:center;justify-content:center}
-.chapter h2{margin:0;color:var(--blue);font-size:23px;border:none;padding:0}
-.chapter .sub{display:block;font-size:13px;color:var(--muted);font-weight:normal}
-h3{color:var(--teal);font-size:18px;margin:30px 0 10px;padding-left:12px;border-left:5px solid var(--teal)}
-h4{color:var(--green);font-size:16px;margin:22px 0 8px}
-p{margin:10px 0}
+.chapter{display:flex;align-items:center;gap:13px;margin:0 0 18px;padding-bottom:10px;border-bottom:3px solid var(--blue)}
+.chapter .num{flex:none;width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--blue),var(--teal));color:#fff;font-size:19px;font-weight:bold;display:flex;align-items:center;justify-content:center}
+.chapter h2{margin:0;color:var(--blue);font-size:22px;border:none;padding:0}
+.chapter .sub{display:block;font-size:12.5px;color:var(--muted);font-weight:normal;line-height:1.4}
+h3{color:var(--teal);font-size:17px;margin:26px 0 8px;padding-left:11px;border-left:5px solid var(--teal)}
+section > h3:first-of-type{margin-top:0}
+p{margin:9px 0}
 strong{color:#0d3f66}
 code{background:var(--code-bg);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:.86em;font-family:Consolas,"Cascadia Code",Menlo,monospace;color:#0d3f66;overflow-wrap:anywhere}
-pre{background:#102a3c;color:#e6eef5;border-radius:10px;padding:16px 20px;overflow-x:auto;font-size:13.5px;line-height:1.65}
+pre{background:#102a3c;color:#e6eef5;border-radius:10px;padding:14px 18px;overflow-x:auto;font-size:13px;line-height:1.6}
 pre code{background:none;border:none;color:inherit;padding:0;font-size:inherit}
-table{border-collapse:collapse;width:100%;margin:14px 0;font-size:13.5px;background:#fff}
+.tablewrap{overflow-x:auto;margin:12px 0}
+table{border-collapse:collapse;width:100%;font-size:13.5px;background:#fff}
 th,td{border:1px solid var(--line);padding:7px 11px;text-align:left;vertical-align:top}
-th{background:linear-gradient(180deg,#eaf2f9,#dfeaf4);color:var(--blue);white-space:nowrap}
+th{background:linear-gradient(180deg,#eaf2f9,#dfeaf4);color:var(--blue)}
+thead th{white-space:nowrap}
 tr:nth-child(even) td{background:#f7fafc}
-ul,ol{padding-left:1.6em}
-li{margin:5px 0}
-.note,.warn,.danger,.tip,.point{border-radius:10px;padding:14px 18px;margin:16px 0;border-left:6px solid}
+ul,ol{padding-left:1.55em;margin:9px 0}
+li{margin:4px 0}
+.note,.warn,.danger,.tip,.point{border-radius:10px;padding:12px 17px;margin:14px 0;border-left:6px solid;font-size:14.5px}
 .note{background:#eef5fc;border-color:var(--teal)}
 .warn{background:#fdf3e7;border-color:var(--orange)}
 .danger{background:#fdeeee;border-color:var(--red)}
 .tip{background:#edf8f2;border-color:var(--green)}
 .point{background:#f2f6fb;border-color:var(--blue)}
-.note::before{content:"ℹ️ 補足";display:block;font-weight:bold;color:var(--teal);margin-bottom:4px}
-.warn::before{content:"⚠️ 注意";display:block;font-weight:bold;color:var(--orange);margin-bottom:4px}
-.danger::before{content:"🚫 重要";display:block;font-weight:bold;color:var(--red);margin-bottom:4px}
-.tip::before{content:"✅ 推奨";display:block;font-weight:bold;color:var(--green);margin-bottom:4px}
-.point::before{content:"💡 ポイント";display:block;font-weight:bold;color:var(--blue);margin-bottom:4px}
-figure.fig{margin:22px 0;text-align:center;background:#fbfdff;border:1px solid var(--line);border-radius:12px;padding:18px 12px 10px}
+.note::before{content:"補足";display:block;font-weight:bold;color:var(--teal);margin-bottom:2px;font-size:13px}
+.warn::before{content:"注意";display:block;font-weight:bold;color:var(--orange);margin-bottom:2px;font-size:13px}
+.danger::before{content:"重要";display:block;font-weight:bold;color:var(--red);margin-bottom:2px;font-size:13px}
+.tip::before{content:"推奨";display:block;font-weight:bold;color:var(--green);margin-bottom:2px;font-size:13px}
+.point::before{content:"ポイント";display:block;font-weight:bold;color:var(--blue);margin-bottom:2px;font-size:13px}
+figure.fig{margin:18px 0;text-align:center;background:#fbfdff;border:1px solid var(--line);border-radius:12px;padding:16px 12px 8px}
 figure.fig svg{max-width:100%;height:auto}
-figcaption{font-size:13px;color:var(--muted);margin-top:8px}
-.lede{font-size:17px;background:#f2f8fd;border:1px solid #cfe2f0;border-radius:10px;padding:16px 22px;margin:0 0 18px;color:#0d3f66}
-.cards{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:16px 0}
-.card{border:1px solid var(--line);border-radius:10px;padding:14px 18px;background:#fbfdff}
-.card h4{margin:0 0 8px;padding:0}
-.card ul{margin:0;padding-left:1.3em;font-size:14px}
+figcaption{font-size:12.5px;color:var(--muted);margin-top:6px}
+.lede{font-size:16px;background:#f2f8fd;border:1px solid #cfe2f0;border-radius:10px;padding:14px 20px;margin:0 0 16px;color:#0d3f66}
+.ask{background:#fff9ec;border:1px solid #e2c98d;border-radius:10px;padding:14px 20px;margin:14px 0}
+.ask h4{margin:0 0 6px;font-size:15px;color:#8a5a12}
+.ask ol{margin:0;padding-left:1.4em}
 .check{list-style:none;padding-left:0}
 .check li{padding-left:1.9em;position:relative}
 .check li::before{content:"☐";position:absolute;left:.3em;color:var(--teal);font-weight:bold}
-footer{max-width:920px;margin:0 auto;padding:0 20px 50px;color:var(--muted);font-size:13px;text-align:center}
+.badge{display:inline-block;background:#e6f0f8;border:1px solid #b9d3e6;color:var(--blue);border-radius:5px;padding:0 7px;font-size:12px;margin-right:6px;white-space:nowrap}
+/* ---- 導入スケジュール（ガントチャート） ---- */
+.gantt{margin:14px 0;font-size:13px}
+.gantt-axis{display:flex;margin-left:var(--labelw);border-bottom:1px solid var(--line);padding-bottom:3px;margin-bottom:6px}
+.gantt-axis span{flex:1 1 0;font-size:11.5px;color:var(--muted);white-space:nowrap}
+.grow{display:flex;align-items:center;margin:5px 0}
+.glabel{flex:none;width:var(--labelw);padding-right:10px;font-size:13px;line-height:1.35}
+.gtrack{position:relative;flex:1 1 auto;height:26px;background:#eef3f8;border:1px solid var(--line);border-radius:5px;
+  background-image:repeating-linear-gradient(to right,transparent 0,transparent calc(var(--tick) - 1px),#dbe6f0 calc(var(--tick) - 1px),#dbe6f0 var(--tick))}
+.gbar{position:absolute;top:3px;height:18px;border-radius:4px;color:#fff;font-size:10.5px;line-height:18px;text-align:center;overflow:hidden;white-space:nowrap}
+.gantt{--labelw:190px;--tick:20%}
+@media (max-width:720px){.gantt{--labelw:110px;font-size:12px}}
+footer{max-width:920px;margin:0 auto;padding:0 20px 46px;color:var(--muted);font-size:12.5px;text-align:center}
 a{color:var(--teal)}
-@media (max-width:720px){nav.toc ol{columns:1} section{padding:22px 18px} .cards{grid-template-columns:1fr} .chapter h2{font-size:19px}}
+@media (max-width:720px){nav.toc ol{columns:1} section{padding:20px 16px} .chapter h2{font-size:19px}}
 @media print{body{background:#fff}section,nav.toc{box-shadow:none;border-color:#bbb;break-inside:avoid-page}.hero{background:var(--blue)}}
 </style>
 </head>
 <body>
 <header class="hero">
   <div class="inner">
-    <h1>FtpTransferAgent のご紹介</h1>
-    <p class="sub">既存 FTP 転送ツールを置き換える、SFTP 対応の新転送ツール</p>
-    <p class="sub" style="font-size:14px;opacity:.85">社内説明資料</p>
+    <h1>FtpTransferAgent 仕様確認資料</h1>
+    <p class="sub">現行ツール FileTransFTP の後継となる新転送ツールの仕様と導入計画</p>
     <div class="meta">
       <span>社内利用限定</span>
-      <span>作成日 2026-06-12 ・ 更新日 2026-07-06</span>
-      <span>所要時間 約 20〜30 分</span>
+      <span>第 1.0 版</span>
+      <span>作成日 2026-08-05</span>
+      <span>確認所要 約 15 分</span>
     </div>
   </div>
 </header>
 <main>
 
 <section>
-<h3 style="margin-top:0">この資料の目的と対象者</h3>
+<h3>本資料の位置づけ</h3>
+<div class="tablewrap">
 <table>
-<tr><th style="width:110px">目的</th><td>新ツール FtpTransferAgent の位置づけ（現行ツール <strong>FileTransFTP</strong> の後継）と、置き換えで何が良くなるかを理解してもらう</td></tr>
-<tr><th>対象者</th><td>既存ツールの運用担当者・案件担当 SE・移行を判断するマネージャー</td></tr>
-<tr><th>前提知識</th><td>「FTP = ファイルをサーバーに送る仕組み」程度で OK</td></tr>
-<tr><th>詳細資料</th><td>技術的な詳細は <a href="spec.html">詳細仕様書</a>、導入手順は <a href="user-guide.html">ユーザーガイド</a> を参照</td></tr>
+<tr><th style="width:110px">目的</th><td>新ツール <strong>FtpTransferAgent</strong> の仕様と導入計画をご確認いただき、<strong>置き換え方針の承認</strong>をいただくこと</td></tr>
+<tr><th>ご確認者</th><td>部門長 / 運用責任者</td></tr>
+<tr><th>作成</th><td>開発チーム</td></tr>
+<tr><th>関連資料</th><td>技術詳細は<a href="spec.html">詳細仕様書</a>、導入・運用手順は<a href="user-guide.html">ユーザーガイド</a>に記載</td></tr>
 </table>
-<div class="point">これは「新しいツールを増やす」話ではなく、「今あるレガシーな FTP 転送ツールを、SFTP に対応した後継ツールへ<strong>置き換える</strong>」話です。プログラミングの知識がなくても理解できる構成にしています。</div>
+</div>
+
+<div class="ask">
+<h4>ご確認・ご承認をお願いしたい事項（全 5 件）</h4>
+<ol>
+  <li><strong>置き換え方針</strong> ─ 現行 FileTransFTP を廃止し、本ツールへ順次移行する方針でよいか（<a href="#c1">1 章</a>）</li>
+  <li><strong>適用範囲</strong> ─ 対象とする連携・対象外とする用途の線引きでよいか（<a href="#c2">2 章</a>）</li>
+  <li><strong>転送成功の判定基準</strong> ─ ハッシュ検証まで通過したものだけを成功とし、終了コードで監視する仕様でよいか（<a href="#c4">4 章</a>・<a href="#c5">5 章</a>）</li>
+  <li><strong>セキュリティ標準</strong> ─ 新規・更改案件は SFTP + 鍵認証 + ホスト鍵検証を標準とする方針でよいか（<a href="#c4">4 章</a>）</li>
+  <li><strong>導入スケジュールと体制</strong> ─ 7 章の日程・担当でよいか（<a href="#c7">7 章</a>）</li>
+</ol>
+</div>
+<p style="margin-bottom:0">各事項は該当章末尾に「<span class="badge">確認事項</span>」として再掲しています。<a href="#c8">8 章</a>にチェックリストとしてまとめています。</p>
 </section>
 
 <nav class="toc">
   <h2>目次</h2>
   <ol>
-    <li><a href="#c1">背景 ─ なぜ既存ツールを作り直すのか</a></li>
-    <li><a href="#c2">概要 ─ FtpTransferAgent とは何か</a></li>
-    <li><a href="#c3">動作の流れ ─ 中で何が起きているのか</a></li>
-    <li><a href="#c4">安心して使える理由 ─ 信頼性・安全性の仕組み</a></li>
-    <li><a href="#c5">便利機能 ─ 実運用を支える機能</a></li>
-    <li><a href="#c6">導入と移行 ─ 使い始めるには</a></li>
-    <li><a href="#c7">注意点とまとめ</a></li>
-    <li><a href="#apx">付録 ─ 設定リファレンス抜粋・用語集</a></li>
+    <li><a href="#c1">背景と置き換えの必要性</a></li>
+    <li><a href="#c2">適用範囲（スコープ）</a></li>
+    <li><a href="#c3">機能仕様</a></li>
+    <li><a href="#c4">信頼性・セキュリティ仕様</a></li>
+    <li><a href="#c5">運用仕様</a></li>
+    <li><a href="#c6">制約・リスクと対応方針</a></li>
+    <li><a href="#c7">導入スケジュール（案）</a></li>
+    <li><a href="#c8">確認事項チェックリスト</a></li>
+    <li><a href="#apx">付録（主要設定・用語）</a></li>
   </ol>
 </nav>
 
+<!-- ============ 1 ============ -->
 <section id="c1">
-<div class="chapter"><div class="num">1</div><h2>背景<span class="sub">なぜ既存ツールを作り直すのか</span></h2></div>
+<div class="chapter"><div class="num">1</div><h2>背景と置き換えの必要性<span class="sub">なぜ現行ツールを作り直すのか</span></h2></div>
 
-<h3>現状: 既存ツール FileTransFTP</h3>
-<p>社内のファイル連携は、以前から <strong>FileTransFTP</strong> が担ってきました。長年の実績がある一方で、次の課題を抱えています。</p>
+<p>社内のファイル連携は長年 <strong>FileTransFTP</strong> が担ってきましたが、次の課題により、新規案件・更改案件への適用が難しくなっています。</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th style="width:130px">課題</th><th>現状</th><th>放置した場合の影響</th></tr></thead>
+<tr><td><strong>SFTP 非対応</strong></td><td>対応プロトコルは FTP / CIFS のみ。外部連携は平文 FTP に限られる</td><td>SFTP を必須とする連携先と接続できず、<strong>案件そのものを受けられない</strong></td></tr>
+<tr><td><strong>セキュリティ</strong></td><td>ID・パスワード・データが暗号化されずに流れる</td><td>監査・セキュリティ点検での指摘対象になる</td></tr>
+<tr><td><strong>社内基準</strong></td><td>新規サーバー構築時の基準が厳格化し、FTP 利用には除外申請が必要</td><td>構築のたびに<strong>申請・承認の負荷</strong>が発生する（SFTP なら申請不要）</td></tr>
+<tr><td><strong>保守性</strong></td><td>.NET Framework 3.5 製で技術基盤が古い</td><td>改修コストが上がり続け、<strong>対応できる要員も減っていく</strong></td></tr>
+<tr><td><strong>性能</strong></td><td>並列処理がなく、1 件ずつの逐次転送</td><td>ファイル件数の増加に対して転送時間が線形に伸びる</td></tr>
+</table>
+</div>
+
+<div class="danger">現行ツールを使い続けるほど移行コストは増え、その間も SFTP 必須案件を取りこぼし続けます。<strong>後継ツールへ計画的に置き換える</strong>ことをご提案します。</div>
+
+<h3>置き換えの基本方針</h3>
 <ul>
-  <li><strong>.NET Framework 3.5</strong> 製で技術基盤が古く（レガシー）、<strong>改修や保守が年々難しくなっている</strong></li>
-  <li><strong>対応プロトコルは FTP / CIFS のみで、SFTP が使えない</strong>（CIFS は社内 LAN 向け。外部連携は平文 FTP 一択）</li>
-  <li>連携先から「SFTP にしてほしい」という要望が来ても応えられない</li>
-  <li><strong>並列処理がなく</strong>、大量ファイル時は 1 件ずつの逐次転送になる</li>
+  <li><strong>転送経路（接続先・ポート・パス）は変更しない。</strong>動かすツールだけを差し替える</li>
+  <li>そのため<strong>一斉切り替えは不要</strong>で、影響の小さい連携から 1 件ずつ移行できる</li>
+  <li>運用モデル（スケジューラからのバッチ起動）も従来どおり。<strong>運用手順の変更は最小限</strong></li>
+  <li><strong>SFTP 化は連携先との調整がついた案件から</strong>段階的に実施する（このときだけ経路が変わる）</li>
 </ul>
 
-<h3>既存ツールを使い続けるリスク</h3>
-<table>
-<tr><th>観点</th><th>リスク</th></tr>
-<tr><td><strong>セキュリティ</strong></td><td>FTP は ID・パスワード・データが<strong>暗号化されずに流れる</strong>。監査・セキュリティ要件で指摘される可能性</td></tr>
-<tr><td><strong>社内ルール</strong></td><td>新規サーバ構築時のセキュリティ基準が厳格化。<strong>FTP の利用には「セキュリティ除外申請」が必要</strong>になり、構築のたびに申請・承認の負荷がかかる（SFTP なら申請不要）</td></tr>
-<tr><td><strong>連携先要件</strong></td><td><strong>SFTP 必須の連携先と接続できず</strong>、新規・更改案件で選択肢を失う</td></tr>
-<tr><td><strong>保守性</strong></td><td>.NET Framework 3.5 等のレガシー基盤のため改修コストが高く、<strong>対応できる要員も減っていく</strong></td></tr>
-<tr><td><strong>将来性</strong></td><td>修正のたびにリスクが増し、<strong>塩漬けが進むほど移行が難しくなる</strong></td></tr>
-</table>
-<div class="danger">「動いているから触らない」を続けるほど、移行コストとリスクは膨らみます。加えて<strong>新規サーバではセキュリティ向上のため FTP に除外申請が要る</strong>運用になりつつあり、<strong>SFTP が使える後継ツールへ計画的に置き換える</strong>のが本提案です。</div>
+<div class="point"><span class="badge">確認事項 1</span>現行 FileTransFTP を廃止し、本ツールへ順次移行する方針でよろしいでしょうか。</div>
 </section>
 
+<!-- ============ 2 ============ -->
 <section id="c2">
-<div class="chapter"><div class="num">2</div><h2>概要<span class="sub">FtpTransferAgent とは何か</span></h2></div>
+<div class="chapter"><div class="num">2</div><h2>適用範囲（スコープ）<span class="sub">何に使い、何には使わないか</span></h2></div>
 
-<div class="lede"><strong>現行ツール FileTransFTP の後継。FTP に加えて SFTP に対応し、「正しく送れたこと」の確認まで自動化した転送ツール。</strong></div>
-<ul>
-  <li><strong>既存ツールの役割（フォルダのファイルを定期転送）はそのまま引き継ぐ</strong></li>
-  <li>.NET 10 製のコンソールアプリ（Windows / Linux / macOS で動作）</li>
-  <li>起動すると <strong>1 回処理して終了する「バッチ型」</strong>（常駐しません）</li>
-  <li>定期実行はタスクスケジューラ / cron に任せる設計 ─ <strong>運用モデルは従来と同じ</strong></li>
-</ul>
+<div class="lede"><strong>「フォルダに置かれたファイルを、決まった相手へ、定期的に、確実に送る（受け取る）」</strong>用途に特化したツールです。</div>
 
-<figure class="fig">
-<svg viewBox="0 0 880 240" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
-  <defs>
-    <marker id="ia1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0 L10 5 L0 10 z" fill="#0b548c"/>
-    </marker>
-  </defs>
-  <g font-size="12.5">
-    <rect x="24" y="60" width="200" height="130" rx="10" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.5"/>
-    <text x="124" y="88" text-anchor="middle" font-weight="bold" fill="#7a5a1e">社内サーバーのフォルダ</text>
-    <rect x="46" y="102" width="156" height="24" rx="4" fill="#fff" stroke="#c9a35a"/>
-    <text x="124" y="119" text-anchor="middle" font-size="11">data_20260706.csv</text>
-    <rect x="46" y="132" width="156" height="24" rx="4" fill="#fff" stroke="#c9a35a"/>
-    <text x="124" y="149" text-anchor="middle" font-size="11">report.pdf</text>
-    <text x="124" y="178" text-anchor="middle" font-size="10.5" fill="#8a7a4a">業務システムがファイルを出力</text>
-    <rect x="300" y="52" width="280" height="146" rx="12" fill="#f2f8fd" stroke="#0b548c" stroke-width="2"/>
-    <text x="440" y="84" text-anchor="middle" font-size="15" font-weight="bold" fill="#0b548c">FtpTransferAgent</text>
-    <text x="440" y="110" text-anchor="middle" font-size="11.5" fill="#4b6478">タスクスケジューラ / cron が定期起動</text>
-    <text x="440" y="132" text-anchor="middle" font-size="11.5" fill="#4b6478">転送 → ハッシュ検証 → 後片づけ → 終了</text>
-    <text x="440" y="154" text-anchor="middle" font-size="11.5" fill="#4b6478">失敗時は自動リトライ + メール通知</text>
-    <text x="440" y="176" text-anchor="middle" font-size="11.5" fill="#4b6478">すべての結果をログに記録</text>
-    <line x1="224" y1="125" x2="300" y2="125" stroke="#0b548c" stroke-width="2.4" marker-end="url(#ia1)"/>
-    <rect x="656" y="60" width="200" height="130" rx="10" fill="#eef7f1" stroke="#0f7a57" stroke-width="1.8"/>
-    <text x="756" y="92" text-anchor="middle" font-weight="bold" fill="#0f7a57">連携先サーバー</text>
-    <text x="756" y="118" text-anchor="middle" font-size="11.5" fill="#40605a">FTP / SFTP（推奨）</text>
-    <text x="756" y="140" text-anchor="middle" font-size="11.5" fill="#40605a">またはローカル / UNC 共有</text>
-    <text x="756" y="168" text-anchor="middle" font-size="10.5" fill="#40605a">アップロード・ダウンロード両対応</text>
-    <line x1="580" y1="125" x2="656" y2="125" stroke="#0b548c" stroke-width="2.4" marker-end="url(#ia1)"/>
-  </g>
-</svg>
-<figcaption>図 1. FtpTransferAgent の全体像：フォルダのファイルを、決まった相手へ、定期的に、確実に送る</figcaption>
-</figure>
-
-<h3>できることマップ</h3>
-<div class="cards">
-  <div class="card">
-    <h4>📤 転送の基本</h4>
-    <ul>
-      <li><strong>アップロード（put）</strong> / <strong>ダウンロード（get）</strong></li>
-      <li><strong>FTP / SFTP</strong> 両対応 + ローカル/UNC 共有</li>
-      <li>ワイルドカードで対象指定（<code>*.csv</code> など）</li>
-      <li>サブフォルダ構造を保ったまま転送</li>
-      <li><strong>並列転送（最大 16・接続再利用）</strong></li>
+<div class="tablewrap">
+<table>
+<thead><tr><th style="width:50%">対象とする用途</th><th>対象外とする用途（別手段を検討）</th></tr></thead>
+<tr>
+  <td>
+    <ul style="margin:0">
+      <li>他システムとの定時ファイル連携（put / get）</li>
+      <li>夜間バッチ・数分間隔の定期転送</li>
+      <li>「データ本体 + 完了通知（END）ファイル」形式の受け渡し</li>
+      <li>同一ファイルの複数拠点への一斉配信</li>
+      <li>社内共有フォルダ（UNC / SMB）への書き込み（現行 CIFS 用途の置き換え）</li>
     </ul>
-  </div>
-  <div class="card">
-    <h4>🛡️ 信頼性</h4>
-    <ul>
-      <li><strong>ハッシュ検証</strong>（SHA256 / SHA512）</li>
-      <li>自動リトライ（指数バックオフ）</li>
-      <li>一時ファイル名 → 完了後リネーム</li>
-      <li><strong>ワーカー隔離</strong>（1 件の失敗が他を止めない）</li>
+  </td>
+  <td>
+    <ul style="margin:0">
+      <li>秒単位のリアルタイム同期 → 常駐型の同期ツール</li>
+      <li>双方向同期・競合解決 → 専用の同期製品</li>
+      <li>人が画面で操作する転送 → WinSCP 等の GUI ツール</li>
+      <li>HTTP / API でのデータ連携 → API 連携基盤</li>
     </ul>
-  </div>
-  <div class="card">
-    <h4>🔧 運用支援</h4>
-    <ul>
-      <li>END ファイルによる<strong>完了判定の連携</strong></li>
-      <li>転送成功後の<strong>自動クリーンアップ</strong></li>
-      <li><strong>複数宛先への同時配信 + 配信トラッキング</strong>（put）</li>
-      <li>二重起動防止（ロックファイル）</li>
-    </ul>
-  </div>
-  <div class="card">
-    <h4>📊 監視・証跡</h4>
-    <ul>
-      <li>ローリングファイルログ（保持日数指定可）</li>
-      <li><strong>エラー時のメール通知</strong></li>
-      <li>終了コードでジョブ監視と連携</li>
-    </ul>
-  </div>
+  </td>
+</tr>
+</table>
 </div>
 
-<h3>既存ツールとの比較</h3>
-<table>
-<tr><th>観点</th><th>FileTransFTP（既存）</th><th>FtpTransferAgent（新）</th></tr>
-<tr><td>対応プロトコル</td><td>FTP / CIFS</td><td><strong>FTP + SFTP + ローカル/UNC 共有</strong></td></tr>
-<tr><td>セキュリティ</td><td>平文通信（SFTP 非対応）</td><td><strong>暗号化・鍵認証・ホスト鍵検証</strong></td></tr>
-<tr><td>転送後の確認</td><td>なし（送信のみ）</td><td><strong>ハッシュ検証（SHA256/512）</strong></td></tr>
-<tr><td>失敗時</td><td>自動リトライ + メール通知</td><td>リトライ（<strong>指数バックオフ</strong>）+ メール通知</td></tr>
-<tr><td>並列処理</td><td>なし（1 件ずつ逐次）</td><td><strong>最大 16 並列・接続再利用</strong></td></tr>
-<tr><td>複数宛先配信</td><td>対応（再送あり/方式は非公開）</td><td><strong>ファンアウト + 配信トラッキング（指紋検知・宛先別並列）</strong></td></tr>
-<tr><td>技術基盤 / 配置</td><td>.NET Framework 3.5（レガシー・要ランタイム）</td><td><strong>.NET 10（現行 LTS）・単一ファイル同梱</strong></td></tr>
-<tr><td>案件ごとの違い</td><td>設定ファイル 1 つ</td><td>設定ファイル 1 つで吸収</td></tr>
-</table>
-<div class="note">失敗時の「リトライ + メール通知」は両ツールとも備えます。新ツールの主な強化点は <strong>SFTP・ハッシュ検証・並列処理・配信トラッキング・単一ファイル配置</strong>です。</div>
+<h3>動作環境</h3>
+<ul>
+  <li>Windows Server / Linux / macOS（.NET 10 ベース）</li>
+  <li><strong>自己完結ビルド</strong>で配布するため、サーバーへの .NET インストールは不要</li>
+  <li>サーバーに配置するのは<strong>実行ファイルと設定ファイル <code>appsettings.json</code> の 2 つのみ</strong></li>
+  <li>案件ごとの違いは<strong>すべて設定ファイルで吸収</strong>する（プログラムの個別改修は不要）</li>
+</ul>
+
+<div class="point"><span class="badge">確認事項 2</span>上表の適用範囲（対象・対象外）の線引きでよろしいでしょうか。</div>
 </section>
 
+<!-- ============ 3 ============ -->
 <section id="c3">
-<div class="chapter"><div class="num">3</div><h2>動作の流れ<span class="sub">中で何が起きているのか</span></h2></div>
+<div class="chapter"><div class="num">3</div><h2>機能仕様<span class="sub">全体構成・処理の流れ・主要機能</span></h2></div>
 
-<h3>実行から終了までの 7 ステップ</h3>
+<h3>3.1 全体構成</h3>
 <figure class="fig">
-<svg viewBox="0 0 880 470" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
+<svg viewBox="0 0 880 230" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif" role="img" aria-label="全体構成図">
   <defs>
-    <marker id="ib1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <marker id="f1a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#0b548c"/>
     </marker>
   </defs>
-  <g font-size="12.5">
-    <g>
-      <circle cx="80" cy="48" r="20" fill="#0b548c"/><text x="80" y="54" text-anchor="middle" fill="#fff" font-weight="bold">1</text>
-      <rect x="130" y="24" width="560" height="48" rx="9" fill="#eef4fa" stroke="#0b548c" stroke-width="1.6"/>
-      <text x="150" y="44" font-weight="bold" fill="#0b548c">設定読み込み + 妥当性チェック</text>
-      <text x="150" y="63" font-size="11" fill="#4b6478">設定がおかしければ転送を始める前に即終了（事故を未然に防ぐ）</text>
-    </g>
-    <g>
-      <circle cx="80" cy="110" r="20" fill="#0b548c"/><text x="80" y="116" text-anchor="middle" fill="#fff" font-weight="bold">2</text>
-      <rect x="130" y="86" width="560" height="48" rx="9" fill="#eef4fa" stroke="#0b548c" stroke-width="1.6"/>
-      <text x="150" y="106" font-weight="bold" fill="#0b548c">転送対象ファイルの列挙</text>
-      <text x="150" y="125" font-size="11" fill="#4b6478">ローカルフォルダ（put）またはリモートフォルダ（get）の中身を確認</text>
-    </g>
-    <g>
-      <circle cx="80" cy="172" r="20" fill="#0b548c"/><text x="80" y="178" text-anchor="middle" fill="#fff" font-weight="bold">3</text>
-      <rect x="130" y="148" width="560" height="48" rx="9" fill="#eef4fa" stroke="#0b548c" stroke-width="1.6"/>
-      <text x="150" y="168" font-weight="bold" fill="#0b548c">フィルタ適用</text>
-      <text x="150" y="187" font-size="11" fill="#4b6478">拡張子 / ワイルドカード / END ファイル条件で「送るべきもの」だけに絞る</text>
-    </g>
-    <g>
-      <circle cx="80" cy="234" r="20" fill="#0f7a57"/><text x="80" y="240" text-anchor="middle" fill="#fff" font-weight="bold">4</text>
-      <rect x="130" y="210" width="560" height="48" rx="9" fill="#eef7f1" stroke="#0f7a57" stroke-width="1.6"/>
-      <text x="150" y="230" font-weight="bold" fill="#0f7a57">並列転送（1〜16 並列）</text>
-      <text x="150" y="249" font-size="11" fill="#40605a">一時名で送って完了後にリネーム ─ 相手に中途半端なファイルを見せない</text>
-    </g>
-    <g>
-      <circle cx="80" cy="296" r="20" fill="#0f7a57"/><text x="80" y="302" text-anchor="middle" fill="#fff" font-weight="bold">5</text>
-      <rect x="130" y="272" width="560" height="48" rx="9" fill="#eef7f1" stroke="#0f7a57" stroke-width="1.6"/>
-      <text x="150" y="292" font-weight="bold" fill="#0f7a57">ハッシュ検証</text>
-      <text x="150" y="311" font-size="11" fill="#40605a">送ったものが壊れていないかを数値（指紋）の突き合わせで確認</text>
-    </g>
-    <g>
-      <circle cx="80" cy="358" r="20" fill="#0b548c"/><text x="80" y="364" text-anchor="middle" fill="#fff" font-weight="bold">6</text>
-      <rect x="130" y="334" width="560" height="48" rx="9" fill="#eef4fa" stroke="#0b548c" stroke-width="1.6"/>
-      <text x="150" y="354" font-weight="bold" fill="#0b548c">クリーンアップ</text>
-      <text x="150" y="373" font-size="11" fill="#4b6478">設定に応じて元ファイル等を削除（検証に通ってから消すので安全）</text>
-    </g>
-    <g>
-      <circle cx="80" cy="420" r="20" fill="#3d4c5a"/><text x="80" y="426" text-anchor="middle" fill="#fff" font-weight="bold">7</text>
-      <rect x="130" y="396" width="560" height="48" rx="9" fill="#f0f2f5" stroke="#5a6b7a" stroke-width="1.6"/>
-      <text x="150" y="416" font-weight="bold" fill="#3d4c5a">ログ出力して終了</text>
-      <text x="150" y="435" font-size="11" fill="#5a6b7a">成功: 終了コード 0 ／ 失敗あり: 1 ─ ジョブ管理基盤がこの値で成否を判定</text>
-    </g>
-    <line x1="80" y1="68" x2="80" y2="90" stroke="#0b548c" stroke-width="2" marker-end="url(#ib1)"/>
-    <line x1="80" y1="130" x2="80" y2="152" stroke="#0b548c" stroke-width="2" marker-end="url(#ib1)"/>
-    <line x1="80" y1="192" x2="80" y2="214" stroke="#0b548c" stroke-width="2" marker-end="url(#ib1)"/>
-    <line x1="80" y1="254" x2="80" y2="276" stroke="#0b548c" stroke-width="2" marker-end="url(#ib1)"/>
-    <line x1="80" y1="316" x2="80" y2="338" stroke="#0b548c" stroke-width="2" marker-end="url(#ib1)"/>
-    <line x1="80" y1="378" x2="80" y2="400" stroke="#0b548c" stroke-width="2" marker-end="url(#ib1)"/>
-    <rect x="716" y="230" width="150" height="104" rx="10" fill="#fdf3e7" stroke="#b35c12" stroke-width="1.5"/>
-    <text x="791" y="256" text-anchor="middle" font-size="11.5" font-weight="bold" fill="#b35c12">失敗したら?</text>
-    <text x="791" y="278" text-anchor="middle" font-size="10.5" fill="#9a6b3a">一時的なエラーは</text>
-    <text x="791" y="294" text-anchor="middle" font-size="10.5" fill="#9a6b3a">自動リトライ</text>
-    <text x="791" y="314" text-anchor="middle" font-size="10.5" fill="#9a6b3a">（4 章参照）</text>
-    <line x1="690" y1="282" x2="716" y2="282" stroke="#b35c12" stroke-width="1.6" stroke-dasharray="5 4"/>
-  </g>
-</svg>
-<figcaption>図 2. 実行から終了までの流れ：「送って終わり」ではなく「検証して終わり」</figcaption>
-</figure>
-<div class="point"><strong>「送って終わり」ではなく「検証して終わり」</strong>。検証に失敗したファイルは成功扱いになりません。</div>
+  <rect x="20" y="54" width="230" height="128" rx="10" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.6"/>
+  <text x="135" y="82" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#7a5a1e">社内サーバーの連携フォルダ</text>
+  <rect x="42" y="96" width="186" height="25" rx="5" fill="#fff" stroke="#c9a35a"/>
+  <text x="135" y="113" text-anchor="middle" font-size="11" fill="#5f4a18">data_20260901.csv</text>
+  <rect x="42" y="127" width="186" height="25" rx="5" fill="#fff" stroke="#c9a35a"/>
+  <text x="135" y="144" text-anchor="middle" font-size="11" fill="#5f4a18">monthly_report.pdf</text>
+  <text x="135" y="169" text-anchor="middle" font-size="10.5" fill="#8a7a4a">業務システムが出力</text>
 
-<h3>put と get（転送の向き）</h3>
+  <line x1="250" y1="118" x2="310" y2="118" stroke="#0b548c" stroke-width="2.4" marker-end="url(#f1a)"/>
+
+  <rect x="316" y="40" width="248" height="152" rx="12" fill="#f2f8fd" stroke="#0b548c" stroke-width="2"/>
+  <text x="440" y="70" text-anchor="middle" font-size="14.5" font-weight="bold" fill="#0b548c">FtpTransferAgent</text>
+  <text x="440" y="97" text-anchor="middle" font-size="11" fill="#4b6478">スケジューラが定期起動</text>
+  <text x="440" y="119" text-anchor="middle" font-size="11" fill="#4b6478">転送 → ハッシュ検証 → 後処理</text>
+  <text x="440" y="141" text-anchor="middle" font-size="11" fill="#4b6478">失敗は自動再試行・メール通知</text>
+  <text x="440" y="163" text-anchor="middle" font-size="11" fill="#4b6478">結果をログと終了コードで報告</text>
+  <text x="440" y="183" text-anchor="middle" font-size="10.5" fill="#7b8fa0">1 回処理して終了（常駐しない）</text>
+
+  <line x1="570" y1="118" x2="630" y2="118" stroke="#0b548c" stroke-width="2.4" marker-end="url(#f1a)"/>
+
+  <rect x="630" y="54" width="230" height="128" rx="10" fill="#eef7f1" stroke="#0f7a57" stroke-width="1.8"/>
+  <text x="745" y="82" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#0f7a57">連携先サーバー</text>
+  <text x="745" y="110" text-anchor="middle" font-size="11.5" fill="#40605a">SFTP（推奨）／ FTP</text>
+  <text x="745" y="132" text-anchor="middle" font-size="11.5" fill="#40605a">ローカル ／ UNC 共有</text>
+  <text x="745" y="163" text-anchor="middle" font-size="10.5" fill="#5d7a72">送信（put）・受信（get）の両対応</text>
+</svg>
+<figcaption>図 1. 全体構成。フォルダに置かれたファイルを、スケジューラ起動のバッチが定期的に転送する</figcaption>
+</figure>
+
+<h3>3.2 処理の流れ</h3>
 <figure class="fig">
-<svg viewBox="0 0 880 210" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
+<svg viewBox="0 0 880 392" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif" role="img" aria-label="処理フロー図">
   <defs>
-    <marker id="ib2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0 L10 5 L0 10 z" fill="#0f7a57"/>
-    </marker>
-    <marker id="ib3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0 L10 5 L0 10 z" fill="#15729e"/>
-    </marker>
-  </defs>
-  <g font-size="12.5">
-    <rect x="20" y="20" width="410 " height="170" rx="12" fill="#f8fcfa" stroke="#0f7a57" stroke-width="1.6"/>
-    <text x="225" y="48" text-anchor="middle" font-size="14" font-weight="bold" fill="#0f7a57">put（アップロード）: ローカル → リモート</text>
-    <rect x="48" y="70" width="130" height="66" rx="9" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.4"/>
-    <text x="113" y="98" text-anchor="middle" font-size="11.5">社内サーバー</text>
-    <text x="113" y="118" text-anchor="middle" font-size="11">./watch/data.csv</text>
-    <rect x="272" y="70" width="130" height="66" rx="9" fill="#eef7f1" stroke="#0f7a57" stroke-width="1.4"/>
-    <text x="337" y="98" text-anchor="middle" font-size="11.5">連携先</text>
-    <text x="337" y="118" text-anchor="middle" font-size="11">/remote/data.csv</text>
-    <line x1="178" y1="103" x2="272" y2="103" stroke="#0f7a57" stroke-width="2.4" marker-end="url(#ib2)"/>
-    <text x="225" y="93" text-anchor="middle" font-size="11" fill="#0f7a57" font-weight="bold">送信</text>
-    <text x="225" y="166" text-anchor="middle" font-size="11" fill="#40605a">社内で作ったデータを連携先に渡す ／ 成功後にローカル削除も可能</text>
-    <rect x="450" y="20" width="410" height="170" rx="12" fill="#f7fafd" stroke="#15729e" stroke-width="1.6"/>
-    <text x="655" y="48" text-anchor="middle" font-size="14" font-weight="bold" fill="#0b548c">get（ダウンロード）: リモート → ローカル</text>
-    <rect x="478" y="70" width="130" height="66" rx="9" fill="#eef4fa" stroke="#15729e" stroke-width="1.4"/>
-    <text x="543" y="98" text-anchor="middle" font-size="11.5">連携先</text>
-    <text x="543" y="118" text-anchor="middle" font-size="11">/remote/data.csv</text>
-    <rect x="702" y="70" width="130" height="66" rx="9" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.4"/>
-    <text x="767" y="98" text-anchor="middle" font-size="11.5">社内サーバー</text>
-    <text x="767" y="118" text-anchor="middle" font-size="11">./watch/data.csv</text>
-    <line x1="608" y1="103" x2="702" y2="103" stroke="#15729e" stroke-width="2.4" marker-end="url(#ib3)"/>
-    <text x="655" y="93" text-anchor="middle" font-size="11" fill="#0b548c" font-weight="bold">取得</text>
-    <text x="655" y="166" text-anchor="middle" font-size="11" fill="#4b6478">連携先が置いたデータを取り込む ／ 成功後にリモート削除も可能</text>
-  </g>
-</svg>
-<figcaption>図 3. put と get：設定ファイルの Direction を "put" / "get" と書き分けるだけで切り替えられる</figcaption>
-</figure>
-
-<h3>「バッチ型」という設計</h3>
-<p>FtpTransferAgent は<strong>常駐しません</strong>。起動 → 処理 → 終了、を毎回繰り返します。</p>
-<figure class="fig">
-<svg viewBox="0 0 880 170" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
-  <g font-size="12.5">
-    <line x1="50" y1="120" x2="850" y2="120" stroke="#5a6b7a" stroke-width="2"/>
-    <g>
-      <circle cx="150" cy="120" r="6" fill="#0b548c"/>
-      <text x="150" y="148" text-anchor="middle" fill="#3d4c5a">8:00</text>
-      <rect x="90" y="40" width="120" height="52" rx="9" fill="#eef4fa" stroke="#0b548c" stroke-width="1.5"/>
-      <text x="150" y="62" text-anchor="middle" font-size="11" fill="#0b548c" font-weight="bold">起動→転送→終了</text>
-      <text x="150" y="80" text-anchor="middle" font-size="10.5" fill="#4b6478">（数秒〜数分）</text>
-      <line x1="150" y1="92" x2="150" y2="114" stroke="#0b548c" stroke-width="1.5" stroke-dasharray="4 3"/>
-    </g>
-    <g>
-      <circle cx="390" cy="120" r="6" fill="#0b548c"/>
-      <text x="390" y="148" text-anchor="middle" fill="#3d4c5a">8:05</text>
-      <rect x="330" y="40" width="120" height="52" rx="9" fill="#eef4fa" stroke="#0b548c" stroke-width="1.5"/>
-      <text x="390" y="62" text-anchor="middle" font-size="11" fill="#0b548c" font-weight="bold">起動→転送→終了</text>
-      <text x="390" y="80" text-anchor="middle" font-size="10.5" fill="#4b6478">新しいファイルだけ処理</text>
-      <line x1="390" y1="92" x2="390" y2="114" stroke="#0b548c" stroke-width="1.5" stroke-dasharray="4 3"/>
-    </g>
-    <g>
-      <circle cx="630" cy="120" r="6" fill="#0b548c"/>
-      <text x="630" y="148" text-anchor="middle" fill="#3d4c5a">8:10</text>
-      <rect x="570" y="40" width="120" height="52" rx="9" fill="#eef4fa" stroke="#0b548c" stroke-width="1.5"/>
-      <text x="630" y="62" text-anchor="middle" font-size="11" fill="#0b548c" font-weight="bold">起動→転送→終了</text>
-      <text x="630" y="80" text-anchor="middle" font-size="10.5" fill="#4b6478">対象がなければ即終了</text>
-      <line x1="630" y1="92" x2="630" y2="114" stroke="#0b548c" stroke-width="1.5" stroke-dasharray="4 3"/>
-    </g>
-    <text x="790" y="66" text-anchor="middle" font-size="11.5" fill="#5a6b7a">タスクスケジューラ /</text>
-    <text x="790" y="84" text-anchor="middle" font-size="11.5" fill="#5a6b7a">cron が定期起動</text>
-  </g>
-</svg>
-<figcaption>図 4. バッチ型の動作モデル：「呼ばれたら働く」を繰り返す</figcaption>
-</figure>
-<p><strong>この設計のメリット</strong></p>
-<ul>
-  <li>プロセスが残らないので、<strong>メモリリークや「いつの間にか止まっていた」が起きにくい</strong></li>
-  <li>ジョブ管理基盤（JP1 / タスクスケジューラ / cron）に<strong>そのまま載る</strong></li>
-  <li>失敗してもプロセスごとやり直せるので<strong>復旧が単純</strong></li>
-</ul>
-</section>
-
-<section id="c4">
-<div class="chapter"><div class="num">4</div><h2>安心して使える理由<span class="sub">信頼性・安全性の仕組み</span></h2></div>
-
-<h3>仕組み①: 中途半端なファイルを相手に見せない</h3>
-<p>転送中のファイルを連携先が誤って処理しないよう、<strong>一時ファイル名</strong>で転送します。</p>
-<figure class="fig">
-<svg viewBox="0 0 880 180" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
-  <defs>
-    <marker id="ic1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0 L10 5 L0 10 z" fill="#0f7a57"/>
-    </marker>
-  </defs>
-  <g font-size="12.5">
-    <rect x="30" y="40" width="340" height="100" rx="10" fill="#fdf3e7" stroke="#b35c12" stroke-width="1.6"/>
-    <text x="200" y="68" text-anchor="middle" font-weight="bold" fill="#b35c12">転送中</text>
-    <rect x="56" y="82" width="288" height="30" rx="6" fill="#fff" stroke="#b35c12" stroke-dasharray="5 3"/>
-    <text x="200" y="102" text-anchor="middle" font-size="11.5" fill="#9a6b3a">/remote/data.csv.tmp_x7f3…</text>
-    <text x="200" y="130" text-anchor="middle" font-size="10.5" fill="#9a6b3a">相手のバッチは拾わない名前</text>
-    <line x1="370" y1="90" x2="510" y2="90" stroke="#0f7a57" stroke-width="2.6" marker-end="url(#ic1)"/>
-    <text x="440" y="78" text-anchor="middle" font-size="11" fill="#0f7a57" font-weight="bold">転送完了 + 検証 OK</text>
-    <text x="440" y="110" text-anchor="middle" font-size="10.5" fill="#40605a">リネーム（一瞬）</text>
-    <rect x="510" y="40" width="340" height="100" rx="10" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.8"/>
-    <text x="680" y="68" text-anchor="middle" font-weight="bold" fill="#0f7a57">完了後</text>
-    <rect x="536" y="82" width="288" height="30" rx="6" fill="#fff" stroke="#0f7a57"/>
-    <text x="680" y="102" text-anchor="middle" font-size="11.5" fill="#0f7a57">/remote/data.csv</text>
-    <text x="680" y="130" text-anchor="middle" font-size="10.5" fill="#40605a">この瞬間に初めて「正式な名前」になる</text>
-  </g>
-</svg>
-<figcaption>図 5. 一時名転送とアトミックリネーム：「半分だけ書かれた data.csv」は存在しない</figcaption>
-</figure>
-<ul>
-  <li>リネームは一瞬で終わる操作なので、<strong>「半分だけ書かれた data.csv」は存在しない</strong></li>
-  <li>連携先には「正式名のファイルだけ処理してください」と伝えればよい</li>
-</ul>
-<div class="point">ファイル連携トラブルの定番「転送中ファイルの取り込み事故」を構造的に防ぎます。</div>
-
-<h3>仕組み②: ハッシュ検証</h3>
-<p>「送れた」ではなく「<strong>壊れずに送れた</strong>」を確認します。</p>
-<figure class="fig">
-<svg viewBox="0 0 880 190" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
-  <defs>
-    <marker id="ic2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <marker id="f2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#0b548c"/>
     </marker>
   </defs>
-  <g font-size="12.5">
-    <rect x="30" y="26" width="200" height="50" rx="9" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.5"/>
-    <text x="130" y="56" text-anchor="middle" font-size="12">ローカルの data.csv</text>
-    <rect x="30" y="112" width="200" height="50" rx="9" fill="#eef4fa" stroke="#15729e" stroke-width="1.5"/>
-    <text x="130" y="142" text-anchor="middle" font-size="12">リモートの data.csv</text>
-    <rect x="310" y="26" width="180" height="50" rx="9" fill="#fff" stroke="#0f7a57" stroke-width="1.5"/>
-    <text x="400" y="50" text-anchor="middle" font-size="12" fill="#0f7a57" font-weight="bold">SHA256 計算</text>
-    <text x="400" y="68" text-anchor="middle" font-size="10.5" fill="#40605a">→ a1b2c3…</text>
-    <rect x="310" y="112" width="180" height="50" rx="9" fill="#fff" stroke="#0f7a57" stroke-width="1.5"/>
-    <text x="400" y="136" text-anchor="middle" font-size="12" fill="#0f7a57" font-weight="bold">SHA256 計算</text>
-    <text x="400" y="154" text-anchor="middle" font-size="10.5" fill="#40605a">→ a1b2c3…</text>
-    <line x1="230" y1="51" x2="310" y2="51" stroke="#0b548c" stroke-width="2" marker-end="url(#ic2)"/>
-    <line x1="230" y1="137" x2="310" y2="137" stroke="#0b548c" stroke-width="2" marker-end="url(#ic2)"/>
-    <rect x="560" y="66" width="130" height="56" rx="9" fill="#e6f0f8" stroke="#0b548c" stroke-width="2"/>
-    <text x="625" y="90" text-anchor="middle" font-size="12" font-weight="bold" fill="#0b548c">一致するか</text>
-    <text x="625" y="110" text-anchor="middle" font-size="12" font-weight="bold" fill="#0b548c">比較</text>
-    <line x1="490" y1="51" x2="560" y2="82" stroke="#0b548c" stroke-width="2" marker-end="url(#ic2)"/>
-    <line x1="490" y1="137" x2="560" y2="106" stroke="#0b548c" stroke-width="2" marker-end="url(#ic2)"/>
-    <rect x="730" y="30" width="126" height="48" rx="9" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.6"/>
-    <text x="793" y="50" text-anchor="middle" font-size="11.5" fill="#0f7a57" font-weight="bold">一致 → 成功</text>
-    <text x="793" y="68" text-anchor="middle" font-size="10.5" fill="#40605a">削除など後処理へ</text>
-    <rect x="730" y="110" width="126" height="48" rx="9" fill="#fdeeee" stroke="#b3261e" stroke-width="1.6"/>
-    <text x="793" y="130" text-anchor="middle" font-size="11.5" fill="#b3261e" font-weight="bold">不一致 → 失敗</text>
-    <text x="793" y="148" text-anchor="middle" font-size="10.5" fill="#b3261e">リトライ / 通知</text>
-    <line x1="690" y1="82" x2="730" y2="56" stroke="#0f7a57" stroke-width="2" marker-end="url(#ic2)"/>
-    <line x1="690" y1="106" x2="730" y2="132" stroke="#b3261e" stroke-width="2" marker-end="url(#ic2)"/>
+  <g>
+    <line x1="44" y1="55" x2="44" y2="69" stroke="#0b548c" stroke-width="1.8" marker-end="url(#f2a)"/>
+    <line x1="44" y1="107" x2="44" y2="121" stroke="#0b548c" stroke-width="1.8" marker-end="url(#f2a)"/>
+    <line x1="44" y1="159" x2="44" y2="173" stroke="#0b548c" stroke-width="1.8" marker-end="url(#f2a)"/>
+    <line x1="44" y1="211" x2="44" y2="225" stroke="#0b548c" stroke-width="1.8" marker-end="url(#f2a)"/>
+    <line x1="44" y1="263" x2="44" y2="277" stroke="#0b548c" stroke-width="1.8" marker-end="url(#f2a)"/>
+    <line x1="44" y1="315" x2="44" y2="329" stroke="#0b548c" stroke-width="1.8" marker-end="url(#f2a)"/>
   </g>
-</svg>
-<figcaption>図 6. ハッシュ検証：ファイル内容の「指紋」を両側で計算して突き合わせる</figcaption>
-</figure>
-<ul>
-  <li>アルゴリズムは <strong>SHA256 / SHA512</strong> から選択（MD5 は安全性の理由で禁止）</li>
-  <li>不一致なら<strong>そのファイルは失敗扱い</strong> → リトライ or エラー通知</li>
-  <li>検証に通るまで「成功後の削除」は行われない（<strong>消してから気づく事故がない</strong>）</li>
-</ul>
 
-<h3>仕組み③: かしこい自動リトライ</h3>
-<p>エラーには「待てば直るもの」と「待っても直らないもの」があります。FtpTransferAgent はこれを<strong>自動で見分けて</strong>振る舞いを変えます。</p>
+  <circle cx="44" cy="38" r="17" fill="#0b548c"/><text x="44" y="43" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">1</text>
+  <rect x="76" y="16" width="784" height="44" rx="9" fill="#eef4fa" stroke="#0b548c" stroke-width="1.5"/>
+  <text x="96" y="36" font-size="12.5" font-weight="bold" fill="#0b548c">設定の読み込みと妥当性チェック</text>
+  <text x="96" y="52" font-size="10.5" fill="#4b6478">設定に不備があれば転送を始める前に停止する（終了コード 1）</text>
+
+  <circle cx="44" cy="90" r="17" fill="#0b548c"/><text x="44" y="95" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">2</text>
+  <rect x="76" y="68" width="784" height="44" rx="9" fill="#eef4fa" stroke="#0b548c" stroke-width="1.5"/>
+  <text x="96" y="88" font-size="12.5" font-weight="bold" fill="#0b548c">転送対象の列挙</text>
+  <text x="96" y="104" font-size="10.5" fill="#4b6478">put ならローカルフォルダ、get ならリモートフォルダの中身を確認する</text>
+
+  <circle cx="44" cy="142" r="17" fill="#0b548c"/><text x="44" y="147" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">3</text>
+  <rect x="76" y="120" width="784" height="44" rx="9" fill="#eef4fa" stroke="#0b548c" stroke-width="1.5"/>
+  <text x="96" y="140" font-size="12.5" font-weight="bold" fill="#0b548c">フィルタの適用</text>
+  <text x="96" y="156" font-size="10.5" fill="#4b6478">拡張子・ワイルドカード・END ファイルの有無で、送るべきファイルだけに絞り込む</text>
+
+  <circle cx="44" cy="194" r="17" fill="#0f7a57"/><text x="44" y="199" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">4</text>
+  <rect x="76" y="172" width="784" height="44" rx="9" fill="#eef7f1" stroke="#0f7a57" stroke-width="1.5"/>
+  <text x="96" y="192" font-size="12.5" font-weight="bold" fill="#0f7a57">並列転送（1〜16 並列）</text>
+  <text x="96" y="208" font-size="10.5" fill="#40605a">一時ファイル名で送り、完了後に正式名へリネームする（相手に書きかけを見せない）</text>
+
+  <circle cx="44" cy="246" r="17" fill="#0f7a57"/><text x="44" y="251" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">5</text>
+  <rect x="76" y="224" width="784" height="44" rx="9" fill="#eef7f1" stroke="#0f7a57" stroke-width="1.5"/>
+  <text x="96" y="244" font-size="12.5" font-weight="bold" fill="#0f7a57">ハッシュ検証</text>
+  <text x="96" y="260" font-size="10.5" fill="#40605a">送信元と送信先で SHA256／SHA512 を突き合わせ、内容が同一であることを確認する</text>
+
+  <circle cx="44" cy="298" r="17" fill="#0b548c"/><text x="44" y="303" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">6</text>
+  <rect x="76" y="276" width="784" height="44" rx="9" fill="#eef4fa" stroke="#0b548c" stroke-width="1.5"/>
+  <text x="96" y="296" font-size="12.5" font-weight="bold" fill="#0b548c">後処理（クリーンアップ）</text>
+  <text x="96" y="312" font-size="10.5" fill="#4b6478">設定に応じて元ファイル等を削除する。検証を通過してから削除するため取り返しがつく</text>
+
+  <circle cx="44" cy="350" r="17" fill="#3d4c5a"/><text x="44" y="355" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">7</text>
+  <rect x="76" y="328" width="784" height="44" rx="9" fill="#f0f2f5" stroke="#5a6b7a" stroke-width="1.5"/>
+  <text x="96" y="348" font-size="12.5" font-weight="bold" fill="#3d4c5a">ログを出力して終了</text>
+  <text x="96" y="364" font-size="10.5" fill="#5a6b7a">全件成功なら終了コード 0、1 件でも失敗すれば 1。ジョブ管理基盤はこの値で成否を判定する</text>
+</svg>
+<figcaption>図 2. 1 回の実行で行う処理。「送って終わり」ではなく「検証して終わり」までを 1 回の実行に含む</figcaption>
+</figure>
+
+<h3>3.3 機能一覧</h3>
+<div class="tablewrap">
 <table>
-<tr><th>エラーの種類</th><th>例</th><th>動作</th></tr>
-<tr><td><strong>一時的なエラー</strong></td><td>ネットワーク瞬断、タイムアウト</td><td><strong>自動リトライ</strong>（間隔を倍々に広げる: 5 秒 → 10 秒 → 20 秒…）</td></tr>
-<tr><td><strong>恒久的なエラー</strong></td><td>パスワード間違い、設定ミス</td><td><strong>即失敗</strong>（無駄なリトライをしない）</td></tr>
+<thead><tr><th style="width:150px">機能</th><th>仕様</th></tr></thead>
+<tr><td>転送方向</td><td><code>put</code>（送信）／ <code>get</code>（受信）を設定で切り替え</td></tr>
+<tr><td>プロトコル</td><td>FTP ／ SFTP ／ ローカル・UNC 共有（<code>local</code> は put 専用）</td></tr>
+<tr><td>対象ファイル指定</td><td>拡張子またはワイルドカード（<code>*.csv</code>、<code>data_*.csv</code> 等）。サブフォルダ構造の維持も可能</td></tr>
+<tr><td>並列転送</td><td>1〜16 並列（既定 1）。接続を再利用し、宛先ごとに並列数を個別指定できる</td></tr>
+<tr><td>END ファイル制御</td><td>「データを置き終わったら目印ファイルを置く」方式に対応。END があるデータだけを転送し、順序は<strong>データ → END</strong> を保証する</td></tr>
+<tr><td>複数宛先配信</td><td>1 ファイルを複数の宛先へ同時配信（put のみ）。3.4 節参照</td></tr>
+<tr><td>転送後の削除</td><td>検証通過後にローカル／リモートの元ファイルを削除（設定で選択）</td></tr>
+<tr><td>二重起動防止</td><td>ロックファイル（PID 方式）。前回実行が継続中なら何もせず終了コード 2 で終了する</td></tr>
+<tr><td>ログ</td><td><code>logs/yyyy/MM/</code> 配下に日次で蓄積。サイズ上限でローテーション、保持日数での自動削除も可能</td></tr>
+<tr><td>メール通知</td><td>エラー発生時に SMTP で通知。宛先は複数指定可、1 回の実行あたりの送信上限あり（既定 100 通）</td></tr>
 </table>
-<ul>
-  <li>リトライ回数・間隔は設定で調整可能（既定: 3 回、5 秒から指数バックオフ）</li>
-  <li>「認証エラーなのに 3 回リトライして相手にアカウントロックをかける」ような事故を防ぐ</li>
-</ul>
-
-<h3>仕組み④: セキュリティへの配慮</h3>
-<table>
-<tr><th>機能</th><th>内容</th></tr>
-<tr><td><strong>SFTP 対応</strong></td><td>通信が暗号化される転送方式。<strong>社内では SFTP を推奨</strong></td></tr>
-<tr><td><strong>秘密鍵認証</strong></td><td>パスワードより安全な鍵ファイルでのログインに対応</td></tr>
-<tr><td><strong>ホスト鍵検証</strong></td><td>接続先サーバーの「指紋」を照合し、<strong>なりすましサーバーを検出</strong></td></tr>
-<tr><td><strong>パストラバーサル対策</strong></td><td>不正なファイルパスでフォルダ外に書き込まれることを防止</td></tr>
-<tr><td><strong>起動時の警告</strong></td><td>平文 FTP 使用時や検証スキップ時に警告を表示</td></tr>
-</table>
-<div class="tip">FTP（暗号化なし）も使えますが、起動時に警告が出ます。新規案件では SFTP + 鍵認証 + ホスト鍵検証の組み合わせを標準としてください。</div>
-</section>
-
-<section id="c5">
-<div class="chapter"><div class="num">5</div><h2>便利機能<span class="sub">実運用を支える機能</span></h2></div>
-
-<h3>END ファイル制御</h3>
-<p>ファイル連携の定番プロトコル「<strong>データを置き終わったら、目印ファイル（END）を置く</strong>」に対応しています。</p>
-<figure class="fig">
-<svg viewBox="0 0 880 240" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
-  <defs>
-    <marker id="id1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0 L10 5 L0 10 z" fill="#0f7a57"/>
-    </marker>
-  </defs>
-  <g font-size="12.5">
-    <rect x="20" y="20" width="330" height="200" rx="10" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.5"/>
-    <text x="185" y="46" text-anchor="middle" font-weight="bold" fill="#7a5a1e">watch フォルダ</text>
-    <rect x="42" y="60" width="200" height="26" rx="5" fill="#fff" stroke="#0f7a57" stroke-width="1.4"/>
-    <text x="142" y="78" text-anchor="middle" font-size="11.5">A.csv + A.csv.END</text>
-    <rect x="42" y="98" width="200" height="26" rx="5" fill="#fff" stroke="#b35c12" stroke-width="1.4"/>
-    <text x="142" y="116" text-anchor="middle" font-size="11.5">B.csv（END なし）</text>
-    <rect x="42" y="136" width="200" height="26" rx="5" fill="#fff" stroke="#b3261e" stroke-width="1.4" stroke-dasharray="4 3"/>
-    <text x="142" y="154" text-anchor="middle" font-size="11.5">C.csv.END（データなし）</text>
-    <text x="185" y="196" text-anchor="middle" font-size="10.5" fill="#8a7a4a">END = 書き終わった合図（0 バイトで OK）</text>
-    <rect x="430" y="46" width="430" height="50" rx="9" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.8"/>
-    <text x="645" y="67" text-anchor="middle" font-weight="bold" fill="#0f7a57">✅ 転送する ─ END がある = 書き込み完了済み</text>
-    <text x="645" y="87" text-anchor="middle" font-size="11" fill="#40605a">必ず「データ → END」の順で転送（受け手も同じ方式を安全に使える）</text>
-    <rect x="430" y="112" width="430" height="42" rx="9" fill="#fdf3e7" stroke="#b35c12" stroke-width="1.6"/>
-    <text x="645" y="130" text-anchor="middle" font-weight="bold" fill="#b35c12">⏸ スキップ ─ まだ書き込み中かもしれない</text>
-    <text x="645" y="148" text-anchor="middle" font-size="11" fill="#9a6b3a">書きかけのデータを拾わない</text>
-    <rect x="430" y="170" width="430" height="42" rx="9" fill="#fdeeee" stroke="#b3261e" stroke-width="1.6"/>
-    <text x="645" y="188" text-anchor="middle" font-weight="bold" fill="#b3261e">⏸ スキップ ─ 対応データがない</text>
-    <text x="645" y="206" text-anchor="middle" font-size="11" fill="#b3261e">孤立した END は転送しない</text>
-    <line x1="242" y1="73" x2="430" y2="71" stroke="#0f7a57" stroke-width="2" marker-end="url(#id1)"/>
-    <line x1="242" y1="111" x2="430" y2="133" stroke="#b35c12" stroke-width="2" stroke-dasharray="6 4"/>
-    <line x1="242" y1="149" x2="430" y2="191" stroke="#b3261e" stroke-width="2" stroke-dasharray="6 4"/>
-  </g>
-</svg>
-<figcaption>図 7. END ファイル制御（RequireEndFile: true）の動作イメージ</figcaption>
-</figure>
-<ul>
-  <li>END ファイル自体を転送するか・しないかも選べる</li>
-  <li>必ず「<strong>データ → END</strong>」の順で転送（順序を保証するので、受け手も同じ方式を安全に使える）</li>
-  <li>拡張子は <code>.END</code> <code>.TRG</code> など複数指定可能</li>
-</ul>
-
-<h3>複数宛先への同時配信（ファンアウト）</h3>
-<p>1 つのファイルを<strong>メイン宛先 + 追加宛先のすべてへ同時に送信</strong>できます（put のみ）。</p>
-<figure class="fig">
-<svg viewBox="0 0 880 250" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
-  <defs>
-    <marker id="id2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0 L10 5 L0 10 z" fill="#0b548c"/>
-    </marker>
-  </defs>
-  <g font-size="12.5">
-    <rect x="40" y="86" width="170" height="76" rx="10" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.5"/>
-    <text x="125" y="116" text-anchor="middle" font-weight="bold" fill="#7a5a1e">data.csv</text>
-    <text x="125" y="138" text-anchor="middle" font-size="10.5" fill="#8a7a4a">1 つのファイル</text>
-    <rect x="300" y="86" width="180" height="76" rx="10" fill="#f2f8fd" stroke="#0b548c" stroke-width="2"/>
-    <text x="390" y="116" text-anchor="middle" font-weight="bold" fill="#0b548c">ファンアウト</text>
-    <text x="390" y="138" text-anchor="middle" font-size="10.5" fill="#4b6478">全宛先へ同時送信</text>
-    <line x1="210" y1="124" x2="300" y2="124" stroke="#0b548c" stroke-width="2.2" marker-end="url(#id2)"/>
-    <rect x="600" y="20" width="250" height="56" rx="10" fill="#eef7f1" stroke="#0f7a57" stroke-width="1.6"/>
-    <text x="725" y="44" text-anchor="middle" font-weight="bold" fill="#0f7a57">本番サイト（SFTP・4 並列）</text>
-    <text x="725" y="64" text-anchor="middle" font-size="10.5" fill="#40605a">宛先ごとにプロトコル・認証・並列数を個別設定</text>
-    <rect x="600" y="96" width="250" height="56" rx="10" fill="#eef4fa" stroke="#15729e" stroke-width="1.6"/>
-    <text x="725" y="120" text-anchor="middle" font-weight="bold" fill="#0b548c">バックアップサイト（FTP・2 並列）</text>
-    <text x="725" y="140" text-anchor="middle" font-size="10.5" fill="#4b6478">SFTP と FTP の混在も可</text>
-    <rect x="600" y="172" width="250" height="56" rx="10" fill="#f6f1fa" stroke="#7b5aa6" stroke-width="1.6"/>
-    <text x="725" y="196" text-anchor="middle" font-weight="bold" fill="#5d4380">拠点の共有フォルダ（local）</text>
-    <text x="725" y="216" text-anchor="middle" font-size="10.5" fill="#6a5a80">UNC 共有への書き込みも一宛先にできる</text>
-    <line x1="480" y1="105" x2="600" y2="50" stroke="#0f7a57" stroke-width="2" marker-end="url(#id2)"/>
-    <line x1="480" y1="124" x2="600" y2="124" stroke="#0b548c" stroke-width="2" marker-end="url(#id2)"/>
-    <line x1="480" y1="143" x2="600" y2="198" stroke="#7b5aa6" stroke-width="2" marker-end="url(#id2)"/>
-  </g>
-</svg>
-<figcaption>図 8. ファンアウト：本番 + バックアップ、複数拠点への一斉配信などに使える</figcaption>
-</figure>
-<ul>
-  <li>宛先ごとに<strong>プロトコル・認証・並列数を個別設定</strong>できる（<strong>SFTP と FTP の混在も可</strong>）</li>
-  <li><strong>全宛先に成功したときだけ</strong>ローカルファイルを削除（1 つでも失敗したら消さずに残す）</li>
-  <li>同じ場所（host/path）へ重複して送る誤設定は<strong>起動時に警告</strong></li>
-</ul>
-<div class="note">用途例: 本番 + バックアップサイト、複数拠点（大阪 / 東京）への一斉配信。サーバー移設で<strong>新旧サーバーへ一時的に二重送信</strong>したい、といった用途にも使えます。</div>
-
-<h3>宛先がダウンしても「賢く」再送する（配信トラッキング）</h3>
-<p>複数宛先配信では、<strong>どの宛先まで送れたかをファイル単位で記録</strong>します。一部の宛先が落ちていても、次回は<strong>まだ送れていない宛先にだけ</strong>送り直します。</p>
-<figure class="fig">
-<svg viewBox="0 0 880 240" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
-  <defs>
-    <marker id="id3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0 L10 5 L0 10 z" fill="#0b548c"/>
-    </marker>
-  </defs>
-  <g font-size="12">
-    <rect x="20" y="20" width="410" height="200" rx="12" fill="#f7fafd" stroke="#0b548c" stroke-width="1.8"/>
-    <text x="225" y="46" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#0b548c">今回 ─ 大阪だけメンテ中で失敗</text>
-    <rect x="40" y="66" width="110" height="40" rx="8" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.4"/>
-    <text x="95" y="91" text-anchor="middle" font-size="11.5">data.csv</text>
-    <rect x="230" y="60" width="176" height="28" rx="7" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.4"/>
-    <text x="318" y="79" text-anchor="middle" font-size="11.5" fill="#0f7a57">東京 ✅ 配信成功</text>
-    <rect x="230" y="96" width="176" height="28" rx="7" fill="#fdeeee" stroke="#b3261e" stroke-width="1.4"/>
-    <text x="318" y="115" text-anchor="middle" font-size="11.5" fill="#b3261e">大阪 ❌ メンテ中</text>
-    <line x1="150" y1="78" x2="230" y2="74" stroke="#0f7a57" stroke-width="1.8" marker-end="url(#id3)"/>
-    <line x1="150" y1="92" x2="230" y2="110" stroke="#b3261e" stroke-width="1.8" marker-end="url(#id3)"/>
-    <rect x="40" y="146" width="366" height="56" rx="8" fill="#e6f0f8" stroke="#15729e" stroke-width="1.5"/>
-    <text x="223" y="168" text-anchor="middle" font-size="11" fill="#0b548c">「東京へは配信済み」を指紋付きで記録し、</text>
-    <text x="223" y="188" text-anchor="middle" font-size="11" fill="#0b548c">data.csv は再送用フォルダへ退避（消さない）</text>
-    <rect x="450" y="20" width="410" height="200" rx="12" fill="#f7fafd" stroke="#0b548c" stroke-width="1.8"/>
-    <text x="655" y="46" text-anchor="middle" font-size="13.5" font-weight="bold" fill="#0b548c">次回 ─ 大阪にだけ送り直す</text>
-    <rect x="470" y="66" width="110" height="40" rx="8" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.4"/>
-    <text x="525" y="91" text-anchor="middle" font-size="11.5">data.csv</text>
-    <rect x="660" y="60" width="176" height="28" rx="7" fill="#f0f2f5" stroke="#5a6b7a" stroke-width="1.4" stroke-dasharray="5 3"/>
-    <text x="748" y="79" text-anchor="middle" font-size="11.5" fill="#5a6b7a">東京 ⏭ スキップ（二重配信しない）</text>
-    <rect x="660" y="96" width="176" height="28" rx="7" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.4"/>
-    <text x="748" y="115" text-anchor="middle" font-size="11.5" fill="#0f7a57">大阪 ✅ 復旧 → 再送成功</text>
-    <line x1="580" y1="78" x2="660" y2="74" stroke="#5a6b7a" stroke-width="1.6" stroke-dasharray="5 3"/>
-    <line x1="580" y1="92" x2="660" y2="110" stroke="#0f7a57" stroke-width="1.8" marker-end="url(#id3)"/>
-    <rect x="470" y="146" width="366" height="56" rx="8" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.5"/>
-    <text x="653" y="168" text-anchor="middle" font-size="11" fill="#0f7a57">全宛先そろったら完了 ─ 設定に応じて</text>
-    <text x="653" y="188" text-anchor="middle" font-size="11" fill="#0f7a57">ローカル削除 or 元の場所へ復元</text>
-  </g>
-</svg>
-<figcaption>図 9. 配信トラッキング：「1 拠点が落ちても、他拠点へ二重送信せず、復旧後その拠点だけ送る」を自動化</figcaption>
-</figure>
-<ul>
-  <li><strong>配信済みの宛先へは二重配信しない</strong>（重複送信事故を防ぐ）</li>
-  <li>送信後に元ファイルが差し替わったら<strong>指紋（サイズ+更新時刻 / ハッシュ）で検知</strong>し、全宛先へ送り直す（静かなデータ欠落を防止）</li>
-  <li>この記録は<strong>部分失敗したときだけ</strong>作られる ─ <strong>全宛先成功なら追加コストはゼロ</strong></li>
-</ul>
-
-<h3>並列処理で「速く・止まらず」送る</h3>
-<p>大量のファイルも<strong>最大 16 並列</strong>で同時転送できます（<code>Concurrency</code>）。ただ速いだけでなく、<strong>並列でも壊れない</strong>ことを重視した設計です。</p>
-<figure class="fig">
-<svg viewBox="0 0 880 250" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
-  <defs>
-    <marker id="id4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0 0 L10 5 L0 10 z" fill="#0b548c"/>
-    </marker>
-  </defs>
-  <g font-size="12.5">
-    <rect x="30" y="80" width="150" height="90" rx="10" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.5"/>
-    <text x="105" y="110" text-anchor="middle" font-weight="bold" fill="#7a5a1e">作る人</text>
-    <text x="105" y="132" text-anchor="middle" font-size="10.5" fill="#8a7a4a">転送対象を見つけて</text>
-    <text x="105" y="148" text-anchor="middle" font-size="10.5" fill="#8a7a4a">待ち行列に積む</text>
-    <rect x="250" y="80" width="240" height="90" rx="10" fill="#e6f0f8" stroke="#0b548c" stroke-width="2"/>
-    <text x="370" y="108" text-anchor="middle" font-weight="bold" fill="#0b548c">待ち行列（キュー）</text>
-    <rect x="272" y="122" width="44" height="30" rx="5" fill="#fff" stroke="#15729e"/>
-    <rect x="324" y="122" width="44" height="30" rx="5" fill="#fff" stroke="#15729e"/>
-    <rect x="376" y="122" width="44" height="30" rx="5" fill="#fff" stroke="#15729e"/>
-    <rect x="428" y="122" width="44" height="30" rx="5" fill="#fff" stroke="#15729e" stroke-dasharray="4 3"/>
-    <text x="294" y="142" text-anchor="middle" font-size="10.5">F1</text>
-    <text x="346" y="142" text-anchor="middle" font-size="10.5">F2</text>
-    <text x="398" y="142" text-anchor="middle" font-size="10.5">F3</text>
-    <text x="450" y="142" text-anchor="middle" font-size="10.5" fill="#999">…</text>
-    <line x1="180" y1="125" x2="250" y2="125" stroke="#0b548c" stroke-width="2" marker-end="url(#id4)"/>
-    <rect x="580" y="24" width="270" height="44" rx="9" fill="#eef7f1" stroke="#0f7a57" stroke-width="1.5"/>
-    <text x="715" y="51" text-anchor="middle" font-size="11.5" fill="#0f7a57"><tspan font-weight="bold">担当 1</tspan>: F1 を転送中（接続は使い回し）</text>
-    <rect x="580" y="80" width="270" height="44" rx="9" fill="#eef7f1" stroke="#0f7a57" stroke-width="1.5"/>
-    <text x="715" y="107" text-anchor="middle" font-size="11.5" fill="#0f7a57"><tspan font-weight="bold">担当 2</tspan>: F2 を転送中</text>
-    <rect x="580" y="136" width="270" height="44" rx="9" fill="#fdeeee" stroke="#b3261e" stroke-width="1.5"/>
-    <text x="715" y="163" text-anchor="middle" font-size="11.5" fill="#b3261e"><tspan font-weight="bold">担当 3</tspan>: F3 失敗 → 他の担当は止まらない</text>
-    <rect x="580" y="192" width="270" height="44" rx="9" fill="#eef7f1" stroke="#0f7a57" stroke-width="1.5" stroke-dasharray="5 4"/>
-    <text x="715" y="219" text-anchor="middle" font-size="11.5" fill="#40605a"><tspan font-weight="bold">担当 N</tspan>（最大 16 人まで増員可）</text>
-    <line x1="490" y1="105" x2="580" y2="48" stroke="#0b548c" stroke-width="1.8" marker-end="url(#id4)"/>
-    <line x1="490" y1="120" x2="580" y2="100" stroke="#0b548c" stroke-width="1.8" marker-end="url(#id4)"/>
-    <line x1="490" y1="135" x2="580" y2="156" stroke="#0b548c" stroke-width="1.8" marker-end="url(#id4)"/>
-    <line x1="490" y1="150" x2="580" y2="212" stroke="#0b548c" stroke-width="1.8" marker-end="url(#id4)"/>
-  </g>
-</svg>
-<figcaption>図 10. 並列転送の流れ作業：作る人・待ち行列・担当に分かれ、1 件の失敗が全体を巻き込まない</figcaption>
-</figure>
-<ul>
-  <li><strong>ワーカー隔離</strong> ─ 1 ファイルの失敗が他の転送を巻き込まない（失敗分だけエラー記録）</li>
-  <li><strong>接続の再利用</strong> ─ 1 ファイルごとに繋ぎ直さず接続を使い回し、確立コストを削減</li>
-  <li><strong>宛先ごとに並列数を指定</strong> ─ 速い宛先は多めに、弱い宛先は控えめに、と個別調整</li>
-  <li><strong>宛先間が独立</strong> ─ ある宛先が詰まっても、健全な宛先への送信は止まらない</li>
-</ul>
-
-<h3>二重起動防止</h3>
-<p>「5 分おきに実行」していて前回がまだ終わっていなかったら…? → <strong>ロックファイル（PID 方式）で自動的に防ぎます。</strong></p>
-<figure class="fig">
-<svg viewBox="0 0 880 170" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
-  <g font-size="12.5">
-    <line x1="50" y1="126" x2="850" y2="126" stroke="#5a6b7a" stroke-width="2"/>
-    <circle cx="150" cy="126" r="6" fill="#0f7a57"/>
-    <text x="150" y="154" text-anchor="middle" fill="#3d4c5a">8:00</text>
-    <rect x="70" y="26" width="220" height="56" rx="9" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.6"/>
-    <text x="180" y="48" text-anchor="middle" font-weight="bold" fill="#0f7a57">起動 → ロック取得</text>
-    <text x="180" y="68" text-anchor="middle" font-size="11" fill="#40605a">大きいファイルを転送中…</text>
-    <line x1="150" y1="82" x2="150" y2="120" stroke="#0f7a57" stroke-width="1.5" stroke-dasharray="4 3"/>
-    <circle cx="450" cy="126" r="6" fill="#b3261e"/>
-    <text x="450" y="154" text-anchor="middle" fill="#3d4c5a">8:05</text>
-    <rect x="335" y="26" width="230" height="56" rx="9" fill="#fdeeee" stroke="#b3261e" stroke-width="1.6"/>
-    <text x="450" y="48" text-anchor="middle" font-weight="bold" fill="#b3261e">ロックあり + 前プロセス生存</text>
-    <text x="450" y="68" text-anchor="middle" font-size="11" fill="#b3261e">→ 何もせず終了（終了コード 2）</text>
-    <line x1="450" y1="82" x2="450" y2="120" stroke="#b3261e" stroke-width="1.5" stroke-dasharray="4 3"/>
-    <circle cx="750" cy="126" r="6" fill="#0f7a57"/>
-    <text x="750" y="154" text-anchor="middle" fill="#3d4c5a">8:10</text>
-    <rect x="640" y="26" width="220" height="56" rx="9" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.6"/>
-    <text x="750" y="48" text-anchor="middle" font-weight="bold" fill="#0f7a57">前回が終わっていれば通常実行</text>
-    <text x="750" y="68" text-anchor="middle" font-size="11" fill="#40605a">クラッシュ後のロックも自動処理</text>
-    <line x1="750" y1="82" x2="750" y2="120" stroke="#0f7a57" stroke-width="1.5" stroke-dasharray="4 3"/>
-  </g>
-</svg>
-<figcaption>図 11. 二重起動防止：同じファイルを 2 つのプロセスが同時に送る事故を防ぐ</figcaption>
-</figure>
-<ul>
-  <li>前回が<strong>異常終了（クラッシュ）していた場合は自動で検知してロックを引き継ぐ</strong>ので、運用者がロックファイルを手で消す必要はありません</li>
-</ul>
-
-<h3>ログとメール通知</h3>
-<div class="cards">
-  <div class="card">
-    <h4>📄 ファイルログ</h4>
-    <ul>
-      <li><code>logs/yyyy/MM/</code> 配下に日次で蓄積</li>
-      <li>サイズ上限で自動ローテーション</li>
-      <li><strong>保持日数を指定して自動削除</strong>可能</li>
-      <li>転送結果・統計・エラーを全件記録</li>
-    </ul>
-  </div>
-  <div class="card">
-    <h4>📧 エラーメール通知</h4>
-    <ul>
-      <li>エラー発生時に <strong>SMTP でメール送信</strong></li>
-      <li>宛先は複数指定可能</li>
-      <li>1 回の実行での送信上限あり（大量エラー時にメールが大量送信されるのを防止）</li>
-    </ul>
-  </div>
 </div>
-</section>
 
-<section id="c6">
-<div class="chapter"><div class="num">6</div><h2>導入と移行<span class="sub">使い始めるには・旧ツールからどう切り替えるか</span></h2></div>
-
-<h3>導入はファイル 2 つだけ</h3>
-<p>サーバーに置くのは基本的にこれだけです。</p>
-<pre><code>/opt/ftp-transfer-agent/          ← 任意の配置先
-├─ FtpTransferAgent(.exe)         ← 実行ファイル（自己完結ビルド）
-└─ appsettings.json               ← 設定ファイル</code></pre>
-<ul>
-  <li><strong>自己完結ビルド</strong>なら、サーバーに .NET のインストールは<strong>不要</strong></li>
-  <li>Windows Server / Linux / macOS いずれも可</li>
-  <li>プログラムの修正は不要。<strong>案件ごとの違いは設定ファイルだけ</strong>で吸収</li>
-  <li>将来 .NET 10 のサポートが終了しても、<strong>ターゲットを次期 LTS に変えて再ビルドするだけ</strong>で移行可能 ─ FileTransFTP の .NET Framework 3.5 のような作り直しは不要</li>
-</ul>
-<div class="point">「実行ファイル + 設定 1 枚」というシンプルさが、案件横展開のしやすさにつながっています。</div>
-
-<h3>設定ファイルの読み方（全体像）</h3>
-<p><code>appsettings.json</code> は役割ごとのセクションに分かれています。</p>
-<table>
-<tr><th>セクション</th><th>決めること</th><th>例</th></tr>
-<tr><td><code>Watch</code></td><td><strong>何を</strong>転送するか</td><td>フォルダ、拡張子、END 条件</td></tr>
-<tr><td><code>Transfer</code></td><td><strong>どこへ・どうやって</strong>送るか</td><td>FTP/SFTP、put/get、接続先、並列数</td></tr>
-<tr><td><code>Retry</code></td><td>失敗したら<strong>どう粘るか</strong></td><td>回数、間隔</td></tr>
-<tr><td><code>Hash</code></td><td><strong>どう検証するか</strong></td><td>SHA256 / SHA512</td></tr>
-<tr><td><code>Cleanup</code></td><td>成功後に<strong>消すかどうか</strong></td><td>ローカル削除、リモート削除</td></tr>
-<tr><td><code>Smtp</code></td><td>障害を<strong>誰に知らせるか</strong></td><td>通知先メールアドレス</td></tr>
-<tr><td><code>Logging</code></td><td>記録を<strong>どう残すか</strong></td><td>ログパス、保持日数</td></tr>
-</table>
-
-<h3>設定例: 最小構成（FTP アップロード）</h3>
-<pre><code>{
-  "Watch":    { "Path": "./watch", "AllowedExtensions": [".csv"] },
-  "Transfer": {
-    "Mode": "ftp",  "Direction": "put",
-    "Host": "ftp.example.com", "Port": 21,
-    "Username": "user", "Password": "********",
-    "RemotePath": "/upload"
-  },
-  "Retry":    { "MaxAttempts": 3, "DelaySeconds": 5 },
-  "Hash":     { "Enabled": true, "Algorithm": "SHA256" }
-}</code></pre>
-<div class="note"><code>./watch</code> フォルダの CSV を <code>/upload</code> へ送り、SHA256 で検証。失敗したら 5 秒 → 10 秒 → 20 秒の間隔で 3 回までリトライします。</div>
-
-<h3>設定例: 推奨構成（SFTP + 鍵認証）</h3>
-<pre><code>{
-  "Transfer": {
-    "Mode": "sftp", "Direction": "put",
-    "Host": "sftp.example.com", "Port": 22,
-    "Username": "user",
-    "PrivateKeyPath": "./id_ed25519",
-    "HostKeyFingerprint": "SHA256:ohD8VZEXGWo6Ez8GSEJQ9Wpafg...",
-    "RemotePath": "/in"
-  }
-}</code></pre>
-<p><strong>新規案件はこの形を標準に:</strong></p>
-<ul>
-  <li><code>Mode: sftp</code> … 通信を暗号化</li>
-  <li><code>PrivateKeyPath</code> … パスワードではなく秘密鍵で認証</li>
-  <li><code>HostKeyFingerprint</code> … 接続先が本物のサーバーか検証（なりすまし対策）</li>
-</ul>
-
-<h3>定期実行の設定</h3>
-<p>バッチ型なので、OS のスケジューラに登録して動かします。</p>
-<p><strong>Windows（タスクスケジューラ）</strong></p>
-<pre><code>schtasks /create /tn "FtpTransferAgent" `
-  /tr "C:\opt\FtpTransferAgent\FtpTransferAgent.exe" /sc minute /mo 5</code></pre>
-<p><strong>Linux（cron）─ 5 分おきの例</strong></p>
-<pre><code>*/5 * * * * /opt/ftp-transfer-agent/FtpTransferAgent</code></pre>
-
-<h3>運用時の監視ポイント</h3>
-<p>ジョブ管理基盤からは<strong>終了コード</strong>で成否を判定できます。</p>
-<table>
-<tr><th>終了コード</th><th>意味</th><th>対応</th></tr>
-<tr><td><code>0</code></td><td>全件成功（または対象なし）</td><td>対応不要</td></tr>
-<tr><td><code>1</code></td><td>設定エラー、または転送失敗あり</td><td><strong>ログを確認して原因対応</strong></td></tr>
-<tr><td><code>2</code></td><td>二重起動を検出してスキップ</td><td>頻発するなら実行間隔を見直し</td></tr>
-</table>
-<p>日常の確認はこの 3 点です。</p>
-<ol>
-  <li>ジョブの終了コード（ジョブ管理基盤のアラート）</li>
-  <li>エラー通知メール（Smtp 有効時）</li>
-  <li>ログファイル（<code>logs/yyyy/MM/</code> 配下）</li>
-</ol>
-
-<h3>旧ツールからの移行の進め方（案）</h3>
-<p><strong>転送経路（送り先・ポート・パス）は変えず、動かすツールだけを差し替える</strong>移行です。経路が変わらないので一斉切り替えは不要 ─ <strong>影響の小さい連携から 1 件ずつ、様子を見ながら</strong>広げられます。</p>
+<h3>3.4 複数宛先配信（ファンアウト）</h3>
+<p>1 つのファイルを<strong>メイン宛先と追加宛先のすべてへ同時に送信</strong>できます（put のみ）。宛先ごとにプロトコル・認証・並列数を個別に設定でき、SFTP と FTP の混在も可能です。</p>
 
 <figure class="fig">
-<svg viewBox="0 0 880 160" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
+<svg viewBox="0 0 880 240" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif" role="img" aria-label="ファンアウト構成図">
   <defs>
-    <marker id="ie1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <marker id="f3a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#0b548c"/>
     </marker>
   </defs>
-  <g font-size="12">
-    <rect x="20" y="34" width="188" height="92" rx="10" fill="#eef4fa" stroke="#0b548c" stroke-width="1.6"/>
-    <text x="114" y="62" text-anchor="middle" font-weight="bold" fill="#0b548c">① 対象を選ぶ</text>
-    <text x="114" y="86" text-anchor="middle" font-size="10.5" fill="#4b6478">社内間連携など、止まっても</text>
-    <text x="114" y="103" text-anchor="middle" font-size="10.5" fill="#4b6478">影響が小さいものから</text>
-    <rect x="244" y="34" width="188" height="92" rx="10" fill="#eef4fa" stroke="#0b548c" stroke-width="1.6"/>
-    <text x="338" y="62" text-anchor="middle" font-weight="bold" fill="#0b548c">② 設定を移植する</text>
-    <text x="338" y="86" text-anchor="middle" font-size="10.5" fill="#4b6478">送り先・ポート・パスはそのまま</text>
-    <text x="338" y="103" text-anchor="middle" font-size="10.5" fill="#4b6478">→ 経路は変わらない</text>
-    <rect x="468" y="34" width="188" height="92" rx="10" fill="#eef4fa" stroke="#0b548c" stroke-width="1.6"/>
-    <text x="562" y="62" text-anchor="middle" font-weight="bold" fill="#0b548c">③ 差し替えて様子見</text>
-    <text x="562" y="86" text-anchor="middle" font-size="10.5" fill="#4b6478">起動先を新ツールへ変更し、</text>
-    <text x="562" y="103" text-anchor="middle" font-size="10.5" fill="#4b6478">ログ・終了コードで結果確認</text>
-    <rect x="692" y="34" width="168" height="92" rx="10" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.8"/>
-    <text x="776" y="62" text-anchor="middle" font-weight="bold" fill="#0f7a57">④ 順に広げる</text>
-    <text x="776" y="86" text-anchor="middle" font-size="10.5" fill="#40605a">安定を確認できた連携から</text>
-    <text x="776" y="103" text-anchor="middle" font-size="10.5" fill="#40605a">同じ手順で置き換え</text>
-    <line x1="208" y1="80" x2="244" y2="80" stroke="#0b548c" stroke-width="2" marker-end="url(#ie1)"/>
-    <line x1="432" y1="80" x2="468" y2="80" stroke="#0b548c" stroke-width="2" marker-end="url(#ie1)"/>
-    <line x1="656" y1="80" x2="692" y2="80" stroke="#0b548c" stroke-width="2" marker-end="url(#ie1)"/>
-  </g>
+  <rect x="20" y="88" width="150" height="64" rx="10" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.6"/>
+  <text x="95" y="116" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#7a5a1e">data.csv</text>
+  <text x="95" y="137" text-anchor="middle" font-size="10.5" fill="#8a7a4a">1 ファイル</text>
+
+  <line x1="170" y1="120" x2="228" y2="120" stroke="#0b548c" stroke-width="2.2" marker-end="url(#f3a)"/>
+
+  <rect x="234" y="88" width="172" height="64" rx="10" fill="#f2f8fd" stroke="#0b548c" stroke-width="2"/>
+  <text x="320" y="114" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#0b548c">ファンアウト</text>
+  <text x="320" y="136" text-anchor="middle" font-size="10.5" fill="#4b6478">全宛先へ同時送信</text>
+
+  <line x1="406" y1="112" x2="466" y2="52" stroke="#0f7a57" stroke-width="2" marker-end="url(#f3a)"/>
+  <line x1="406" y1="120" x2="466" y2="120" stroke="#15729e" stroke-width="2" marker-end="url(#f3a)"/>
+  <line x1="406" y1="128" x2="466" y2="190" stroke="#7b5aa6" stroke-width="2" marker-end="url(#f3a)"/>
+
+  <rect x="470" y="22" width="390" height="60" rx="10" fill="#eef7f1" stroke="#0f7a57" stroke-width="1.7"/>
+  <text x="490" y="48" font-size="12.5" font-weight="bold" fill="#0f7a57">熊本拠点サーバー（SFTP・並列 4）</text>
+  <text x="490" y="68" font-size="10.5" fill="#40605a">宛先ごとにプロトコル・認証・並列数を個別に設定できる</text>
+
+  <rect x="470" y="90" width="390" height="60" rx="10" fill="#eef4fa" stroke="#15729e" stroke-width="1.7"/>
+  <text x="490" y="116" font-size="12.5" font-weight="bold" fill="#0b548c">鹿児島拠点サーバー（SFTP・並列 2）</text>
+  <text x="490" y="136" font-size="10.5" fill="#4b6478">回線の弱い宛先は並列数を抑えるなど個別に調整できる</text>
+
+  <rect x="470" y="158" width="390" height="60" rx="10" fill="#f6f1fa" stroke="#7b5aa6" stroke-width="1.7"/>
+  <text x="490" y="184" font-size="12.5" font-weight="bold" fill="#5d4380">バックアップ用共有フォルダ（UNC）</text>
+  <text x="490" y="204" font-size="10.5" fill="#6a5a80">現行 CIFS 連携の置き換え先として、同じ配信に混在させられる</text>
 </svg>
-<figcaption>図 12. 段階的な移行：経路を変えず、動かすツールだけを 1 件ずつ差し替える</figcaption>
+<figcaption>図 3. ファンアウトの構成例。熊本・鹿児島の 2 拠点と社内共有フォルダへ、同じファイルを一斉配信する</figcaption>
 </figure>
 
-<ul>
-  <li>運用モデル（スケジューラ起動のバッチ）は従来と同じなので、<strong>変更は起動コマンドの差し替えが中心</strong></li>
-  <li>まず <strong>FTP のまま</strong>置き換え、<strong>SFTP 化は連携先と調整がついた案件から</strong>（この時だけ経路が変わる）</li>
-</ul>
+<p>一部の宛先だけ失敗した場合は、<strong>どの宛先まで送れたかをファイル単位で記録</strong>し、次回の実行では<strong>まだ送れていない宛先にだけ</strong>送り直します（配信トラッキング）。</p>
 
-<h3>導入前チェックリスト</h3>
-<p>案件を移行する前に、連携先と以下を確認してください。<strong>この 8 項目が決まれば、設定ファイルはほぼ書けます。</strong></p>
-<ul class="check">
-  <li>転送方式は <strong>FTP / SFTP / ローカル（UNC 共有）のどれか</strong>（外部連携は SFTP 推奨。旧 CIFS 用途はローカル/UNC 宛先で代替）</li>
-  <li>認証は<strong>パスワードか秘密鍵か</strong></li>
-  <li>転送方向は <strong>put か get か</strong></li>
-  <li>対象ファイルの<strong>命名規則・拡張子</strong></li>
-  <li><strong>END ファイル運用</strong>の有無（拡張子は何か、誰が消すか）</li>
-  <li>転送成功後に<strong>元ファイルを消すか残すか</strong></li>
-  <li><strong>実行間隔</strong>（何分おきか、業務時間帯の制約）</li>
-  <li>障害時の<strong>通知先メールアドレス</strong></li>
-</ul>
-</section>
-
-<section id="c7">
-<div class="chapter"><div class="num">7</div><h2>注意点とまとめ</h2></div>
-
-<h3>注意①: 同名ファイルの上書き衝突</h3>
-<p><strong>唯一の「事故りやすい設定」</strong>なので必ず押さえてください。</p>
 <figure class="fig">
-<svg viewBox="0 0 880 190" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
+<svg viewBox="0 0 880 250" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif" role="img" aria-label="配信トラッキング図">
   <defs>
-    <marker id="if1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+    <marker id="f4a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0f7a57"/>
+    </marker>
+    <marker id="f4b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0 0 L10 5 L0 10 z" fill="#b3261e"/>
     </marker>
   </defs>
-  <g font-size="12.5">
-    <text x="200" y="34" text-anchor="middle" font-size="12" fill="#b35c12" font-weight="bold">IncludeSubfolders: true + PreserveFolderStructure: false</text>
-    <rect x="60" y="52" width="230" height="42" rx="8" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.5"/>
-    <text x="175" y="78" text-anchor="middle">watch/<tspan font-weight="bold">A</tspan>/result.csv</text>
-    <rect x="60" y="120" width="230" height="42" rx="8" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.5"/>
-    <text x="175" y="146" text-anchor="middle">watch/<tspan font-weight="bold">B</tspan>/result.csv</text>
-    <rect x="500" y="86" width="250" height="48" rx="8" fill="#fdeeee" stroke="#b3261e" stroke-width="1.8"/>
-    <text x="625" y="106" text-anchor="middle" font-weight="bold" fill="#b3261e">/remote/result.csv</text>
-    <text x="625" y="124" text-anchor="middle" font-size="11" fill="#b3261e">← 後勝ちで上書き!</text>
-    <line x1="290" y1="73" x2="500" y2="102" stroke="#b3261e" stroke-width="2" marker-end="url(#if1)"/>
-    <line x1="290" y1="141" x2="500" y2="118" stroke="#b3261e" stroke-width="2" marker-end="url(#if1)"/>
-    <text x="810" y="105" text-anchor="middle" font-size="11" fill="#5a6b7a">起動時に</text>
-    <text x="810" y="122" text-anchor="middle" font-size="11" fill="#5a6b7a">エラーで検出</text>
-  </g>
-</svg>
-<figcaption>図 13. 危険な組み合わせ：フォルダ構造を保たずにサブフォルダを対象にすると、同名ファイルが衝突する</figcaption>
-</figure>
-<p><strong>対策（どちらか）</strong></p>
-<ul>
-  <li><code>PreserveFolderStructure: true</code> にしてフォルダ構造ごと転送する（推奨）</li>
-  <li>全ファイルで名前が重複しない命名規約にする</li>
-</ul>
-<div class="note">この組み合わせは起動時の設定チェックで検出され、実行前に止まります。</div>
 
-<h3>注意②: 向いていない用途</h3>
-<p>FtpTransferAgent は万能ではありません。以下は<strong>別の手段</strong>を検討してください。</p>
+  <rect x="14" y="14" width="420" height="222" rx="12" fill="#f7fafd" stroke="#0b548c" stroke-width="1.7"/>
+  <text x="224" y="42" text-anchor="middle" font-size="13" font-weight="bold" fill="#0b548c">今回 ─ 鹿児島がメンテナンス中で失敗</text>
+  <rect x="34" y="70" width="112" height="40" rx="8" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.4"/>
+  <text x="90" y="95" text-anchor="middle" font-size="11.5" fill="#7a5a1e">data.csv</text>
+  <line x1="146" y1="83" x2="204" y2="76" stroke="#0f7a57" stroke-width="1.8" marker-end="url(#f4a)"/>
+  <line x1="146" y1="97" x2="204" y2="114" stroke="#b3261e" stroke-width="1.8" marker-end="url(#f4b)"/>
+  <rect x="206" y="62" width="212" height="30" rx="7" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.4"/>
+  <text x="312" y="82" text-anchor="middle" font-size="11.5" fill="#0f7a57">熊本 ─ 配信成功</text>
+  <rect x="206" y="102" width="212" height="30" rx="7" fill="#fdeeee" stroke="#b3261e" stroke-width="1.4"/>
+  <text x="312" y="122" text-anchor="middle" font-size="11.5" fill="#b3261e">鹿児島 ─ 接続できず失敗</text>
+  <rect x="34" y="152" width="384" height="66" rx="8" fill="#e6f0f8" stroke="#15729e" stroke-width="1.4"/>
+  <text x="226" y="178" text-anchor="middle" font-size="11" fill="#0b548c">「熊本へは配信済み」を指紋付きで記録し、</text>
+  <text x="226" y="200" text-anchor="middle" font-size="11" fill="#0b548c">data.csv は再送用フォルダへ退避する（削除しない）</text>
+
+  <rect x="446" y="14" width="420" height="222" rx="12" fill="#f7fafd" stroke="#0b548c" stroke-width="1.7"/>
+  <text x="656" y="42" text-anchor="middle" font-size="13" font-weight="bold" fill="#0b548c">次回 ─ 鹿児島にだけ送り直す</text>
+  <rect x="466" y="70" width="112" height="40" rx="8" fill="#fff8ec" stroke="#c9a35a" stroke-width="1.4"/>
+  <text x="522" y="95" text-anchor="middle" font-size="11.5" fill="#7a5a1e">data.csv</text>
+  <line x1="578" y1="83" x2="636" y2="76" stroke="#8a97a4" stroke-width="1.6" stroke-dasharray="5 3"/>
+  <line x1="578" y1="97" x2="636" y2="114" stroke="#0f7a57" stroke-width="1.8" marker-end="url(#f4a)"/>
+  <rect x="638" y="62" width="212" height="30" rx="7" fill="#f0f2f5" stroke="#8a97a4" stroke-width="1.4" stroke-dasharray="5 3"/>
+  <text x="744" y="82" text-anchor="middle" font-size="11.5" fill="#5a6b7a">熊本 ─ 送らない（配信済み）</text>
+  <rect x="638" y="102" width="212" height="30" rx="7" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.4"/>
+  <text x="744" y="122" text-anchor="middle" font-size="11.5" fill="#0f7a57">鹿児島 ─ 復旧後に再送成功</text>
+  <rect x="466" y="152" width="384" height="66" rx="8" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.4"/>
+  <text x="658" y="178" text-anchor="middle" font-size="11" fill="#0f7a57">全宛先そろった時点で完了とし、設定に応じて</text>
+  <text x="658" y="200" text-anchor="middle" font-size="11" fill="#0f7a57">ローカル削除、または元の場所へ復元する</text>
+</svg>
+<figcaption>図 4. 配信トラッキング。1 拠点が落ちても他拠点へ二重送信せず、復旧後にその拠点だけへ送り直す</figcaption>
+</figure>
+
+<ul>
+  <li><strong>全宛先に成功したときだけ</strong>元ファイルを削除する。1 つでも失敗したら削除せず残す</li>
+  <li>配信済みの宛先へは<strong>二重配信しない</strong></li>
+  <li>送信後に元ファイルが差し替わった場合は<strong>指紋（サイズ + 更新時刻、またはハッシュ）で検知</strong>し、全宛先へ送り直す</li>
+  <li>この記録は<strong>部分失敗したときだけ</strong>作成されるため、全宛先成功時の追加コストは発生しない</li>
+  <li>同じ接続先・同じパスへ重複して送る誤設定は<strong>起動時に警告</strong>する</li>
+</ul>
+<div class="note">サーバー移設時に、新旧サーバーへ一時的に二重送信したい場合にも利用できます。</div>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="c4">
+<div class="chapter"><div class="num">4</div><h2>信頼性・セキュリティ仕様<span class="sub">「確実に届いた」をどう担保するか</span></h2></div>
+
+<h3>4.1 転送の確実性</h3>
+<figure class="fig">
+<svg viewBox="0 0 880 200" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif" role="img" aria-label="一時名転送とハッシュ検証の図">
+  <defs>
+    <marker id="f5a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0b548c"/>
+    </marker>
+    <marker id="f5b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#0f7a57"/>
+    </marker>
+    <marker id="f5c" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#b3261e"/>
+    </marker>
+  </defs>
+
+  <rect x="16" y="58" width="216" height="84" rx="10" fill="#fdf3e7" stroke="#b35c12" stroke-width="1.6"/>
+  <text x="124" y="86" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#b35c12">① 一時名で転送</text>
+  <text x="124" y="108" text-anchor="middle" font-size="10.5" fill="#9a6b3a">/remote/data.csv.tmp_x7f3</text>
+  <text x="124" y="128" text-anchor="middle" font-size="10.5" fill="#9a6b3a">相手のバッチが拾わない名前</text>
+
+  <line x1="232" y1="100" x2="278" y2="100" stroke="#0b548c" stroke-width="2.2" marker-end="url(#f5a)"/>
+
+  <rect x="282" y="58" width="200" height="84" rx="10" fill="#f2f8fd" stroke="#0b548c" stroke-width="1.8"/>
+  <text x="382" y="86" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#0b548c">② ハッシュ照合</text>
+  <text x="382" y="108" text-anchor="middle" font-size="10.5" fill="#4b6478">送信元と送信先の内容から</text>
+  <text x="382" y="128" text-anchor="middle" font-size="10.5" fill="#4b6478">SHA256 を計算して突き合わせ</text>
+
+  <line x1="482" y1="92" x2="552" y2="50" stroke="#0f7a57" stroke-width="2.2" marker-end="url(#f5b)"/>
+  <line x1="482" y1="108" x2="552" y2="150" stroke="#b3261e" stroke-width="2.2" marker-end="url(#f5c)"/>
+
+  <rect x="556" y="18" width="304" height="64" rx="10" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.7"/>
+  <text x="576" y="44" font-size="12.5" font-weight="bold" fill="#0f7a57">③ 一致 → 正式名にリネーム</text>
+  <text x="576" y="64" font-size="10.5" fill="#40605a">この瞬間に初めて /remote/data.csv が現れる</text>
+
+  <rect x="556" y="118" width="304" height="64" rx="10" fill="#fdeeee" stroke="#b3261e" stroke-width="1.7"/>
+  <text x="576" y="144" font-size="12.5" font-weight="bold" fill="#b3261e">③′ 不一致 → 失敗として記録</text>
+  <text x="576" y="164" font-size="10.5" fill="#b3261e">元ファイルは削除せず、再試行とメール通知を行う</text>
+</svg>
+<figcaption>図 5. 一時名転送とハッシュ検証。「半分だけ書かれた data.csv」が相手側に現れることはない</figcaption>
+</figure>
+
+<div class="tablewrap">
 <table>
-<tr><th>用途</th><th>理由 / 代替</th></tr>
-<tr><td>リアルタイム同期（秒単位）</td><td>バッチ型のため。→ 常駐型の同期ツール</td></tr>
-<tr><td>双方向同期・競合解決</td><td>一方向転送が前提。→ 専用同期製品</td></tr>
-<tr><td>人が画面で操作する転送</td><td>CLI ツールのため。→ WinSCP 等の GUI</td></tr>
-<tr><td>HTTP/API でのデータ連携</td><td>FTP/SFTP 専用。→ API 連携基盤</td></tr>
+<thead><tr><th style="width:150px">仕組み</th><th>仕様</th></tr></thead>
+<tr><td><strong>一時名 → リネーム</strong></td><td>転送中は一時ファイル名を使い、完了後に正式名へリネームする。リネームは一瞬で完了するため、書きかけのファイルを相手のバッチが取り込む事故が構造的に起きない</td></tr>
+<tr><td><strong>ハッシュ検証</strong></td><td>SHA256 ／ SHA512 で内容の同一性を確認する（MD5 は安全性の理由で選択不可）。不一致ならそのファイルは<strong>失敗扱い</strong>とし、成功後の削除は行わない</td></tr>
+<tr><td><strong>自動再試行</strong></td><td>ネットワーク瞬断・タイムアウト等の<strong>一時的なエラーのみ</strong>再試行する（既定 3 回、5 秒 → 10 秒 → 20 秒の指数バックオフ）</td></tr>
+<tr><td><strong>再試行しない判定</strong></td><td>認証失敗・設定不備など<strong>待っても直らないエラーは即座に失敗</strong>とする。相手側のアカウントロックを誘発しない</td></tr>
+<tr><td><strong>ワーカー隔離</strong></td><td>並列転送中に 1 件が失敗しても、他のファイル・他の宛先の転送は継続する</td></tr>
 </table>
-<div class="point">「<strong>フォルダに置かれたファイルを、決まった相手に、定期的に、確実に送る</strong>」という用途に特化したツールです。</div>
+</div>
+
+<h3>4.2 セキュリティ仕様</h3>
+<div class="tablewrap">
+<table>
+<thead><tr><th style="width:150px">項目</th><th>仕様</th></tr></thead>
+<tr><td>通信の暗号化</td><td>SFTP（SSH ベース）に対応。<strong>社内標準は SFTP</strong>とする</td></tr>
+<tr><td>認証方式</td><td>パスワード認証に加え、<strong>秘密鍵認証</strong>に対応</td></tr>
+<tr><td>接続先の検証</td><td><strong>ホスト鍵指紋の照合</strong>により、なりすましサーバーへの送信を防止する</td></tr>
+<tr><td>パス安全性</td><td>不正なパス指定による指定フォルダ外への読み書き（パストラバーサル）を防止する</td></tr>
+<tr><td>起動時の警告</td><td>平文 FTP の使用時、ホスト鍵検証を省略した場合などに警告を出力する</td></tr>
+<tr><td>資格情報の管理</td><td>設定ファイルへの直書きではなく、環境変数による上書きを推奨する</td></tr>
+</table>
+</div>
+
+<div class="tip">FTP も引き続き利用できますが（既存連携の移行のため）、<strong>新規・更改案件は「SFTP + 鍵認証 + ホスト鍵検証」を標準</strong>とすることをご提案します。</div>
+
+<div class="point"><span class="badge">確認事項 3</span>ハッシュ検証まで通過したものだけを成功とみなす判定基準でよろしいでしょうか。<br>
+<span class="badge">確認事項 4</span>新規・更改案件のセキュリティ標準を「SFTP + 鍵認証 + ホスト鍵検証」としてよろしいでしょうか。</div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="c5">
+<div class="chapter"><div class="num">5</div><h2>運用仕様<span class="sub">どう動かし、どう監視するか</span></h2></div>
+
+<h3>5.1 実行方式</h3>
+<p>常駐せず、<strong>起動 → 処理 → 終了</strong>を毎回繰り返すバッチ型です。定期実行は OS のスケジューラに任せます。</p>
+<pre><code># Windows（タスクスケジューラ・5 分間隔）
+schtasks /create /tn "FtpTransferAgent" /sc minute /mo 5 ^
+  /tr "C:\opt\FtpTransferAgent\FtpTransferAgent.exe"
+
+# Linux（cron・5 分間隔）
+*/5 * * * * /opt/ftp-transfer-agent/FtpTransferAgent</code></pre>
+<ul>
+  <li>プロセスが残らないため、メモリリークや「いつの間にか停止していた」が起きにくい</li>
+  <li>既存のジョブ管理基盤（JP1 / タスクスケジューラ / cron）にそのまま載せられる</li>
+  <li>前回の実行が終わっていなければ<strong>二重起動を防止</strong>し、何もせず終了コード 2 で終了する</li>
+</ul>
+
+<h3>5.2 監視方法</h3>
+<p>ジョブ管理基盤からは<strong>終了コード</strong>で成否を判定します。</p>
+<div class="tablewrap">
+<table>
+<thead><tr><th style="width:110px">終了コード</th><th>意味</th><th>運用対応</th></tr></thead>
+<tr><td><code>0</code></td><td>全件成功（対象ファイルなしを含む）</td><td>対応不要</td></tr>
+<tr><td><code>1</code></td><td>設定エラー、または 1 件以上の転送失敗</td><td><strong>ログを確認して原因に対応する</strong></td></tr>
+<tr><td><code>2</code></td><td>二重起動を検出してスキップ</td><td>頻発する場合は実行間隔を見直す</td></tr>
+</table>
+</div>
+<p>日常の確認は次の 3 点です。</p>
+<ol>
+  <li>ジョブの終了コード（ジョブ管理基盤のアラート）</li>
+  <li>エラー通知メール（SMTP 有効時）</li>
+  <li>ログファイル（<code>logs/yyyy/MM/</code> 配下）</li>
+</ol>
+
+<h3>5.3 移行時に連携先と確認する項目</h3>
+<p>案件を移行する際は、以下の 8 項目を確認します。これらが決まれば設定ファイルは作成できます。</p>
+<ul class="check">
+  <li>転送方式（FTP / SFTP / ローカル・UNC 共有のいずれか。外部連携は SFTP 推奨）</li>
+  <li>認証方式（パスワード / 秘密鍵）</li>
+  <li>転送方向（put / get）</li>
+  <li>対象ファイルの命名規則・拡張子</li>
+  <li>END ファイル運用の有無（拡張子、削除の担当）</li>
+  <li>転送成功後に元ファイルを削除するか保持するか</li>
+  <li>実行間隔（何分間隔か、業務時間帯の制約）</li>
+  <li>障害時の通知先メールアドレス</li>
+</ul>
+
+<div class="point"><span class="badge">確認事項 3（再掲）</span>終了コードによる監視方式でよろしいでしょうか。既存のジョブ管理基盤の設定変更が必要になります。</div>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="c6">
+<div class="chapter"><div class="num">6</div><h2>制約・リスクと対応方針<span class="sub">あらかじめ認識しておく事項</span></h2></div>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th style="width:180px">項目</th><th>内容</th><th style="width:34%">対応方針</th></tr></thead>
+<tr>
+  <td><strong>同名ファイルの上書き衝突</strong></td>
+  <td>サブフォルダを対象にしつつフォルダ構造を維持しない設定にすると、<code>A/result.csv</code> と <code>B/result.csv</code> が同じ宛先パスに集まり上書きされる</td>
+  <td><strong>起動時の設定チェックでエラーとして検出し、実行前に停止する。</strong>フォルダ構造を維持する設定を標準とする</td>
+</tr>
+<tr>
+  <td><strong>平文 FTP の残存</strong></td>
+  <td>移行初期は既存連携が FTP のまま残る</td>
+  <td>まずツールのみ差し替え、<strong>SFTP 化は連携先と調整のついた案件から順次実施</strong>する</td>
+</tr>
+<tr>
+  <td><strong>リアルタイム性</strong></td>
+  <td>バッチ型のため、実行間隔より短い遅延では届かない</td>
+  <td>実行間隔を業務要件に合わせて設定する（分単位まで短縮可能）</td>
+</tr>
+<tr>
+  <td><strong>資格情報の管理</strong></td>
+  <td>設定ファイルにパスワードを直書きすると、ファイルの取り扱いが機微になる</td>
+  <td>環境変数による上書き、または鍵認証への切り替えを推奨する</td>
+</tr>
+<tr>
+  <td><strong>技術基盤の更新</strong></td>
+  <td>.NET 10 も将来はサポートが終了する</td>
+  <td><strong>次期 LTS を対象に再ビルドするだけで移行できる。</strong>現行ツールのような作り直しは発生しない</td>
+</tr>
+</table>
+</div>
 
 <h3>品質面の裏付け</h3>
 <ul>
-  <li><strong>自動テストを完備</strong>: 単体テストに加え、<strong>実際の FTP / SFTP サーバーを立てた統合テスト</strong>（本体を通したエンドツーエンド検証）</li>
-  <li>ネットワーク障害・ファイルロック・<strong>並列実行・複数宛先配信</strong>などの<strong>異常系テスト</strong>を含む</li>
-  <li>CI（GitHub Actions）で<strong>全テスト + コード整形チェック</strong>を毎回実行</li>
-  <li>実績ある OSS ライブラリを採用（FluentFTP / SSH.NET / Polly）</li>
+  <li>単体テストに加え、<strong>実際の FTP / SFTP サーバーを立てた統合テスト</strong>（本体を通したエンドツーエンド検証）を実施している</li>
+  <li>ネットワーク障害・ファイルロック・並列実行・複数宛先配信などの<strong>異常系テスト</strong>を含む</li>
+  <li>CI（GitHub Actions）で<strong>全テストとコード整形チェック</strong>を毎回実行している</li>
+  <li>転送処理には実績のある OSS ライブラリ（FluentFTP / SSH.NET / Polly）を採用している</li>
 </ul>
-
-<h3>まとめ</h3>
-<div class="lede"><strong>FtpTransferAgent は、レガシー化した既存ツール FileTransFTP の後継です。</strong></div>
-<ul>
-  <li>置き換えの最大の動機は <strong>SFTP 対応</strong>（セキュリティ・連携先要件への対応）</li>
-  <li>単なる移植ではなく、<strong>検証・リトライ・完了判定・証跡</strong>も併せて強化</li>
-  <li>運用モデル（スケジューラ起動のバッチ）は従来と同じなので、<strong>移行の負担は小さい</strong></li>
-  <li><strong>設定ファイル 1 枚</strong>で案件ごとの違いを吸収 → 段階的な置き換えがしやすい</li>
-</ul>
-<p><strong>移行で押さえる 3 点</strong></p>
-<ol>
-  <li>案件単位の<strong>段階的置き換え</strong>（並行稼働 → 突き合わせ → 切り替え）</li>
-  <li>新規・更改案件は <strong>SFTP + 鍵認証 + ホスト鍵検証</strong>を標準にする</li>
-  <li>移行前チェックリスト 8 項目を連携先と握る</li>
-</ol>
-<div class="tip">導入相談・設定レビューは開発チームまでお気軽にどうぞ。詳細な仕様は <a href="spec.html">詳細仕様書</a>、手順は <a href="user-guide.html">ユーザーガイド</a> にまとまっています。</div>
 </section>
 
-<section id="apx">
-<div class="chapter"><div class="num">A</div><h2>付録<span class="sub">主要設定リファレンス（抜粋）・用語集</span></h2></div>
+<!-- ============ 7 ============ -->
+<section id="c7">
+<div class="chapter"><div class="num">7</div><h2>導入スケジュール（案）<span class="sub">承認から全案件移行までの計画</span></h2></div>
 
-<h3>付録 A: 主要設定リファレンス（抜粋）</h3>
+<p>影響の小さい連携を<strong>パイロット</strong>として先行移行し、安定を確認したうえで残りの案件へ展開します。日程は<strong>ご承認をいただいた日を起点</strong>として調整可能です。</p>
+
+<div id="schedule-gantt" class="gantt"></div>
+<div class="tablewrap" id="schedule-table"></div>
+<noscript><div class="warn">スケジュールの表とチャートは JavaScript で描画しています。表示されない場合はブラウザで JavaScript を有効にしてください。</div></noscript>
+
+<div class="note">日程は下表のフェーズ単位でずらせます。<strong>開始日と各フェーズの週数を変更すれば、表とチャートの日付は自動で再計算されます</strong>（この HTML ファイル末尾の <code>SCHEDULE</code> にある数値のみを書き換えてください）。</div>
+
+<h3>体制</h3>
+<div class="tablewrap">
 <table>
-<tr><th>設定</th><th>既定値</th><th>説明</th></tr>
-<tr><td><code>Watch.Path</code></td><td>（必須）</td><td>監視/保存フォルダ</td></tr>
-<tr><td><code>Watch.AllowedExtensions</code></td><td><code>[]</code></td><td>対象フィルタ。<code>*.txt</code> 等のワイルドカード可</td></tr>
-<tr><td><code>Transfer.Mode</code> / <code>Direction</code></td><td><code>ftp</code> / <code>put</code></td><td>プロトコルと転送方向</td></tr>
-<tr><td><code>Transfer.Concurrency</code></td><td><code>1</code></td><td>並列転送数（1〜16）。宛先ごとに個別指定可</td></tr>
-<tr><td><code>Transfer.AdditionalDestinations</code></td><td><code>[]</code></td><td>複数宛先配信の追加宛先（put）。各宛先に一意な <code>Name</code> が必要</td></tr>
-<tr><td><code>Transfer.TimeoutSeconds</code></td><td><code>120</code></td><td>接続・転送タイムアウト</td></tr>
-<tr><td><code>Retry.MaxAttempts</code> / <code>DelaySeconds</code></td><td><code>3</code> / <code>5</code></td><td>リトライ回数と初回間隔</td></tr>
-<tr><td><code>Hash.Algorithm</code></td><td><code>SHA256</code></td><td><code>SHA256</code> / <code>SHA512</code>（MD5 不可）</td></tr>
-<tr><td><code>Cleanup.DeleteAfterVerify</code></td><td><code>true</code></td><td>put 成功後にローカル削除</td></tr>
-<tr><td><code>Logging.Retention.RetentionDays</code></td><td><code>30</code></td><td>ログ保持日数（有効化時）</td></tr>
+<thead><tr><th style="width:150px">役割</th><th>担当</th><th>主な作業</th></tr></thead>
+<tr><td>方針承認</td><td>部門長</td><td>本資料の承認、移行対象案件の優先順位決定</td></tr>
+<tr><td>ツール提供・支援</td><td>開発チーム</td><td>ビルド配布、設定レビュー、不具合対応</td></tr>
+<tr><td>案件ごとの設定</td><td>案件担当 SE</td><td>連携先との確認、設定ファイル作成、切り替え作業</td></tr>
+<tr><td>運用・監視</td><td>運用担当</td><td>ジョブ登録、稼働監視、障害一次対応</td></tr>
 </table>
-<p>詳細は<a href="user-guide.html#ref">ユーザーガイドの設定リファレンス</a>を参照してください。</p>
+</div>
 
-<h3>付録 B: 用語集</h3>
+<div class="point"><span class="badge">確認事項 5</span>上記の日程および体制でよろしいでしょうか。開始日が変わる場合は、全フェーズを同じ日数だけ後ろ倒しします。</div>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="c8">
+<div class="chapter"><div class="num">8</div><h2>確認事項チェックリスト<span class="sub">ご承認をお願いしたい 5 項目</span></h2></div>
+
+<div class="tablewrap">
 <table>
-<tr><th>用語</th><th>意味</th></tr>
-<tr><td><strong>FTP / SFTP</strong></td><td>ファイル転送の通信方式。SFTP は暗号化あり（SSH ベース）で安全</td></tr>
-<tr><td><strong>CIFS</strong></td><td>Windows のファイル共有プロトコル（SMB）。主に社内 LAN 向けで、外部連携や暗号化用途には不向き</td></tr>
-<tr><td><strong>put / get</strong></td><td>put = こちらから送る（アップロード）、get = 取りに行く（ダウンロード）</td></tr>
-<tr><td><strong>ハッシュ値</strong></td><td>ファイル内容から計算される「指紋」。1 ビットでも違えば値が変わる</td></tr>
+<thead><tr><th style="width:44px">No.</th><th style="width:150px">確認事項</th><th>内容</th><th style="width:96px;white-space:nowrap">該当章</th></tr></thead>
+<tr><td>1</td><td><strong>置き換え方針</strong></td><td>現行 FileTransFTP を廃止し、FtpTransferAgent へ順次移行する。転送経路は変更せず、ツールのみ差し替える</td><td><a href="#c1">1 章</a></td></tr>
+<tr><td>2</td><td><strong>適用範囲</strong></td><td>定時ファイル連携を対象とし、リアルタイム同期・双方向同期・GUI 操作・API 連携は対象外とする</td><td><a href="#c2">2 章</a></td></tr>
+<tr><td>3</td><td><strong>成功判定と監視</strong></td><td>ハッシュ検証を通過したものだけを成功とし、終了コード 0 / 1 / 2 でジョブ管理基盤から監視する</td><td style="white-space:nowrap"><a href="#c4">4 章</a>・<a href="#c5">5 章</a></td></tr>
+<tr><td>4</td><td><strong>セキュリティ標準</strong></td><td>新規・更改案件は SFTP + 鍵認証 + ホスト鍵検証を標準とする。既存 FTP 連携は移行後に順次 SFTP 化する</td><td><a href="#c4">4 章</a></td></tr>
+<tr><td>5</td><td><strong>スケジュールと体制</strong></td><td>7 章の日程・担当で進める。開始日が変わる場合は全体を後ろ倒しする</td><td><a href="#c7">7 章</a></td></tr>
+</table>
+</div>
+
+<h3>ご確認後のお願い</h3>
+<ol>
+  <li>上記 5 項目について、ご承認または修正のご指示をお願いします</li>
+  <li>ご承認後、<strong>パイロット対象とする連携（1 件）</strong>をご指定ください</li>
+  <li>移行対象案件の優先順位について、ご意向があればご共有ください</li>
+</ol>
+<div class="tip">仕様の詳細は<a href="spec.html">詳細仕様書</a>、導入・運用手順は<a href="user-guide.html">ユーザーガイド</a>に記載しています。ご不明点は開発チームまでお問い合わせください。</div>
+</section>
+
+<!-- ============ 付録 ============ -->
+<section id="apx">
+<div class="chapter"><div class="num">A</div><h2>付録<span class="sub">主要設定と用語</span></h2></div>
+
+<h3>付録 A. 主要設定（抜粋）</h3>
+<div class="tablewrap">
+<table>
+<thead><tr><th style="width:36%">設定</th><th style="width:90px">既定値</th><th>説明</th></tr></thead>
+<tr><td><code>Watch.Path</code></td><td>必須</td><td>監視・保存フォルダ</td></tr>
+<tr><td><code>Watch.AllowedExtensions</code></td><td><code>[]</code></td><td>対象ファイルのフィルタ。<code>*.csv</code> 等のワイルドカード指定可</td></tr>
+<tr><td><code>Transfer.Mode</code> ／ <code>Direction</code></td><td><code>ftp</code> ／ <code>put</code></td><td>プロトコルと転送方向</td></tr>
+<tr><td><code>Transfer.Concurrency</code></td><td><code>1</code></td><td>並列転送数（1〜16）。宛先ごとに個別指定可</td></tr>
+<tr><td><code>Transfer.AdditionalDestinations</code></td><td><code>[]</code></td><td>複数宛先配信の追加宛先（put のみ）。各宛先に一意な <code>Name</code> が必要</td></tr>
+<tr><td><code>Transfer.TimeoutSeconds</code></td><td><code>120</code></td><td>接続・転送のタイムアウト（秒）</td></tr>
+<tr><td><code>Retry.MaxAttempts</code> ／ <code>DelaySeconds</code></td><td><code>3</code> ／ <code>5</code></td><td>再試行回数と初回待機秒（指数バックオフの基準）</td></tr>
+<tr><td><code>Hash.Algorithm</code></td><td><code>SHA256</code></td><td><code>SHA256</code> ／ <code>SHA512</code>（MD5 は選択不可）</td></tr>
+<tr><td><code>Cleanup.DeleteAfterVerify</code></td><td><code>true</code></td><td>put 成功後にローカルファイルを削除（複数宛先では全宛先成功後）</td></tr>
+<tr><td><code>Logging.Retention.RetentionDays</code></td><td><code>30</code></td><td>ログの保持日数（保持機能を有効化した場合）</td></tr>
+</table>
+</div>
+<p>全項目は<a href="user-guide.html#ref">ユーザーガイドの設定リファレンス</a>を参照してください。</p>
+
+<h3>付録 B. 用語</h3>
+<div class="tablewrap">
+<table>
+<thead><tr><th style="width:180px">用語</th><th>意味</th></tr></thead>
+<tr><td><strong>FTP / SFTP</strong></td><td>ファイル転送の通信方式。SFTP は SSH ベースで通信が暗号化される</td></tr>
+<tr><td><strong>CIFS / SMB</strong></td><td>Windows のファイル共有プロトコル。社内 LAN 向けで、外部連携には不向き</td></tr>
+<tr><td><strong>put / get</strong></td><td>put はこちらから送る（送信）、get は取りに行く（受信）</td></tr>
+<tr><td><strong>ハッシュ値</strong></td><td>ファイル内容から計算される「指紋」。1 ビットでも異なれば値が変わる</td></tr>
 <tr><td><strong>END ファイル</strong></td><td>「データを置き終わった」ことを示す目印ファイル。トリガーファイルとも呼ぶ</td></tr>
 <tr><td><strong>ファンアウト</strong></td><td>1 つのファイルを複数の宛先へ同時に配信すること（put のみ）</td></tr>
-<tr><td><strong>配信トラッキング</strong></td><td>複数宛先配信で「どのファイルをどの宛先まで送れたか」を記録し、未配信の宛先だけ再送する仕組み</td></tr>
-<tr><td><strong>並列転送 / Concurrency</strong></td><td>複数ファイルを同時に処理する数（1〜16）。1 件の失敗は他に波及しない（ワーカー隔離）</td></tr>
-<tr><td><strong>指数バックオフ</strong></td><td>リトライ間隔を 5 秒 → 10 秒 → 20 秒のように倍々に広げる方式</td></tr>
+<tr><td><strong>配信トラッキング</strong></td><td>どのファイルをどの宛先まで送れたかを記録し、未配信の宛先だけへ再送する仕組み</td></tr>
+<tr><td><strong>指数バックオフ</strong></td><td>再試行の間隔を 5 秒 → 10 秒 → 20 秒のように倍々に広げる方式</td></tr>
 <tr><td><strong>バッチ型</strong></td><td>常駐せず、起動のたびに 1 回処理して終了する動作モデル</td></tr>
-<tr><td><strong>終了コード</strong></td><td>プログラムが終了時に返す数値。0 = 正常、それ以外 = 異常</td></tr>
-<tr><td><strong>ロックファイル</strong></td><td>「実行中」の目印ファイル。二重起動の防止に使う</td></tr>
-<tr><td><strong>.NET Framework / .NET 10</strong></td><td>アプリの実行基盤。Framework 3.5 は Windows 専用のレガシー。.NET 10 はクロスプラットフォームの現行 LTS（2028 年まで）で、次期 LTS への移行も再ビルドで済む</td></tr>
-<tr><td><strong>単一ファイル（self-contained）</strong></td><td>ランタイムを同梱して 1 つの実行ファイルにまとめた配布形態。サーバーに .NET を入れなくても動く</td></tr>
+<tr><td><strong>終了コード</strong></td><td>プログラムが終了時に返す数値。0 は正常、それ以外は異常</td></tr>
+<tr><td><strong>自己完結ビルド</strong></td><td>実行環境（ランタイム）を同梱した配布形態。サーバーに .NET を導入せずに動作する</td></tr>
 </table>
+</div>
 </section>
 
 </main>
-<footer>FtpTransferAgent 社内説明資料 ・ 社内利用限定 ・ 2026-07-06</footer>
+<footer>FtpTransferAgent 仕様確認資料 ・ 社内利用限定 ・ 第 1.0 版（2026-08-05）</footer>
+
+<script>
+/* =======================================================================
+   導入スケジュール設定
+   -----------------------------------------------------------------------
+   ★ 日程を変えるときは、以下の「数値」だけを書き換えてください。
+      表とガントチャートの日付は自動で再計算されます。
+
+      startYear / startMonth / startDay … 全体の開始日（週の初め＝月曜を推奨）
+      offset … 開始日から数えて「何週目」に始めるか（0 = 開始週）
+      weeks  … そのフェーズにかける「週数」
+
+      例）全体を 2 週間後ろ倒しする → startDay を 14 増やす
+          移行期間を延ばす         → 該当フェーズの weeks を増やし、
+                                     それ以降のフェーズの offset を同じ数だけ増やす
+   ======================================================================= */
+const SCHEDULE = {
+  startYear: 2026,
+  startMonth: 9,
+  startDay: 7,
+  phases: [
+    { name: "仕様確認・承認",         offset:  0, weeks: 2, owner: "部門長 / 開発チーム", exit: "本資料の承認、パイロット対象の決定" },
+    { name: "検証環境での動作確認",   offset:  2, weeks: 2, owner: "開発チーム",         exit: "put / get・検証・通知の動作確認完了" },
+    { name: "パイロット設定の作成",   offset:  4, weeks: 1, owner: "案件担当 SE",        exit: "設定ファイルのレビュー完了" },
+    { name: "パイロット並行稼働",     offset:  5, weeks: 3, owner: "運用担当 / 案件担当 SE", exit: "新旧ツールの転送結果が一致" },
+    { name: "パイロット切り替え",     offset:  8, weeks: 2, owner: "運用担当",           exit: "旧ツール停止、2 週間の無障害稼働" },
+    { name: "残案件の順次移行",       offset: 10, weeks: 8, owner: "案件担当 SE",        exit: "全対象案件の切り替え完了" },
+    { name: "旧ツール撤去・手順整備", offset: 18, weeks: 2, owner: "運用担当 / 開発チーム", exit: "運用手順書の改訂完了" }
+  ]
+};
+
+(function renderSchedule() {
+  const BAR_COLORS = ["#0b548c", "#15729e", "#1a86a8", "#0f7a57", "#3f8a3a", "#b35c12", "#5d4380"];
+  const base = new Date(SCHEDULE.startYear, SCHEDULE.startMonth - 1, SCHEDULE.startDay);
+  const totalWeeks = SCHEDULE.phases.reduce((max, p) => Math.max(max, p.offset + p.weeks), 0);
+  if (!totalWeeks) return;
+
+  const addDays = (d, n) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
+  const fmt = d => d.getFullYear() + "/" + String(d.getMonth() + 1).padStart(2, "0") + "/" + String(d.getDate()).padStart(2, "0");
+  const pct = w => (w / totalWeeks * 100);
+
+  /* --- ガントチャート --- */
+  const gantt = document.getElementById("schedule-gantt");
+  const tickWeeks = totalWeeks > 24 ? 8 : 4;
+  gantt.style.setProperty("--tick", pct(tickWeeks).toFixed(4) + "%");
+
+  const axis = document.createElement("div");
+  axis.className = "gantt-axis";
+  for (let w = 0; w < totalWeeks; w += tickWeeks) {
+    const cell = document.createElement("span");
+    cell.style.flex = "0 0 " + pct(Math.min(tickWeeks, totalWeeks - w)).toFixed(4) + "%";
+    cell.textContent = fmt(addDays(base, w * 7));
+    axis.appendChild(cell);
+  }
+  gantt.appendChild(axis);
+
+  SCHEDULE.phases.forEach((p, i) => {
+    const row = document.createElement("div");
+    row.className = "grow";
+    const label = document.createElement("div");
+    label.className = "glabel";
+    label.textContent = p.name;
+    const track = document.createElement("div");
+    track.className = "gtrack";
+    const bar = document.createElement("div");
+    bar.className = "gbar";
+    bar.style.left = pct(p.offset).toFixed(4) + "%";
+    bar.style.width = pct(p.weeks).toFixed(4) + "%";
+    bar.style.background = BAR_COLORS[i % BAR_COLORS.length];
+    bar.textContent = p.weeks + " 週";
+    track.appendChild(bar);
+    row.appendChild(label);
+    row.appendChild(track);
+    gantt.appendChild(row);
+  });
+
+  /* --- スケジュール表 --- */
+  const rows = SCHEDULE.phases.map((p, i) => {
+    const start = addDays(base, p.offset * 7);
+    const end = addDays(base, (p.offset + p.weeks) * 7 - 1);
+    return "<tr><td>" + (i + 1) + "</td><td><strong>" + p.name + "</strong></td>"
+      + "<td style=\"white-space:nowrap\">" + fmt(start) + " 〜 " + fmt(end) + "</td>"
+      + "<td style=\"white-space:nowrap\">" + p.weeks + " 週</td>"
+      + "<td style=\"white-space:nowrap\">" + p.owner + "</td><td>" + p.exit + "</td></tr>";
+  }).join("");
+
+  const last = addDays(base, totalWeeks * 7 - 1);
+  document.getElementById("schedule-table").innerHTML =
+    "<table><thead><tr><th style=\"width:44px\">No.</th><th style=\"width:168px\">フェーズ</th>"
+    + "<th>期間</th><th>週数</th><th>主担当</th><th>完了条件</th></tr></thead><tbody>" + rows
+    + "</tbody></table>"
+    + "<p style=\"font-size:13px;color:#5a6b7a;margin:8px 0 0\">全体期間: " + fmt(base) + " 〜 " + fmt(last)
+    + "（" + totalWeeks + " 週間）</p>";
+})();
+</script>
 </body>
 </html>
