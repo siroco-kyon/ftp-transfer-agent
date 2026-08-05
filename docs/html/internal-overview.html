@@ -95,7 +95,7 @@ a{color:var(--teal)}
       <span>社内利用限定</span>
       <span>第 1.0 版</span>
       <span>作成日 2026-08-05</span>
-      <span>確認所要 約 15 分</span>
+      <span>想定確認時間 15 分</span>
     </div>
   </div>
 </header>
@@ -105,24 +105,23 @@ a{color:var(--teal)}
 <h3>本資料の位置づけ</h3>
 <div class="tablewrap">
 <table>
-<tr><th style="width:110px">目的</th><td>新ツール <strong>FtpTransferAgent</strong> の仕様と導入計画をご確認いただき、<strong>置き換え方針の承認</strong>をいただくこと</td></tr>
-<tr><th>ご確認者</th><td>部門長 / 運用責任者</td></tr>
-<tr><th>作成</th><td>開発チーム</td></tr>
-<tr><th>関連資料</th><td>技術詳細は<a href="spec.html">詳細仕様書</a>、導入・運用手順は<a href="user-guide.html">ユーザーガイド</a>に記載</td></tr>
+<tr><th style="width:120px">目的</th><td>新ツール <strong>FtpTransferAgent</strong> の仕様と導入計画をご確認のうえ、<strong>置き換え方針をご承認いただくこと</strong></td></tr>
+<tr><th>本資料の範囲</th><td>機能・信頼性・運用の仕様と、導入スケジュール。設定手順やプログラムの内部構造は扱わない</td></tr>
+<tr><th>関連資料</th><td>技術的な詳細は<a href="spec.html">詳細仕様書</a>、導入・運用手順は<a href="user-guide.html">ユーザーガイド</a>に記載</td></tr>
 </table>
 </div>
 
 <div class="ask">
-<h4>ご確認・ご承認をお願いしたい事項（全 5 件）</h4>
+<h4>ご確認いただきたい事項（全 5 件）</h4>
 <ol>
-  <li><strong>置き換え方針</strong> ─ 現行 FileTransFTP を廃止し、本ツールへ順次移行する方針でよいか（<a href="#c1">1 章</a>）</li>
-  <li><strong>適用範囲</strong> ─ 対象とする連携・対象外とする用途の線引きでよいか（<a href="#c2">2 章</a>）</li>
-  <li><strong>転送成功の判定基準</strong> ─ ハッシュ検証まで通過したものだけを成功とし、終了コードで監視する仕様でよいか（<a href="#c4">4 章</a>・<a href="#c5">5 章</a>）</li>
-  <li><strong>セキュリティ標準</strong> ─ 新規・更改案件は SFTP + 鍵認証 + ホスト鍵検証を標準とする方針でよいか（<a href="#c4">4 章</a>）</li>
-  <li><strong>導入スケジュールと体制</strong> ─ 7 章の日程・担当でよいか（<a href="#c7">7 章</a>）</li>
+  <li><strong>置き換え方針</strong> ─ 現行 FileTransFTP を廃止し、本ツールへ順次移行してよいか（<a href="#c1">1 章</a>）</li>
+  <li><strong>適用範囲</strong> ─ 対象とする連携と対象外とする用途の線引きでよいか（<a href="#c2">2 章</a>）</li>
+  <li><strong>転送成功の判定基準</strong> ─ ハッシュ検証を通過したものだけを成功とし、終了コードで監視する仕様でよいか（<a href="#c4">4 章</a>・<a href="#c5">5 章</a>）</li>
+  <li><strong>セキュリティ標準</strong> ─ 新規・更改案件は SFTP + 鍵認証 + ホスト鍵検証を標準としてよいか（<a href="#c4">4 章</a>）</li>
+  <li><strong>導入スケジュール</strong> ─ 7 章の日程で進めてよいか（<a href="#c7">7 章</a>）</li>
 </ol>
 </div>
-<p style="margin-bottom:0">各事項は該当章末尾に「<span class="badge">確認事項</span>」として再掲しています。<a href="#c8">8 章</a>にチェックリストとしてまとめています。</p>
+<p style="margin-bottom:0">各事項は該当する章の末尾に「<span class="badge">確認事項</span>」として再掲し、<a href="#c8">8 章</a>にチェックリストとしてまとめています。</p>
 </section>
 
 <nav class="toc">
@@ -144,27 +143,45 @@ a{color:var(--teal)}
 <section id="c1">
 <div class="chapter"><div class="num">1</div><h2>背景と置き換えの必要性<span class="sub">なぜ現行ツールを作り直すのか</span></h2></div>
 
+<h3>1.1 現行ツールが抱える課題</h3>
 <p>社内のファイル連携は長年 <strong>FileTransFTP</strong> が担ってきましたが、次の課題により、新規案件・更改案件への適用が難しくなっています。</p>
 
 <div class="tablewrap">
 <table>
 <thead><tr><th style="width:130px">課題</th><th>現状</th><th>放置した場合の影響</th></tr></thead>
-<tr><td><strong>SFTP 非対応</strong></td><td>対応プロトコルは FTP / CIFS のみ。外部連携は平文 FTP に限られる</td><td>SFTP を必須とする連携先と接続できず、<strong>案件そのものを受けられない</strong></td></tr>
+<tr><td><strong>SFTP 非対応</strong></td><td>対応プロトコルは FTP / CIFS のみ。外部連携は平文 FTP に限られる</td><td>SFTP を必須とする連携先と接続できず、<strong>案件自体を受注できない</strong></td></tr>
 <tr><td><strong>セキュリティ</strong></td><td>ID・パスワード・データが暗号化されずに流れる</td><td>監査・セキュリティ点検での指摘対象になる</td></tr>
-<tr><td><strong>社内基準</strong></td><td>新規サーバー構築時の基準が厳格化し、FTP 利用には除外申請が必要</td><td>構築のたびに<strong>申請・承認の負荷</strong>が発生する（SFTP なら申請不要）</td></tr>
+<tr><td><strong>社内基準</strong></td><td>新規サーバー構築時の基準が厳格化し、FTP の利用には除外申請が必要</td><td>構築のたびに<strong>申請・承認の負荷</strong>が発生する（SFTP なら申請不要）</td></tr>
 <tr><td><strong>保守性</strong></td><td>.NET Framework 3.5 製で技術基盤が古い</td><td>改修コストが上がり続け、<strong>対応できる要員も減っていく</strong></td></tr>
-<tr><td><strong>性能</strong></td><td>並列処理がなく、1 件ずつの逐次転送</td><td>ファイル件数の増加に対して転送時間が線形に伸びる</td></tr>
+<tr><td><strong>性能</strong></td><td>並列処理がなく、1 件ずつの逐次転送</td><td>ファイル件数の増加に比例して転送時間が伸びる</td></tr>
 </table>
 </div>
 
-<div class="danger">現行ツールを使い続けるほど移行コストは増え、その間も SFTP 必須案件を取りこぼし続けます。<strong>後継ツールへ計画的に置き換える</strong>ことをご提案します。</div>
+<div class="danger">現行ツールを使い続けるほど移行コストは増え、その間も SFTP 必須の案件を取りこぼし続けます。<strong>後継ツールへ計画的に置き換える</strong>ことをご提案します。</div>
 
-<h3>置き換えの基本方針</h3>
+<h3>1.2 現行ツールとの機能比較</h3>
+<div class="tablewrap">
+<table>
+<thead><tr><th style="width:150px">観点</th><th style="width:36%">FileTransFTP（現行）</th><th>FtpTransferAgent（新）</th></tr></thead>
+<tr><td>対応プロトコル</td><td>FTP / CIFS</td><td><strong>FTP / SFTP / ローカル・UNC 共有</strong></td></tr>
+<tr><td>通信の暗号化</td><td>なし（平文のみ）</td><td><strong>SFTP により暗号化。</strong>鍵認証・ホスト鍵検証にも対応</td></tr>
+<tr><td>転送後の確認</td><td>なし（送信のみ）</td><td><strong>ハッシュ検証（SHA256 / SHA512）</strong></td></tr>
+<tr><td>失敗時の動作</td><td>自動再試行 + メール通知</td><td>自動再試行（<strong>指数バックオフ</strong>）+ メール通知</td></tr>
+<tr><td>並列転送</td><td>なし（1 件ずつ逐次）</td><td><strong>最大 16 並列。</strong>接続を再利用する</td></tr>
+<tr><td>複数宛先への配信</td><td>対応（再送の方式は非公開）</td><td><strong>ファンアウト + 配信トラッキング</strong>（未配信の宛先だけ再送）</td></tr>
+<tr><td>技術基盤</td><td>.NET Framework 3.5（Windows 専用・レガシー）</td><td><strong>.NET 10（現行 LTS・クロスプラットフォーム）</strong></td></tr>
+<tr><td>サーバーへの配置</td><td>ランタイムの導入が必要</td><td><strong>実行ファイルと設定ファイルの 2 つのみ</strong>（ランタイム同梱）</td></tr>
+<tr><td>案件ごとの差異</td><td>設定ファイルで対応</td><td>設定ファイルで対応（同等）</td></tr>
+</table>
+</div>
+<div class="note">失敗時の再試行とメール通知は現行ツールも備えています。今回の主な強化点は <strong>SFTP 対応・ハッシュ検証・並列転送・配信トラッキング・配置の簡素化</strong>の 5 点です。</div>
+
+<h3>1.3 置き換えの基本方針</h3>
 <ul>
-  <li><strong>転送経路（接続先・ポート・パス）は変更しない。</strong>動かすツールだけを差し替える</li>
-  <li>そのため<strong>一斉切り替えは不要</strong>で、影響の小さい連携から 1 件ずつ移行できる</li>
-  <li>運用モデル（スケジューラからのバッチ起動）も従来どおり。<strong>運用手順の変更は最小限</strong></li>
-  <li><strong>SFTP 化は連携先との調整がついた案件から</strong>段階的に実施する（このときだけ経路が変わる）</li>
+  <li><strong>転送経路（接続先・ポート・パス）は変更せず、実行するツールだけを差し替える</strong></li>
+  <li>そのため一斉切り替えは不要で、<strong>影響の小さい連携から 1 件ずつ移行できる</strong></li>
+  <li>運用モデル（スケジューラからのバッチ起動）も従来どおりのため、<strong>運用手順の変更は最小限</strong>で済む</li>
+  <li><strong>SFTP 化は連携先との調整がついた案件から段階的に実施する</strong>（このときだけ経路が変わる）</li>
 </ul>
 
 <div class="point"><span class="badge">確認事項 1</span>現行 FileTransFTP を廃止し、本ツールへ順次移行する方針でよろしいでしょうか。</div>
@@ -186,7 +203,7 @@ a{color:var(--teal)}
       <li>夜間バッチ・数分間隔の定期転送</li>
       <li>「データ本体 + 完了通知（END）ファイル」形式の受け渡し</li>
       <li>同一ファイルの複数拠点への一斉配信</li>
-      <li>社内共有フォルダ（UNC / SMB）への書き込み（現行 CIFS 用途の置き換え）</li>
+      <li>社内共有フォルダ（UNC / SMB）への書き込み（現行の CIFS 用途の置き換え）</li>
     </ul>
   </td>
   <td>
@@ -204,9 +221,9 @@ a{color:var(--teal)}
 <h3>動作環境</h3>
 <ul>
   <li>Windows Server / Linux / macOS（.NET 10 ベース）</li>
-  <li><strong>自己完結ビルド</strong>で配布するため、サーバーへの .NET インストールは不要</li>
+  <li><strong>自己完結ビルド</strong>で配布するため、サーバーへの .NET のインストールは不要</li>
   <li>サーバーに配置するのは<strong>実行ファイルと設定ファイル <code>appsettings.json</code> の 2 つのみ</strong></li>
-  <li>案件ごとの違いは<strong>すべて設定ファイルで吸収</strong>する（プログラムの個別改修は不要）</li>
+  <li>案件ごとの違いは<strong>すべて設定ファイルで対応する</strong>（プログラムの個別改修は不要）</li>
 </ul>
 
 <div class="point"><span class="badge">確認事項 2</span>上表の適用範囲（対象・対象外）の線引きでよろしいでしょうか。</div>
@@ -273,7 +290,7 @@ a{color:var(--teal)}
   <circle cx="44" cy="38" r="17" fill="#0b548c"/><text x="44" y="43" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">1</text>
   <rect x="76" y="16" width="784" height="44" rx="9" fill="#eef4fa" stroke="#0b548c" stroke-width="1.5"/>
   <text x="96" y="36" font-size="12.5" font-weight="bold" fill="#0b548c">設定の読み込みと妥当性チェック</text>
-  <text x="96" y="52" font-size="10.5" fill="#4b6478">設定に不備があれば転送を始める前に停止する（終了コード 1）</text>
+  <text x="96" y="52" font-size="10.5" fill="#4b6478">設定に不備があれば、転送を始める前に停止する（終了コード 1）</text>
 
   <circle cx="44" cy="90" r="17" fill="#0b548c"/><text x="44" y="95" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">2</text>
   <rect x="76" y="68" width="784" height="44" rx="9" fill="#eef4fa" stroke="#0b548c" stroke-width="1.5"/>
@@ -287,8 +304,8 @@ a{color:var(--teal)}
 
   <circle cx="44" cy="194" r="17" fill="#0f7a57"/><text x="44" y="199" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">4</text>
   <rect x="76" y="172" width="784" height="44" rx="9" fill="#eef7f1" stroke="#0f7a57" stroke-width="1.5"/>
-  <text x="96" y="192" font-size="12.5" font-weight="bold" fill="#0f7a57">並列転送（1〜16 並列）</text>
-  <text x="96" y="208" font-size="10.5" fill="#40605a">一時ファイル名で送り、完了後に正式名へリネームする（相手に書きかけを見せない）</text>
+  <text x="96" y="192" font-size="12.5" font-weight="bold" fill="#0f7a57">並列転送（最大 16 並列）</text>
+  <text x="96" y="208" font-size="10.5" fill="#40605a">一時ファイル名で送り、完了後に正式名へリネームする（書きかけを相手側に見せない）</text>
 
   <circle cx="44" cy="246" r="17" fill="#0f7a57"/><text x="44" y="251" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">5</text>
   <rect x="76" y="224" width="784" height="44" rx="9" fill="#eef7f1" stroke="#0f7a57" stroke-width="1.5"/>
@@ -298,35 +315,35 @@ a{color:var(--teal)}
   <circle cx="44" cy="298" r="17" fill="#0b548c"/><text x="44" y="303" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">6</text>
   <rect x="76" y="276" width="784" height="44" rx="9" fill="#eef4fa" stroke="#0b548c" stroke-width="1.5"/>
   <text x="96" y="296" font-size="12.5" font-weight="bold" fill="#0b548c">後処理（クリーンアップ）</text>
-  <text x="96" y="312" font-size="10.5" fill="#4b6478">設定に応じて元ファイル等を削除する。検証を通過してから削除するため取り返しがつく</text>
+  <text x="96" y="312" font-size="10.5" fill="#4b6478">設定に応じて元ファイル等を削除する。検証の通過後に削除するため、届く前に消えることはない</text>
 
   <circle cx="44" cy="350" r="17" fill="#3d4c5a"/><text x="44" y="355" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">7</text>
   <rect x="76" y="328" width="784" height="44" rx="9" fill="#f0f2f5" stroke="#5a6b7a" stroke-width="1.5"/>
   <text x="96" y="348" font-size="12.5" font-weight="bold" fill="#3d4c5a">ログを出力して終了</text>
   <text x="96" y="364" font-size="10.5" fill="#5a6b7a">全件成功なら終了コード 0、1 件でも失敗すれば 1。ジョブ管理基盤はこの値で成否を判定する</text>
 </svg>
-<figcaption>図 2. 1 回の実行で行う処理。「送って終わり」ではなく「検証して終わり」までを 1 回の実行に含む</figcaption>
+<figcaption>図 2. 1 回の実行で行う処理。送信だけで終わらせず、検証と後処理まで完了させる</figcaption>
 </figure>
 
 <h3>3.3 機能一覧</h3>
 <div class="tablewrap">
 <table>
 <thead><tr><th style="width:150px">機能</th><th>仕様</th></tr></thead>
-<tr><td>転送方向</td><td><code>put</code>（送信）／ <code>get</code>（受信）を設定で切り替え</td></tr>
+<tr><td>転送方向</td><td><code>put</code>（送信）／ <code>get</code>（受信）を設定で切り替える</td></tr>
 <tr><td>プロトコル</td><td>FTP ／ SFTP ／ ローカル・UNC 共有（<code>local</code> は put 専用）</td></tr>
-<tr><td>対象ファイル指定</td><td>拡張子またはワイルドカード（<code>*.csv</code>、<code>data_*.csv</code> 等）。サブフォルダ構造の維持も可能</td></tr>
-<tr><td>並列転送</td><td>1〜16 並列（既定 1）。接続を再利用し、宛先ごとに並列数を個別指定できる</td></tr>
-<tr><td>END ファイル制御</td><td>「データを置き終わったら目印ファイルを置く」方式に対応。END があるデータだけを転送し、順序は<strong>データ → END</strong> を保証する</td></tr>
-<tr><td>複数宛先配信</td><td>1 ファイルを複数の宛先へ同時配信（put のみ）。3.4 節参照</td></tr>
-<tr><td>転送後の削除</td><td>検証通過後にローカル／リモートの元ファイルを削除（設定で選択）</td></tr>
-<tr><td>二重起動防止</td><td>ロックファイル（PID 方式）。前回実行が継続中なら何もせず終了コード 2 で終了する</td></tr>
-<tr><td>ログ</td><td><code>logs/yyyy/MM/</code> 配下に日次で蓄積。サイズ上限でローテーション、保持日数での自動削除も可能</td></tr>
-<tr><td>メール通知</td><td>エラー発生時に SMTP で通知。宛先は複数指定可、1 回の実行あたりの送信上限あり（既定 100 通）</td></tr>
+<tr><td>対象ファイルの指定</td><td>拡張子またはワイルドカード（<code>*.csv</code>、<code>data_*.csv</code> 等）。サブフォルダ構造の維持も可能</td></tr>
+<tr><td>並列転送</td><td>最大 16 並列（既定 1）。接続を再利用し、宛先ごとに並列数を個別に指定できる</td></tr>
+<tr><td>END ファイル制御</td><td>「データを置き終わったら目印のファイルを置く」方式に対応。END があるデータだけを転送し、順序は<strong>データ → END</strong> を保証する</td></tr>
+<tr><td>複数宛先への配信</td><td>1 ファイルを複数の宛先へ同時に配信する（put のみ）。3.4 節を参照</td></tr>
+<tr><td>転送後の削除</td><td>検証の通過後に、ローカルまたはリモートの元ファイルを削除する（設定で選択）</td></tr>
+<tr><td>二重起動の防止</td><td>ロックファイル（PID 方式）。前回の実行が継続中なら、何もせず終了コード 2 で終了する</td></tr>
+<tr><td>ログ</td><td><code>logs/yyyy/MM/</code> 配下に日次で蓄積する。サイズ上限でのローテーション、保持日数での自動削除も可能</td></tr>
+<tr><td>メール通知</td><td>エラー発生時に SMTP でメールを送信する。宛先は複数指定でき、1 回の実行あたりの送信上限がある（既定 100 通）</td></tr>
 </table>
 </div>
 
-<h3>3.4 複数宛先配信（ファンアウト）</h3>
-<p>1 つのファイルを<strong>メイン宛先と追加宛先のすべてへ同時に送信</strong>できます（put のみ）。宛先ごとにプロトコル・認証・並列数を個別に設定でき、SFTP と FTP の混在も可能です。</p>
+<h3>3.4 複数宛先への配信（ファンアウト）</h3>
+<p>1 つのファイルを<strong>メイン宛先と追加宛先のすべてへ同時に送信</strong>できます（put のみ）。宛先ごとにプロトコル・認証・並列数を個別に設定でき、SFTP と FTP を混在させることもできます。</p>
 
 <figure class="fig">
 <svg viewBox="0 0 880 240" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif" role="img" aria-label="ファンアウト構成図">
@@ -355,13 +372,13 @@ a{color:var(--teal)}
 
   <rect x="470" y="90" width="390" height="60" rx="10" fill="#eef4fa" stroke="#15729e" stroke-width="1.7"/>
   <text x="490" y="116" font-size="12.5" font-weight="bold" fill="#0b548c">鹿児島拠点サーバー（SFTP・並列 2）</text>
-  <text x="490" y="136" font-size="10.5" fill="#4b6478">回線の弱い宛先は並列数を抑えるなど個別に調整できる</text>
+  <text x="490" y="136" font-size="10.5" fill="#4b6478">回線が細い宛先は並列数を抑えるなど、個別に調整できる</text>
 
   <rect x="470" y="158" width="390" height="60" rx="10" fill="#f6f1fa" stroke="#7b5aa6" stroke-width="1.7"/>
-  <text x="490" y="184" font-size="12.5" font-weight="bold" fill="#5d4380">バックアップ用共有フォルダ（UNC）</text>
-  <text x="490" y="204" font-size="10.5" fill="#6a5a80">現行 CIFS 連携の置き換え先として、同じ配信に混在させられる</text>
+  <text x="490" y="184" font-size="12.5" font-weight="bold" fill="#5d4380">バックアップ用の共有フォルダ（UNC）</text>
+  <text x="490" y="204" font-size="10.5" fill="#6a5a80">現行の CIFS 連携の置き換え先として、同じ配信に混在できる</text>
 </svg>
-<figcaption>図 3. ファンアウトの構成例。熊本・鹿児島の 2 拠点と社内共有フォルダへ、同じファイルを一斉配信する</figcaption>
+<figcaption>図 3. ファンアウトの構成例。熊本・鹿児島の 2 拠点と社内の共有フォルダへ、同じファイルを一斉に配信する</figcaption>
 </figure>
 
 <p>一部の宛先だけ失敗した場合は、<strong>どの宛先まで送れたかをファイル単位で記録</strong>し、次回の実行では<strong>まだ送れていない宛先にだけ</strong>送り直します（配信トラッキング）。</p>
@@ -402,20 +419,20 @@ a{color:var(--teal)}
   <rect x="638" y="102" width="212" height="30" rx="7" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.4"/>
   <text x="744" y="122" text-anchor="middle" font-size="11.5" fill="#0f7a57">鹿児島 ─ 復旧後に再送成功</text>
   <rect x="466" y="152" width="384" height="66" rx="8" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.4"/>
-  <text x="658" y="178" text-anchor="middle" font-size="11" fill="#0f7a57">全宛先そろった時点で完了とし、設定に応じて</text>
-  <text x="658" y="200" text-anchor="middle" font-size="11" fill="#0f7a57">ローカル削除、または元の場所へ復元する</text>
+  <text x="658" y="178" text-anchor="middle" font-size="11" fill="#0f7a57">全宛先への配信がそろった時点で完了とし、</text>
+  <text x="658" y="200" text-anchor="middle" font-size="11" fill="#0f7a57">設定に応じてローカル削除、または元の場所へ復元する</text>
 </svg>
-<figcaption>図 4. 配信トラッキング。1 拠点が落ちても他拠点へ二重送信せず、復旧後にその拠点だけへ送り直す</figcaption>
+<figcaption>図 4. 配信トラッキング。1 拠点が停止しても他拠点へ二重送信せず、復旧後にその拠点だけへ送り直す</figcaption>
 </figure>
 
 <ul>
-  <li><strong>全宛先に成功したときだけ</strong>元ファイルを削除する。1 つでも失敗したら削除せず残す</li>
-  <li>配信済みの宛先へは<strong>二重配信しない</strong></li>
+  <li><strong>全宛先に成功したときだけ</strong>元ファイルを削除する。1 つでも失敗した場合は削除せずに残す</li>
+  <li>配信済みの宛先へは<strong>二重に配信しない</strong></li>
   <li>送信後に元ファイルが差し替わった場合は<strong>指紋（サイズ + 更新時刻、またはハッシュ）で検知</strong>し、全宛先へ送り直す</li>
-  <li>この記録は<strong>部分失敗したときだけ</strong>作成されるため、全宛先成功時の追加コストは発生しない</li>
-  <li>同じ接続先・同じパスへ重複して送る誤設定は<strong>起動時に警告</strong>する</li>
+  <li>この記録は<strong>一部の宛先が失敗したときだけ</strong>作成されるため、全宛先に成功した場合の追加コストは発生しない</li>
+  <li>同じ接続先の同じパスへ重複して送る誤設定は、<strong>起動時に警告する</strong></li>
 </ul>
-<div class="note">サーバー移設時に、新旧サーバーへ一時的に二重送信したい場合にも利用できます。</div>
+<div class="note">サーバーの移設時に、新旧のサーバーへ一時的に二重送信したい場合にも利用できます。</div>
 </section>
 
 <!-- ============ 4 ============ -->
@@ -440,7 +457,7 @@ a{color:var(--teal)}
   <rect x="16" y="58" width="216" height="84" rx="10" fill="#fdf3e7" stroke="#b35c12" stroke-width="1.6"/>
   <text x="124" y="86" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#b35c12">① 一時名で転送</text>
   <text x="124" y="108" text-anchor="middle" font-size="10.5" fill="#9a6b3a">/remote/data.csv.tmp_x7f3</text>
-  <text x="124" y="128" text-anchor="middle" font-size="10.5" fill="#9a6b3a">相手のバッチが拾わない名前</text>
+  <text x="124" y="128" text-anchor="middle" font-size="10.5" fill="#9a6b3a">相手のバッチが取り込まない名前</text>
 
   <line x1="232" y1="100" x2="278" y2="100" stroke="#0b548c" stroke-width="2.2" marker-end="url(#f5a)"/>
 
@@ -460,17 +477,17 @@ a{color:var(--teal)}
   <text x="576" y="144" font-size="12.5" font-weight="bold" fill="#b3261e">③′ 不一致 → 失敗として記録</text>
   <text x="576" y="164" font-size="10.5" fill="#b3261e">元ファイルは削除せず、再試行とメール通知を行う</text>
 </svg>
-<figcaption>図 5. 一時名転送とハッシュ検証。「半分だけ書かれた data.csv」が相手側に現れることはない</figcaption>
+<figcaption>図 5. 一時名での転送とハッシュ検証。「半分だけ書かれた data.csv」が相手側に現れることはない</figcaption>
 </figure>
 
 <div class="tablewrap">
 <table>
 <thead><tr><th style="width:150px">仕組み</th><th>仕様</th></tr></thead>
 <tr><td><strong>一時名 → リネーム</strong></td><td>転送中は一時ファイル名を使い、完了後に正式名へリネームする。リネームは一瞬で完了するため、書きかけのファイルを相手のバッチが取り込む事故が構造的に起きない</td></tr>
-<tr><td><strong>ハッシュ検証</strong></td><td>SHA256 ／ SHA512 で内容の同一性を確認する（MD5 は安全性の理由で選択不可）。不一致ならそのファイルは<strong>失敗扱い</strong>とし、成功後の削除は行わない</td></tr>
-<tr><td><strong>自動再試行</strong></td><td>ネットワーク瞬断・タイムアウト等の<strong>一時的なエラーのみ</strong>再試行する（既定 3 回、5 秒 → 10 秒 → 20 秒の指数バックオフ）</td></tr>
-<tr><td><strong>再試行しない判定</strong></td><td>認証失敗・設定不備など<strong>待っても直らないエラーは即座に失敗</strong>とする。相手側のアカウントロックを誘発しない</td></tr>
-<tr><td><strong>ワーカー隔離</strong></td><td>並列転送中に 1 件が失敗しても、他のファイル・他の宛先の転送は継続する</td></tr>
+<tr><td><strong>ハッシュ検証</strong></td><td>SHA256 ／ SHA512 で内容の同一性を確認する（MD5 は安全性の理由により選択できない）。不一致であれば<strong>そのファイルは失敗として扱い</strong>、成功後の削除は行わない</td></tr>
+<tr><td><strong>自動再試行</strong></td><td>ネットワークの瞬断やタイムアウトなど、<strong>一時的なエラーだけ</strong>再試行する（既定 3 回、5 秒 → 10 秒 → 20 秒の指数バックオフ）</td></tr>
+<tr><td><strong>再試行しない判定</strong></td><td>認証の失敗や設定の不備など、<strong>待っても直らないエラーは即座に失敗とする。</strong>連携先のアカウントロックを誘発しない</td></tr>
+<tr><td><strong>ワーカー隔離</strong></td><td>並列転送中に 1 件が失敗しても、他のファイルや他の宛先への転送は継続する</td></tr>
 </table>
 </div>
 
@@ -478,18 +495,18 @@ a{color:var(--teal)}
 <div class="tablewrap">
 <table>
 <thead><tr><th style="width:150px">項目</th><th>仕様</th></tr></thead>
-<tr><td>通信の暗号化</td><td>SFTP（SSH ベース）に対応。<strong>社内標準は SFTP</strong>とする</td></tr>
-<tr><td>認証方式</td><td>パスワード認証に加え、<strong>秘密鍵認証</strong>に対応</td></tr>
-<tr><td>接続先の検証</td><td><strong>ホスト鍵指紋の照合</strong>により、なりすましサーバーへの送信を防止する</td></tr>
-<tr><td>パス安全性</td><td>不正なパス指定による指定フォルダ外への読み書き（パストラバーサル）を防止する</td></tr>
-<tr><td>起動時の警告</td><td>平文 FTP の使用時、ホスト鍵検証を省略した場合などに警告を出力する</td></tr>
-<tr><td>資格情報の管理</td><td>設定ファイルへの直書きではなく、環境変数による上書きを推奨する</td></tr>
+<tr><td>通信の暗号化</td><td>SFTP（SSH ベース）に対応する。<strong>社内標準は SFTP</strong> とする</td></tr>
+<tr><td>認証方式</td><td>パスワード認証に加え、<strong>秘密鍵による認証</strong>に対応する</td></tr>
+<tr><td>接続先の検証</td><td><strong>ホスト鍵の指紋を照合し、</strong>なりすましサーバーへの送信を防止する</td></tr>
+<tr><td>パスの安全性</td><td>不正なパス指定によって指定フォルダの外へ読み書きされること（パストラバーサル）を防止する</td></tr>
+<tr><td>起動時の警告</td><td>平文 FTP を使用している場合や、ホスト鍵の検証を省略している場合に警告を出力する</td></tr>
+<tr><td>資格情報の管理</td><td>設定ファイルへ直接記載せず、環境変数による上書きを推奨する</td></tr>
 </table>
 </div>
 
-<div class="tip">FTP も引き続き利用できますが（既存連携の移行のため）、<strong>新規・更改案件は「SFTP + 鍵認証 + ホスト鍵検証」を標準</strong>とすることをご提案します。</div>
+<div class="tip">既存連携を移行するため FTP も引き続き利用できますが、<strong>新規・更改案件は「SFTP + 鍵認証 + ホスト鍵検証」を標準</strong>とすることをご提案します。</div>
 
-<div class="point"><span class="badge">確認事項 3</span>ハッシュ検証まで通過したものだけを成功とみなす判定基準でよろしいでしょうか。<br>
+<div class="point"><span class="badge">確認事項 3</span>ハッシュ検証を通過したものだけを成功とみなす判定基準でよろしいでしょうか。<br>
 <span class="badge">確認事項 4</span>新規・更改案件のセキュリティ標準を「SFTP + 鍵認証 + ホスト鍵検証」としてよろしいでしょうか。</div>
 </section>
 
@@ -498,7 +515,7 @@ a{color:var(--teal)}
 <div class="chapter"><div class="num">5</div><h2>運用仕様<span class="sub">どう動かし、どう監視するか</span></h2></div>
 
 <h3>5.1 実行方式</h3>
-<p>常駐せず、<strong>起動 → 処理 → 終了</strong>を毎回繰り返すバッチ型です。定期実行は OS のスケジューラに任せます。</p>
+<p>常駐せず、<strong>起動 → 処理 → 終了</strong>を毎回繰り返すバッチ型です。定期的な実行は OS のスケジューラに任せます。</p>
 <pre><code># Windows（タスクスケジューラ・5 分間隔）
 schtasks /create /tn "FtpTransferAgent" /sc minute /mo 5 ^
   /tr "C:\opt\FtpTransferAgent\FtpTransferAgent.exe"
@@ -506,9 +523,9 @@ schtasks /create /tn "FtpTransferAgent" /sc minute /mo 5 ^
 # Linux（cron・5 分間隔）
 */5 * * * * /opt/ftp-transfer-agent/FtpTransferAgent</code></pre>
 <ul>
-  <li>プロセスが残らないため、メモリリークや「いつの間にか停止していた」が起きにくい</li>
+  <li>常駐しないため、メモリリークや、停止に気づかないまま放置される事態が起きにくい</li>
   <li>既存のジョブ管理基盤（JP1 / タスクスケジューラ / cron）にそのまま載せられる</li>
-  <li>前回の実行が終わっていなければ<strong>二重起動を防止</strong>し、何もせず終了コード 2 で終了する</li>
+  <li>前回の実行が終わっていない場合は<strong>二重起動を防止し、</strong>何もせず終了コード 2 で終了する</li>
 </ul>
 
 <h3>5.2 監視方法</h3>
@@ -516,7 +533,7 @@ schtasks /create /tn "FtpTransferAgent" /sc minute /mo 5 ^
 <div class="tablewrap">
 <table>
 <thead><tr><th style="width:110px">終了コード</th><th>意味</th><th>運用対応</th></tr></thead>
-<tr><td><code>0</code></td><td>全件成功（対象ファイルなしを含む）</td><td>対応不要</td></tr>
+<tr><td><code>0</code></td><td>全件成功（対象ファイルがない場合を含む）</td><td>対応不要</td></tr>
 <tr><td><code>1</code></td><td>設定エラー、または 1 件以上の転送失敗</td><td><strong>ログを確認して原因に対応する</strong></td></tr>
 <tr><td><code>2</code></td><td>二重起動を検出してスキップ</td><td>頻発する場合は実行間隔を見直す</td></tr>
 </table>
@@ -529,19 +546,19 @@ schtasks /create /tn "FtpTransferAgent" /sc minute /mo 5 ^
 </ol>
 
 <h3>5.3 移行時に連携先と確認する項目</h3>
-<p>案件を移行する際は、以下の 8 項目を確認します。これらが決まれば設定ファイルは作成できます。</p>
+<p>案件を移行する際は、次の 8 項目を確認します。これらが決まれば設定ファイルを作成できます。</p>
 <ul class="check">
-  <li>転送方式（FTP / SFTP / ローカル・UNC 共有のいずれか。外部連携は SFTP 推奨）</li>
+  <li>転送方式（FTP / SFTP / ローカル・UNC 共有のいずれか。外部連携は SFTP を推奨）</li>
   <li>認証方式（パスワード / 秘密鍵）</li>
   <li>転送方向（put / get）</li>
-  <li>対象ファイルの命名規則・拡張子</li>
-  <li>END ファイル運用の有無（拡張子、削除の担当）</li>
-  <li>転送成功後に元ファイルを削除するか保持するか</li>
+  <li>対象ファイルの命名規則と拡張子</li>
+  <li>END ファイル運用の有無（拡張子、削除する担当者）</li>
+  <li>転送の成功後に元ファイルを削除するか、保持するか</li>
   <li>実行間隔（何分間隔か、業務時間帯の制約）</li>
   <li>障害時の通知先メールアドレス</li>
 </ul>
 
-<div class="point"><span class="badge">確認事項 3（再掲）</span>終了コードによる監視方式でよろしいでしょうか。既存のジョブ管理基盤の設定変更が必要になります。</div>
+<div class="point"><span class="badge">確認事項 3（再掲）</span>終了コードによる監視方式でよろしいでしょうか。導入時にジョブ管理基盤側の設定変更が必要になります。</div>
 </section>
 
 <!-- ============ 6 ============ -->
@@ -553,22 +570,22 @@ schtasks /create /tn "FtpTransferAgent" /sc minute /mo 5 ^
 <thead><tr><th style="width:180px">項目</th><th>内容</th><th style="width:34%">対応方針</th></tr></thead>
 <tr>
   <td><strong>同名ファイルの上書き衝突</strong></td>
-  <td>サブフォルダを対象にしつつフォルダ構造を維持しない設定にすると、<code>A/result.csv</code> と <code>B/result.csv</code> が同じ宛先パスに集まり上書きされる</td>
+  <td>サブフォルダを対象にしながらフォルダ構造を維持しない設定にすると、<code>A/result.csv</code> と <code>B/result.csv</code> が同じ宛先パスに集まり、上書きされる</td>
   <td><strong>起動時の設定チェックでエラーとして検出し、実行前に停止する。</strong>フォルダ構造を維持する設定を標準とする</td>
 </tr>
 <tr>
   <td><strong>平文 FTP の残存</strong></td>
-  <td>移行初期は既存連携が FTP のまま残る</td>
-  <td>まずツールのみ差し替え、<strong>SFTP 化は連携先と調整のついた案件から順次実施</strong>する</td>
+  <td>移行の初期は、既存の連携が FTP のまま残る</td>
+  <td>まずツールだけを差し替え、<strong>SFTP 化は連携先との調整がついた案件から順次実施する</strong></td>
 </tr>
 <tr>
   <td><strong>リアルタイム性</strong></td>
-  <td>バッチ型のため、実行間隔より短い遅延では届かない</td>
-  <td>実行間隔を業務要件に合わせて設定する（分単位まで短縮可能）</td>
+  <td>バッチ型のため、実行間隔より短い時間で届けることはできない</td>
+  <td>実行間隔を業務要件に合わせて設定する（分単位まで短縮できる）</td>
 </tr>
 <tr>
   <td><strong>資格情報の管理</strong></td>
-  <td>設定ファイルにパスワードを直書きすると、ファイルの取り扱いが機微になる</td>
+  <td>設定ファイルにパスワードを直接記載すると、設定ファイル自体の取り扱いに注意が必要になる</td>
   <td>環境変数による上書き、または鍵認証への切り替えを推奨する</td>
 </tr>
 <tr>
@@ -579,39 +596,28 @@ schtasks /create /tn "FtpTransferAgent" /sc minute /mo 5 ^
 </table>
 </div>
 
-<h3>品質面の裏付け</h3>
+<h3>品質の担保</h3>
 <ul>
-  <li>単体テストに加え、<strong>実際の FTP / SFTP サーバーを立てた統合テスト</strong>（本体を通したエンドツーエンド検証）を実施している</li>
-  <li>ネットワーク障害・ファイルロック・並列実行・複数宛先配信などの<strong>異常系テスト</strong>を含む</li>
-  <li>CI（GitHub Actions）で<strong>全テストとコード整形チェック</strong>を毎回実行している</li>
+  <li>単体テストに加え、<strong>実際の FTP / SFTP サーバーを立てた統合テスト</strong>（本体を通したエンドツーエンドの検証）を実施している</li>
+  <li>ネットワーク障害・ファイルロック・並列実行・複数宛先への配信など、<strong>異常系のテスト</strong>を含む</li>
+  <li>CI（GitHub Actions）で<strong>全テストとコード整形のチェック</strong>を毎回実行している</li>
   <li>転送処理には実績のある OSS ライブラリ（FluentFTP / SSH.NET / Polly）を採用している</li>
 </ul>
 </section>
 
 <!-- ============ 7 ============ -->
 <section id="c7">
-<div class="chapter"><div class="num">7</div><h2>導入スケジュール（案）<span class="sub">承認から全案件移行までの計画</span></h2></div>
+<div class="chapter"><div class="num">7</div><h2>導入スケジュール（案）<span class="sub">承認から全案件の移行完了まで</span></h2></div>
 
-<p>影響の小さい連携を<strong>パイロット</strong>として先行移行し、安定を確認したうえで残りの案件へ展開します。日程は<strong>ご承認をいただいた日を起点</strong>として調整可能です。</p>
+<p>まず検証環境で動作を確認し、続いて<strong>影響の小さい連携を 1 件だけ先行して移行</strong>します。そこで問題がないことを確認したうえで、残りの連携へ同じ手順を広げます。日程は<strong>ご承認をいただいた日を起点</strong>とし、開始日が変わる場合は全体を後ろ倒しします。</p>
 
 <div id="schedule-gantt" class="gantt"></div>
 <div class="tablewrap" id="schedule-table"></div>
-<noscript><div class="warn">スケジュールの表とチャートは JavaScript で描画しています。表示されない場合はブラウザで JavaScript を有効にしてください。</div></noscript>
+<noscript><div class="warn">スケジュールの表とチャートは JavaScript で描画しています。表示されない場合は、ブラウザで JavaScript を有効にしてください。</div></noscript>
 
-<div class="note">日程は下表のフェーズ単位でずらせます。<strong>開始日と各フェーズの週数を変更すれば、表とチャートの日付は自動で再計算されます</strong>（この HTML ファイル末尾の <code>SCHEDULE</code> にある数値のみを書き換えてください）。</div>
+<div class="note">日程はフェーズ単位で調整できます。<strong>開始日と各フェーズの週数を変更すれば、表とチャートの日付は自動で再計算されます</strong>（この HTML ファイルの末尾にある <code>SCHEDULE</code> の数値だけを書き換えてください）。</div>
 
-<h3>体制</h3>
-<div class="tablewrap">
-<table>
-<thead><tr><th style="width:150px">役割</th><th>担当</th><th>主な作業</th></tr></thead>
-<tr><td>方針承認</td><td>部門長</td><td>本資料の承認、移行対象案件の優先順位決定</td></tr>
-<tr><td>ツール提供・支援</td><td>開発チーム</td><td>ビルド配布、設定レビュー、不具合対応</td></tr>
-<tr><td>案件ごとの設定</td><td>案件担当 SE</td><td>連携先との確認、設定ファイル作成、切り替え作業</td></tr>
-<tr><td>運用・監視</td><td>運用担当</td><td>ジョブ登録、稼働監視、障害一次対応</td></tr>
-</table>
-</div>
-
-<div class="point"><span class="badge">確認事項 5</span>上記の日程および体制でよろしいでしょうか。開始日が変わる場合は、全フェーズを同じ日数だけ後ろ倒しします。</div>
+<div class="point"><span class="badge">確認事項 5</span>上記の導入スケジュールで進めてよろしいでしょうか。</div>
 </section>
 
 <!-- ============ 8 ============ -->
@@ -621,21 +627,21 @@ schtasks /create /tn "FtpTransferAgent" /sc minute /mo 5 ^
 <div class="tablewrap">
 <table>
 <thead><tr><th style="width:44px">No.</th><th style="width:150px">確認事項</th><th>内容</th><th style="width:96px;white-space:nowrap">該当章</th></tr></thead>
-<tr><td>1</td><td><strong>置き換え方針</strong></td><td>現行 FileTransFTP を廃止し、FtpTransferAgent へ順次移行する。転送経路は変更せず、ツールのみ差し替える</td><td><a href="#c1">1 章</a></td></tr>
-<tr><td>2</td><td><strong>適用範囲</strong></td><td>定時ファイル連携を対象とし、リアルタイム同期・双方向同期・GUI 操作・API 連携は対象外とする</td><td><a href="#c2">2 章</a></td></tr>
+<tr><td>1</td><td><strong>置き換え方針</strong></td><td>現行 FileTransFTP を廃止し、FtpTransferAgent へ順次移行する。転送経路は変更せず、ツールだけを差し替える</td><td><a href="#c1">1 章</a></td></tr>
+<tr><td>2</td><td><strong>適用範囲</strong></td><td>定時のファイル連携を対象とし、リアルタイム同期・双方向同期・GUI 操作・API 連携は対象外とする</td><td><a href="#c2">2 章</a></td></tr>
 <tr><td>3</td><td><strong>成功判定と監視</strong></td><td>ハッシュ検証を通過したものだけを成功とし、終了コード 0 / 1 / 2 でジョブ管理基盤から監視する</td><td style="white-space:nowrap"><a href="#c4">4 章</a>・<a href="#c5">5 章</a></td></tr>
-<tr><td>4</td><td><strong>セキュリティ標準</strong></td><td>新規・更改案件は SFTP + 鍵認証 + ホスト鍵検証を標準とする。既存 FTP 連携は移行後に順次 SFTP 化する</td><td><a href="#c4">4 章</a></td></tr>
-<tr><td>5</td><td><strong>スケジュールと体制</strong></td><td>7 章の日程・担当で進める。開始日が変わる場合は全体を後ろ倒しする</td><td><a href="#c7">7 章</a></td></tr>
+<tr><td>4</td><td><strong>セキュリティ標準</strong></td><td>新規・更改案件は SFTP + 鍵認証 + ホスト鍵検証を標準とする。既存の FTP 連携は移行後に順次 SFTP 化する</td><td><a href="#c4">4 章</a></td></tr>
+<tr><td>5</td><td><strong>導入スケジュール</strong></td><td>7 章の日程で進める。開始日が変わる場合は全体を後ろ倒しする</td><td><a href="#c7">7 章</a></td></tr>
 </table>
 </div>
 
 <h3>ご確認後のお願い</h3>
 <ol>
   <li>上記 5 項目について、ご承認または修正のご指示をお願いします</li>
-  <li>ご承認後、<strong>パイロット対象とする連携（1 件）</strong>をご指定ください</li>
-  <li>移行対象案件の優先順位について、ご意向があればご共有ください</li>
+  <li>ご承認後、<strong>先行して移行する連携（1 件）</strong>をご指定ください</li>
+  <li>移行する案件の優先順位について、ご希望があればお知らせください</li>
 </ol>
-<div class="tip">仕様の詳細は<a href="spec.html">詳細仕様書</a>、導入・運用手順は<a href="user-guide.html">ユーザーガイド</a>に記載しています。ご不明点は開発チームまでお問い合わせください。</div>
+<div class="tip">仕様の詳細は<a href="spec.html">詳細仕様書</a>、導入・運用の手順は<a href="user-guide.html">ユーザーガイド</a>に記載しています。ご不明な点は開発チームまでお問い合わせください。</div>
 </section>
 
 <!-- ============ 付録 ============ -->
@@ -647,15 +653,15 @@ schtasks /create /tn "FtpTransferAgent" /sc minute /mo 5 ^
 <table>
 <thead><tr><th style="width:36%">設定</th><th style="width:90px">既定値</th><th>説明</th></tr></thead>
 <tr><td><code>Watch.Path</code></td><td>必須</td><td>監視・保存フォルダ</td></tr>
-<tr><td><code>Watch.AllowedExtensions</code></td><td><code>[]</code></td><td>対象ファイルのフィルタ。<code>*.csv</code> 等のワイルドカード指定可</td></tr>
+<tr><td><code>Watch.AllowedExtensions</code></td><td><code>[]</code></td><td>対象ファイルのフィルタ。<code>*.csv</code> 等のワイルドカードを指定できる</td></tr>
 <tr><td><code>Transfer.Mode</code> ／ <code>Direction</code></td><td><code>ftp</code> ／ <code>put</code></td><td>プロトコルと転送方向</td></tr>
-<tr><td><code>Transfer.Concurrency</code></td><td><code>1</code></td><td>並列転送数（1〜16）。宛先ごとに個別指定可</td></tr>
-<tr><td><code>Transfer.AdditionalDestinations</code></td><td><code>[]</code></td><td>複数宛先配信の追加宛先（put のみ）。各宛先に一意な <code>Name</code> が必要</td></tr>
+<tr><td><code>Transfer.Concurrency</code></td><td><code>1</code></td><td>並列転送数（1〜16）。宛先ごとに個別に指定できる</td></tr>
+<tr><td><code>Transfer.AdditionalDestinations</code></td><td><code>[]</code></td><td>複数宛先への配信の追加宛先（put のみ）。各宛先に一意な <code>Name</code> が必要</td></tr>
 <tr><td><code>Transfer.TimeoutSeconds</code></td><td><code>120</code></td><td>接続・転送のタイムアウト（秒）</td></tr>
-<tr><td><code>Retry.MaxAttempts</code> ／ <code>DelaySeconds</code></td><td><code>3</code> ／ <code>5</code></td><td>再試行回数と初回待機秒（指数バックオフの基準）</td></tr>
-<tr><td><code>Hash.Algorithm</code></td><td><code>SHA256</code></td><td><code>SHA256</code> ／ <code>SHA512</code>（MD5 は選択不可）</td></tr>
-<tr><td><code>Cleanup.DeleteAfterVerify</code></td><td><code>true</code></td><td>put 成功後にローカルファイルを削除（複数宛先では全宛先成功後）</td></tr>
-<tr><td><code>Logging.Retention.RetentionDays</code></td><td><code>30</code></td><td>ログの保持日数（保持機能を有効化した場合）</td></tr>
+<tr><td><code>Retry.MaxAttempts</code> ／ <code>DelaySeconds</code></td><td><code>3</code> ／ <code>5</code></td><td>再試行の回数と初回の待機秒数（指数バックオフの基準）</td></tr>
+<tr><td><code>Hash.Algorithm</code></td><td><code>SHA256</code></td><td><code>SHA256</code> ／ <code>SHA512</code>（MD5 は選択できない）</td></tr>
+<tr><td><code>Cleanup.DeleteAfterVerify</code></td><td><code>true</code></td><td>put の成功後にローカルファイルを削除する（複数宛先では全宛先の成功後）</td></tr>
+<tr><td><code>Logging.Retention.RetentionDays</code></td><td><code>30</code></td><td>ログの保持日数（保持機能を有効にした場合）</td></tr>
 </table>
 </div>
 <p>全項目は<a href="user-guide.html#ref">ユーザーガイドの設定リファレンス</a>を参照してください。</p>
@@ -664,16 +670,16 @@ schtasks /create /tn "FtpTransferAgent" /sc minute /mo 5 ^
 <div class="tablewrap">
 <table>
 <thead><tr><th style="width:180px">用語</th><th>意味</th></tr></thead>
-<tr><td><strong>FTP / SFTP</strong></td><td>ファイル転送の通信方式。SFTP は SSH ベースで通信が暗号化される</td></tr>
-<tr><td><strong>CIFS / SMB</strong></td><td>Windows のファイル共有プロトコル。社内 LAN 向けで、外部連携には不向き</td></tr>
-<tr><td><strong>put / get</strong></td><td>put はこちらから送る（送信）、get は取りに行く（受信）</td></tr>
-<tr><td><strong>ハッシュ値</strong></td><td>ファイル内容から計算される「指紋」。1 ビットでも異なれば値が変わる</td></tr>
-<tr><td><strong>END ファイル</strong></td><td>「データを置き終わった」ことを示す目印ファイル。トリガーファイルとも呼ぶ</td></tr>
+<tr><td><strong>FTP / SFTP</strong></td><td>ファイル転送の通信方式。SFTP は SSH をベースとしており、通信が暗号化される</td></tr>
+<tr><td><strong>CIFS / SMB</strong></td><td>Windows のファイル共有プロトコル。社内 LAN 向けで、外部との連携には向かない</td></tr>
+<tr><td><strong>put / get</strong></td><td>put はこちらから送ること（送信）、get は取りに行くこと（受信）</td></tr>
+<tr><td><strong>ハッシュ値</strong></td><td>ファイルの内容から計算される「指紋」。1 ビットでも異なれば値が変わる</td></tr>
+<tr><td><strong>END ファイル</strong></td><td>「データを置き終わった」ことを示す目印のファイル。トリガーファイルとも呼ぶ</td></tr>
 <tr><td><strong>ファンアウト</strong></td><td>1 つのファイルを複数の宛先へ同時に配信すること（put のみ）</td></tr>
 <tr><td><strong>配信トラッキング</strong></td><td>どのファイルをどの宛先まで送れたかを記録し、未配信の宛先だけへ再送する仕組み</td></tr>
 <tr><td><strong>指数バックオフ</strong></td><td>再試行の間隔を 5 秒 → 10 秒 → 20 秒のように倍々に広げる方式</td></tr>
-<tr><td><strong>バッチ型</strong></td><td>常駐せず、起動のたびに 1 回処理して終了する動作モデル</td></tr>
-<tr><td><strong>終了コード</strong></td><td>プログラムが終了時に返す数値。0 は正常、それ以外は異常</td></tr>
+<tr><td><strong>バッチ型</strong></td><td>常駐せず、起動のたびに 1 回だけ処理して終了する動作モデル</td></tr>
+<tr><td><strong>終了コード</strong></td><td>プログラムが終了時に返す数値。0 は正常、それ以外は異常を示す</td></tr>
 <tr><td><strong>自己完結ビルド</strong></td><td>実行環境（ランタイム）を同梱した配布形態。サーバーに .NET を導入せずに動作する</td></tr>
 </table>
 </div>
@@ -689,26 +695,33 @@ schtasks /create /tn "FtpTransferAgent" /sc minute /mo 5 ^
    ★ 日程を変えるときは、以下の「数値」だけを書き換えてください。
       表とガントチャートの日付は自動で再計算されます。
 
-      startYear / startMonth / startDay … 全体の開始日（週の初め＝月曜を推奨）
+      startYear / startMonth / startDay … 全体の開始日（週初め＝月曜を推奨）
       offset … 開始日から数えて「何週目」に始めるか（0 = 開始週）
       weeks  … そのフェーズにかける「週数」
 
       例）全体を 2 週間後ろ倒しする → startDay を 14 増やす
-          移行期間を延ばす         → 該当フェーズの weeks を増やし、
-                                     それ以降のフェーズの offset を同じ数だけ増やす
+          あるフェーズを延ばす     → そのフェーズの weeks を増やし、
+                                     以降のフェーズの offset を同じ数だけ増やす
    ======================================================================= */
 const SCHEDULE = {
   startYear: 2026,
   startMonth: 9,
   startDay: 7,
   phases: [
-    { name: "仕様確認・承認",         offset:  0, weeks: 2, owner: "部門長 / 開発チーム", exit: "本資料の承認、パイロット対象の決定" },
-    { name: "検証環境での動作確認",   offset:  2, weeks: 2, owner: "開発チーム",         exit: "put / get・検証・通知の動作確認完了" },
-    { name: "パイロット設定の作成",   offset:  4, weeks: 1, owner: "案件担当 SE",        exit: "設定ファイルのレビュー完了" },
-    { name: "パイロット並行稼働",     offset:  5, weeks: 3, owner: "運用担当 / 案件担当 SE", exit: "新旧ツールの転送結果が一致" },
-    { name: "パイロット切り替え",     offset:  8, weeks: 2, owner: "運用担当",           exit: "旧ツール停止、2 週間の無障害稼働" },
-    { name: "残案件の順次移行",       offset: 10, weeks: 8, owner: "案件担当 SE",        exit: "全対象案件の切り替え完了" },
-    { name: "旧ツール撤去・手順整備", offset: 18, weeks: 2, owner: "運用担当 / 開発チーム", exit: "運用手順書の改訂完了" }
+    { name: "仕様確認・承認",       offset:  0, weeks: 2,
+      task: "本資料の確認、先行して移行する連携の決定",       exit: "本資料の承認" },
+    { name: "検証環境での動作確認", offset:  2, weeks: 2,
+      task: "検証環境で put / get・ハッシュ検証・エラー通知を確認", exit: "想定どおりの動作を確認" },
+    { name: "先行連携の設定作成",   offset:  4, weeks: 1,
+      task: "連携先と 5.3 の 8 項目を確認し、設定ファイルを作成", exit: "設定ファイルの承認" },
+    { name: "先行連携の試行運用",   offset:  5, weeks: 3,
+      task: "新ツールで運用し、現行ツールは復旧用に待機",     exit: "3 週間、転送漏れ・障害なく稼働" },
+    { name: "先行連携の本運用移行", offset:  8, weeks: 2,
+      task: "現行ツール側の設定を撤去し、監視設定を確定",     exit: "現行ツールの停止" },
+    { name: "残りの連携の順次移行", offset: 10, weeks: 8,
+      task: "同じ手順を連携ごとに繰り返す",                   exit: "全連携の切り替え完了" },
+    { name: "現行ツールの撤去",     offset: 18, weeks: 2,
+      task: "現行ツールの削除、運用手順書の改訂",             exit: "運用手順書の改訂" }
   ]
 };
 
@@ -764,13 +777,13 @@ const SCHEDULE = {
     return "<tr><td>" + (i + 1) + "</td><td><strong>" + p.name + "</strong></td>"
       + "<td style=\"white-space:nowrap\">" + fmt(start) + " 〜 " + fmt(end) + "</td>"
       + "<td style=\"white-space:nowrap\">" + p.weeks + " 週</td>"
-      + "<td style=\"white-space:nowrap\">" + p.owner + "</td><td>" + p.exit + "</td></tr>";
+      + "<td>" + p.task + "</td><td>" + p.exit + "</td></tr>";
   }).join("");
 
   const last = addDays(base, totalWeeks * 7 - 1);
   document.getElementById("schedule-table").innerHTML =
-    "<table><thead><tr><th style=\"width:44px\">No.</th><th style=\"width:168px\">フェーズ</th>"
-    + "<th>期間</th><th>週数</th><th>主担当</th><th>完了条件</th></tr></thead><tbody>" + rows
+    "<table><thead><tr><th style=\"width:44px\">No.</th><th style=\"width:150px\">フェーズ</th>"
+    + "<th>期間</th><th>週数</th><th style=\"width:210px\">主な作業</th><th style=\"width:170px\">完了条件</th></tr></thead><tbody>" + rows
     + "</tbody></table>"
     + "<p style=\"font-size:13px;color:#5a6b7a;margin:8px 0 0\">全体期間: " + fmt(base) + " 〜 " + fmt(last)
     + "（" + totalWeeks + " 週間）</p>";
