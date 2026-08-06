@@ -1,0 +1,36 @@
+# 改行コードの正規化
+#
+# Windows で編集したファイルが CRLF で保存され、ファイル全体が変更扱いになるのを防ぐ。
+# リポジトリ内は常に LF で保持し、チェックアウト時も LF に揃える。
+# （このリポジトリにはシェルスクリプトが無いため eol=lf で問題ない）
+
+* text=auto eol=lf
+
+# Visual Studio が CRLF で書き出すため、ソリューションファイルのみ CRLF を維持する
+*.sln text eol=crlf
+
+# 明示指定（拡張子から誤判定されないように）
+*.cs      text eol=lf
+*.csproj  text eol=lf
+*.pubxml  text eol=lf
+*.json    text eol=lf
+*.md      text eol=lf
+*.html    text eol=lf
+*.yml     text eol=lf
+*.yaml    text eol=lf
+*.csv     text eol=lf
+*.py      text eol=lf
+
+# バイナリ（差分表示と改行変換の対象外にする）
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.pdf  binary
+*.pptx binary
+*.xlsx binary
+*.docx binary
+*.zip  binary
+*.snk  binary
+*.dat  binary
