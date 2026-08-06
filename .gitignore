@@ -9,3 +9,10 @@ obj/
 
 # Marp で生成されるスライドHTML（ソースは slides/*.md）
 slides/*.html
+
+# 性能計測の作業ディレクトリ（docs/sftp-performance-analysis.md 参照）
+# ローカル FTP/SFTP サーバーの資材と大量のテストデータが生成される
+.bench/
+
+# テスト実行時に生成される一時ディレクトリ
+.ftptransferagent-tmp/
