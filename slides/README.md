@@ -2,7 +2,7 @@
 
 `slides/` 配下の Marp スライドを PDF / PNG / PPTX に書き出す手順をまとめる。
 
-> 📄 **HTML 版の説明資料**: 同じ内容の流れを踏襲した非スライド形式の HTML 資料が
+> 📄 **HTML 版の仕様確認資料**: 上長への仕様確認・承認用の非スライド形式の HTML 資料が
 > [docs/html/internal-overview.html](../docs/html/internal-overview.html) にある（図はインライン SVG・単一ファイルで配布可）。
 > あわせて [docs/html/spec.html](../docs/html/spec.html)（詳細仕様書）/
 > [docs/html/user-guide.html](../docs/html/user-guide.html)（ユーザーガイド）も参照。
