@@ -645,7 +645,7 @@ dotnet run --project FtpTransferAgent</code></pre>
   <li><code>Direction: get</code> では追加宛先は使用されず、警告が表示される</li>
   <li><code>sizetime</code> 署名は退避・復元でファイルの更新時刻が変わらないよう、移動時に元の更新時刻を保持する。<code>DeleteAfterVerify: false</code> でローカルを残す場合、保持マーカーの指紋は次回列挙時に再計算される指紋に合わせて記録するため、成功後に END ファイルを削除する構成でも配信済みファイルが毎回再送されることはない</li>
 </ul>
-<div class="note"><strong>一時ファイルの掃除について</strong>: 正常終了・例外終了では一時ファイル（アップロードスナップショット、ダウンロードの検証用一時ファイル）はその実行内で削除されます。強制終了・電源断で残った一時ファイルは次回起動時に掃除しますが、エージェント専用ディレクトリ（<code>&lt;TEMP&gt;/FtpTransferAgent/upload-snapshots/…</code>、watch 配下の <code>.ftptransferagent-tmp</code>）の残骸だけを対象にするため、<strong>利用者ファイルには一切触れません</strong>。</div>
+<div class="note"><strong>一時ファイルの掃除について</strong>: 正常終了・例外終了では一時ファイル（アップロードスナップショット、ダウンロードの検証用一時ファイル）はその実行内で削除されます。強制終了・電源断で残った一時ファイルは次回起動時に掃除しますが、エージェント専用ディレクトリ（<code>&lt;TEMP&gt;/FtpTransferAgent/upload-snapshots/…</code>、watch 配下の <code>.ftptransferagent-tmp</code>）の残骸だけを対象にするため、<strong>利用者ファイルには一切触れません</strong>。watch 配下の <code>.ftptransferagent-tmp</code> は空になった時点でディレクトリごと削除するため、監視フォルダに空フォルダが残りません（中身がある場合は非再帰削除が失敗するだけで、ファイルが消えることはありません）。</div>
 <p>詳細設計は <a href="../per-destination-delivery-tracking.md">宛先別配信トラッキング</a>、実装（キュー構成・並列処理・マーカー保存先）は <a href="../fanout-and-parallelism.md">ファンアウトと並列処理 実装詳細</a> を参照してください。</p>
 </section>
 
