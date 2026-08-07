@@ -724,6 +724,186 @@ public class WorkerDownloadTests
             Assert.True(File.Exists(realFile), "real data file must be kept");
             Assert.True(File.Exists(lookAlike), "user file resembling the temp pattern must be kept");
             Assert.True(File.Exists(verifyLookAlike), "user file resembling the verify pattern must be kept");
+            // 掃除後の空ディレクトリは Watch.Path に残さない
+            Assert.False(Directory.Exists(tempDir), "the emptied temp directory must not be left behind");
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Get_RemovesEmptyDownloadTempDirectoryAfterRun()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var tempDir = Path.Combine(dir, ".ftptransferagent-tmp");
+
+            var watch = Options.Create(new WatchOptions { Path = dir });
+            var transfer = Options.Create(new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "get",
+                Host = "host",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/remote",
+                Concurrency = 1
+            });
+            var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+            var hashOpt = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+            var cleanup = Options.Create(new CleanupOptions());
+
+            var mock = new Mock<IFileTransferClient>();
+            mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+                .ReturnsAsync(new[] { "/remote/data.txt" });
+            mock.Setup(c => c.DownloadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Callback<string, string, CancellationToken>((_, local, _) =>
+                {
+                    // 転送中は一時ディレクトリが存在する (削除は全転送完了後)
+                    Assert.True(Directory.Exists(tempDir), "temp directory must exist while downloading");
+                    File.WriteAllText(local, "data");
+                })
+                .Returns(Task.CompletedTask);
+            mock.Setup(c => c.Dispose());
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            using var provider = services.BuildServiceProvider();
+            var logger = provider.GetRequiredService<ILogger<Worker>>();
+            using var lifetime = new DummyLifetime();
+            var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
+
+            await worker.RunAsync(CancellationToken.None);
+
+            // ダウンロード結果は残り、空になった一時ディレクトリは Watch.Path から消える
+            Assert.True(File.Exists(Path.Combine(dir, "data.txt")), "downloaded file must be kept");
+            Assert.False(Directory.Exists(tempDir), "the empty temp directory must be removed after the run");
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Get_RemovesEmptyDownloadTempDirectoryLeftByPreviousRun()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        try
+        {
+            // 前回実行が残した「空の」一時ディレクトリ (転送対象は無い)
+            var tempDir = Path.Combine(dir, ".ftptransferagent-tmp");
+            Directory.CreateDirectory(tempDir);
+
+            var userFile = Path.Combine(dir, "data.txt");
+            await File.WriteAllTextAsync(userFile, "keep me");
+
+            var watch = Options.Create(new WatchOptions { Path = dir });
+            var transfer = Options.Create(new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "get",
+                Host = "host",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/remote",
+                Concurrency = 1
+            });
+            var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+            var hashOpt = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+            var cleanup = Options.Create(new CleanupOptions());
+
+            var mock = new Mock<IFileTransferClient>();
+            mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+                .ReturnsAsync(Array.Empty<string>());
+            mock.Setup(c => c.Dispose());
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            using var provider = services.BuildServiceProvider();
+            var logger = provider.GetRequiredService<ILogger<Worker>>();
+            using var lifetime = new DummyLifetime();
+            var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
+
+            await worker.RunAsync(CancellationToken.None);
+
+            Assert.False(Directory.Exists(tempDir), "the empty temp directory from a previous run must be removed");
+            Assert.True(File.Exists(userFile), "user files must be kept");
+        }
+        finally
+        {
+            if (Directory.Exists(dir))
+            {
+                Directory.Delete(dir, true);
+            }
+        }
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_Get_KeepsDownloadTempDirectoryWhenFilesRemainInside()
+    {
+        // 空フォルダ削除がファイルを巻き込まないことの回帰テスト。
+        // 実行終了時点で一時ディレクトリに中身が残っていれば、ディレクトリごと消してはいけない
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var tempDir = Path.Combine(dir, ".ftptransferagent-tmp");
+            string? survivor = null;
+
+            var watch = Options.Create(new WatchOptions { Path = dir });
+            var transfer = Options.Create(new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "get",
+                Host = "host",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/remote",
+                Concurrency = 1
+            });
+            var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+            var hashOpt = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+            var cleanup = Options.Create(new CleanupOptions());
+
+            var mock = new Mock<IFileTransferClient>();
+            mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), It.IsAny<bool>()))
+                .ReturnsAsync(new[] { "/remote/data.txt" });
+            mock.Setup(c => c.DownloadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Callback<string, string, CancellationToken>((_, local, _) =>
+                {
+                    File.WriteAllText(local, "data");
+                    // 転送中に一時ディレクトリへ別ファイルが置かれた状況を作る
+                    survivor = Path.Combine(Path.GetDirectoryName(local)!, "in-flight.dat");
+                    File.WriteAllText(survivor, "must survive");
+                })
+                .Returns(Task.CompletedTask);
+            mock.Setup(c => c.Dispose());
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            using var provider = services.BuildServiceProvider();
+            var logger = provider.GetRequiredService<ILogger<Worker>>();
+            using var lifetime = new DummyLifetime();
+            var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
+
+            await worker.RunAsync(CancellationToken.None);
+
+            Assert.NotNull(survivor);
+            Assert.True(File.Exists(survivor), "files inside the temp directory must never be deleted by the empty-directory cleanup");
+            Assert.True(Directory.Exists(tempDir), "a non-empty temp directory must be kept");
+            Assert.Equal("must survive", await File.ReadAllTextAsync(survivor!));
         }
         finally
         {

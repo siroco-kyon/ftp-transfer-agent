@@ -628,12 +628,42 @@ public class Worker : BackgroundService
 
         if (leftovers == 0)
         {
+            // 中身が無ければ前回実行が残した空のディレクトリなので、Watch.Path に
+            // エージェント由来のフォルダが残り続けないよう削除する
+            TryRemoveDownloadTempDirectoryIfEmpty();
             return;
         }
 
         TryDeleteDirectory(tempDir);
         _logger.LogInformation("Cleaned up {Count} orphaned download temp file(s) left by a previously interrupted run in {Dir}.",
             leftovers, tempDir);
+    }
+
+    // 空になったダウンロード検証用一時ディレクトリを Watch.Path から取り除く。
+    // 非再帰の Directory.Delete を使うため、中に何か残っていれば IOException になるだけで
+    // ファイルが消えることはない (中身がある = まだ必要な残骸なので次回起動時の掃除に任せる)。
+    private void TryRemoveDownloadTempDirectoryIfEmpty()
+    {
+        var tempDir = GetDownloadTempDirectory();
+        try
+        {
+            if (!Directory.Exists(tempDir))
+            {
+                return;
+            }
+
+            EnsureNoReparsePointBelowWatch(tempDir);
+            Directory.Delete(tempDir, recursive: false);
+            _logger.LogDebug("Removed the empty download temp directory {Dir}", tempDir);
+        }
+        catch (Exception ex) when (ex is IOException
+            or UnauthorizedAccessException
+            or DirectoryNotFoundException
+            or InvalidOperationException)
+        {
+            // 中身が残っている / 別プロセスが掴んでいる等。次回起動時の掃除で回収する
+            _logger.LogDebug("Could not remove the download temp directory {Dir}: {Error}", tempDir, ex.Message);
+        }
     }
 
     private LocalCleanupGuard? TryCreateLocalCleanupGuard(UploadCandidate candidate)
@@ -2001,6 +2031,13 @@ public class Worker : BackgroundService
             foreach (var snapshotDirectory in uploadSnapshotDirectories)
             {
                 TryDeleteDirectory(snapshotDirectory);
+            }
+
+            // ダウンロードが全て終わった後なら検証用一時ディレクトリは空のはずなので、
+            // Watch.Path に空フォルダを残さないよう取り除く (中身があれば削除されない)
+            if (_transfer.Direction is "get")
+            {
+                TryRemoveDownloadTempDirectoryIfEmpty();
             }
         }
 
