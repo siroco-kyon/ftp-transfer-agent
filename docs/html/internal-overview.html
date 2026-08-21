@@ -116,7 +116,7 @@ a{color:var(--teal)}
 <ol>
   <li><strong>置き換え方針</strong> ─ 現行 FileTransFTP を廃止し、本ツールへ順次移行してよいか（<a href="#c1">1 章</a>）</li>
   <li><strong>適用範囲</strong> ─ 対象とする連携と対象外とする用途の線引きでよいか（<a href="#c2">2 章</a>）</li>
-  <li><strong>転送成功の判定基準</strong> ─ ハッシュ検証を通過したものだけを成功とし、終了コードで監視する仕様でよいか（<a href="#c4">4 章</a>・<a href="#c5">5 章</a>）</li>
+  <li><strong>転送成功の判定基準</strong> ─ 転送の完了（ハッシュ検証を有効にした場合はその通過）をもって成功とし、終了コードで監視する仕様でよいか（<a href="#c4">4 章</a>・<a href="#c5">5 章</a>）</li>
   <li><strong>セキュリティ標準</strong> ─ 新規・更改案件は SFTP + 鍵認証 + ホスト鍵検証を標準としてよいか（<a href="#c4">4 章</a>）</li>
   <li><strong>導入スケジュール</strong> ─ 7 章の日程で進めてよいか（<a href="#c7">7 章</a>）</li>
 </ol>
@@ -309,13 +309,13 @@ a{color:var(--teal)}
 
   <circle cx="44" cy="246" r="17" fill="#0f7a57"/><text x="44" y="251" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">5</text>
   <rect x="76" y="224" width="784" height="44" rx="9" fill="#eef7f1" stroke="#0f7a57" stroke-width="1.5"/>
-  <text x="96" y="244" font-size="12.5" font-weight="bold" fill="#0f7a57">ハッシュ検証</text>
-  <text x="96" y="260" font-size="10.5" fill="#40605a">送信元と送信先で SHA256／SHA512 を突き合わせ、内容が同一であることを確認する</text>
+  <text x="96" y="244" font-size="12.5" font-weight="bold" fill="#0f7a57">ハッシュ検証（任意）</text>
+  <text x="96" y="260" font-size="10.5" fill="#40605a">送信元と送信先で SHA256／SHA512 を突き合わせ、内容が同一であることを確認する（SFTP では省略を推奨）</text>
 
   <circle cx="44" cy="298" r="17" fill="#0b548c"/><text x="44" y="303" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">6</text>
   <rect x="76" y="276" width="784" height="44" rx="9" fill="#eef4fa" stroke="#0b548c" stroke-width="1.5"/>
   <text x="96" y="296" font-size="12.5" font-weight="bold" fill="#0b548c">後処理（クリーンアップ）</text>
-  <text x="96" y="312" font-size="10.5" fill="#4b6478">設定に応じて元ファイル等を削除する。検証の通過後に削除するため、届く前に消えることはない</text>
+  <text x="96" y="312" font-size="10.5" fill="#4b6478">設定に応じて元ファイル等を削除する。転送（検証を有効にした場合はその通過）の完了後に削除するため、届く前に消えることはない</text>
 
   <circle cx="44" cy="350" r="17" fill="#3d4c5a"/><text x="44" y="355" text-anchor="middle" font-size="13" fill="#fff" font-weight="bold">7</text>
   <rect x="76" y="328" width="784" height="44" rx="9" fill="#f0f2f5" stroke="#5a6b7a" stroke-width="1.5"/>
@@ -461,10 +461,11 @@ a{color:var(--teal)}
 
   <line x1="232" y1="100" x2="278" y2="100" stroke="#0b548c" stroke-width="2.2" marker-end="url(#f5a)"/>
 
-  <rect x="282" y="58" width="200" height="84" rx="10" fill="#f2f8fd" stroke="#0b548c" stroke-width="1.8"/>
-  <text x="382" y="86" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#0b548c">② ハッシュ照合</text>
-  <text x="382" y="108" text-anchor="middle" font-size="10.5" fill="#4b6478">送信元と送信先の内容から</text>
-  <text x="382" y="128" text-anchor="middle" font-size="10.5" fill="#4b6478">SHA256 を計算して突き合わせ</text>
+  <rect x="282" y="50" width="200" height="100" rx="10" fill="#f2f8fd" stroke="#0b548c" stroke-width="1.8"/>
+  <text x="382" y="78" text-anchor="middle" font-size="12.5" font-weight="bold" fill="#0b548c">② ハッシュ照合（任意）</text>
+  <text x="382" y="99" text-anchor="middle" font-size="10.5" fill="#4b6478">送信元と送信先の内容から</text>
+  <text x="382" y="115" text-anchor="middle" font-size="10.5" fill="#4b6478">SHA256 を計算して突き合わせ</text>
+  <text x="382" y="137" text-anchor="middle" font-size="10.5" font-weight="bold" fill="#0b548c">SFTP では省略を推奨</text>
 
   <line x1="482" y1="92" x2="552" y2="50" stroke="#0f7a57" stroke-width="2.2" marker-end="url(#f5b)"/>
   <line x1="482" y1="108" x2="552" y2="150" stroke="#b3261e" stroke-width="2.2" marker-end="url(#f5c)"/>
@@ -477,17 +478,30 @@ a{color:var(--teal)}
   <text x="576" y="144" font-size="12.5" font-weight="bold" fill="#b3261e">③′ 不一致 → 失敗として記録</text>
   <text x="576" y="164" font-size="10.5" fill="#b3261e">元ファイルは削除せず、再試行とメール通知を行う</text>
 </svg>
-<figcaption>図 5. 一時名での転送とハッシュ検証。「半分だけ書かれた data.csv」が相手側に現れることはない</figcaption>
+<figcaption>図 5. 一時名での転送とハッシュ検証。「半分だけ書かれた data.csv」が相手側に現れることはない。②のハッシュ照合は任意で、SFTP では省略を推奨する</figcaption>
 </figure>
 
 <div class="tablewrap">
 <table>
 <thead><tr><th style="width:150px">仕組み</th><th>仕様</th></tr></thead>
 <tr><td><strong>一時名 → リネーム</strong></td><td>転送中は一時ファイル名を使い、完了後に正式名へリネームする。リネームは一瞬で完了するため、書きかけのファイルを相手のバッチが取り込む事故が構造的に起きない</td></tr>
-<tr><td><strong>ハッシュ検証</strong></td><td>SHA256 ／ SHA512 で内容の同一性を確認する（MD5 は安全性の理由により選択できない）。不一致であれば<strong>そのファイルは失敗として扱い</strong>、成功後の削除は行わない</td></tr>
+<tr><td><strong>ハッシュ検証</strong><br><span style="font-size:12.5px;color:#6b7f8c">（任意・経路によって推奨が異なる）</span></td><td>SHA256 ／ SHA512 で送信元と送信先の内容の同一性を確認する（MD5 は安全性の理由により選択できない）。不一致であれば<strong>そのファイルは失敗として扱い</strong>、成功後の削除は行わない。<strong>SFTP では通信路自体が HMAC で完全性を保証するため、ハッシュ検証は無効での運用を推奨</strong>する（下の補足を参照）</td></tr>
 <tr><td><strong>自動再試行</strong></td><td>ネットワークの瞬断やタイムアウトなど、<strong>一時的なエラーだけ</strong>再試行する（既定 3 回、5 秒 → 10 秒 → 20 秒の指数バックオフ）</td></tr>
 <tr><td><strong>再試行しない判定</strong></td><td>認証の失敗や設定の不備など、<strong>待っても直らないエラーは即座に失敗とする。</strong>連携先のアカウントロックを誘発しない</td></tr>
 <tr><td><strong>ワーカー隔離</strong></td><td>並列転送中に 1 件が失敗しても、他のファイルや他の宛先への転送は継続する</td></tr>
+</table>
+</div>
+
+<div class="note"><strong>ハッシュ検証は「必須」ではなく、通信経路に応じて有効・無効を選ぶ設定項目です。</strong><br>
+SFTP（SSH）では、通信路そのものが<strong>パケット 1 つごとに HMAC（改ざん・破損の検知符号）で保護</strong>されています。途中でデータが 1 ビットでも化ければ検知され、通信自体がエラーとして中断されます。加えて、サーバーへの書き込みが成功したかどうかも 1 回ごとに応答で確認しています。<strong>つまり内容の同一性は転送レイヤーですでに担保されており、ハッシュ検証はその上に重ねる二重確認</strong>になります。<br>
+一方でハッシュ検証を有効にすると、送信したファイルを照合のために<strong>相手側から全量読み戻す</strong>ため、<strong>ネットワーク転送量がおよそ 2 倍</strong>になり、大容量ファイルでは所要時間に直接響きます。得られる追加の保証に対して代償が大きいため、<strong>SFTP 経路ではハッシュ検証を無効にする運用を推奨</strong>します。</div>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th style="width:150px">経路</th><th style="width:230px">転送レイヤーの完全性保証</th><th>ハッシュ検証の推奨</th></tr></thead>
+<tr><td><strong>SFTP</strong></td><td>パケットごとの HMAC ＋ 書き込み応答の確認</td><td><strong>無効を推奨</strong>（保証が重複し、転送量が 2 倍になるだけのため）</td></tr>
+<tr><td><strong>FTP</strong></td><td>TCP チェックサム（16 ビット）のみ</td><td><strong>有効を推奨</strong>（転送レイヤーの保護が弱いため、内容の確認はハッシュに頼る）</td></tr>
+<tr><td><strong>ファイルサーバー<br>（SMB 共有）</strong></td><td>環境設定に依存（SMB 署名の有無による）</td><td>配置先の設定が確認できない場合は<strong>有効を推奨</strong></td></tr>
 </table>
 </div>
 
@@ -506,7 +520,7 @@ a{color:var(--teal)}
 
 <div class="tip">既存連携を移行するため FTP も引き続き利用できますが、<strong>新規・更改案件は「SFTP + 鍵認証 + ホスト鍵検証」を標準</strong>とすることをご提案します。</div>
 
-<div class="point"><span class="badge">確認事項 3</span>ハッシュ検証を通過したものだけを成功とみなす判定基準でよろしいでしょうか。<br>
+<div class="point"><span class="badge">確認事項 3</span>転送の完了（ハッシュ検証を有効にした場合はその通過）をもって成功とみなす判定基準でよろしいでしょうか。あわせて、<strong>SFTP 経路ではハッシュ検証を無効とする</strong>運用方針でよろしいでしょうか。<br>
 <span class="badge">確認事項 4</span>新規・更改案件のセキュリティ標準を「SFTP + 鍵認証 + ホスト鍵検証」としてよろしいでしょうか。</div>
 </section>
 
@@ -629,7 +643,7 @@ schtasks /create /tn "FtpTransferAgent" /sc minute /mo 5 ^
 <thead><tr><th style="width:44px">No.</th><th style="width:150px">確認事項</th><th>内容</th><th style="width:96px;white-space:nowrap">該当章</th></tr></thead>
 <tr><td>1</td><td><strong>置き換え方針</strong></td><td>現行 FileTransFTP を廃止し、FtpTransferAgent へ順次移行する。転送経路は変更せず、ツールだけを差し替える</td><td><a href="#c1">1 章</a></td></tr>
 <tr><td>2</td><td><strong>適用範囲</strong></td><td>定時のファイル連携を対象とし、リアルタイム同期・双方向同期・GUI 操作・API 連携は対象外とする</td><td><a href="#c2">2 章</a></td></tr>
-<tr><td>3</td><td><strong>成功判定と監視</strong></td><td>ハッシュ検証を通過したものだけを成功とし、終了コード 0 / 1 / 2 でジョブ管理基盤から監視する</td><td style="white-space:nowrap"><a href="#c4">4 章</a>・<a href="#c5">5 章</a></td></tr>
+<tr><td>3</td><td><strong>成功判定と監視</strong></td><td>転送の完了（ハッシュ検証を有効にした場合はその通過）をもって成功とし、終了コード 0 / 1 / 2 でジョブ管理基盤から監視する。ハッシュ検証は SFTP 経路では無効、FTP・ファイルサーバー経路では有効を推奨する</td><td style="white-space:nowrap"><a href="#c4">4 章</a>・<a href="#c5">5 章</a></td></tr>
 <tr><td>4</td><td><strong>セキュリティ標準</strong></td><td>新規・更改案件は SFTP + 鍵認証 + ホスト鍵検証を標準とする。既存の FTP 連携は移行後に順次 SFTP 化する</td><td><a href="#c4">4 章</a></td></tr>
 <tr><td>5</td><td><strong>導入スケジュール</strong></td><td>7 章の日程で進める。開始日が変わる場合は全体を後ろ倒しする</td><td><a href="#c7">7 章</a></td></tr>
 </table>
