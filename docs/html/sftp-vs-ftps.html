@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SFTP と FTPS の違い ― 本ツールが SFTP を標準とした理由</title>
+<style>
+:root{
+  --blue:#0b548c; --teal:#15729e; --green:#0f7a57; --orange:#b35c12; --red:#b3261e; --purple:#5d4380;
+  --ink:#1f2f3d; --muted:#5a6b7a; --line:#d4e0ea; --bg:#f4f8fb; --card:#ffffff; --code-bg:#eef3f8;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;color:var(--ink);background:var(--bg);
+  font-family:"BIZ UDPGothic","Yu Gothic UI","Hiragino Sans","Meiryo",sans-serif;
+  line-height:1.85;font-size:15.5px}
+.hero{background:linear-gradient(135deg,#0b548c 0%,#15729e 55%,#0f7a57 130%);color:#fff;padding:44px 24px 36px;text-align:center}
+.hero .inner{max-width:880px;margin:0 auto}
+.hero h1{margin:0 0 8px;font-size:29px;letter-spacing:.02em}
+.hero .sub{font-size:16px;opacity:.95;margin:0}
+.hero .meta{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:16px;font-size:12.5px}
+.hero .meta span{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:2px 14px}
+main{max-width:920px;margin:0 auto;padding:26px 20px 70px}
+section{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:26px 32px;margin-bottom:26px;box-shadow:0 1px 4px rgba(15,50,80,.06)}
+nav.toc{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 26px;margin-bottom:26px;box-shadow:0 1px 4px rgba(15,50,80,.06)}
+nav.toc h2{margin:0 0 8px;font-size:15px;color:var(--blue);border:none;padding:0}
+nav.toc ol{margin:0;padding-left:1.4em;columns:2;column-gap:2.5em}
+nav.toc li{margin:2px 0;break-inside:avoid}
+nav.toc a{color:var(--teal);text-decoration:none}
+nav.toc a:hover{text-decoration:underline}
+.chapter{display:flex;align-items:center;gap:13px;margin:0 0 18px;padding-bottom:10px;border-bottom:3px solid var(--blue)}
+.chapter .num{flex:none;width:40px;height:40px;border-radius:11px;background:linear-gradient(135deg,var(--blue),var(--teal));color:#fff;font-size:19px;font-weight:bold;display:flex;align-items:center;justify-content:center}
+.chapter h2{margin:0;color:var(--blue);font-size:22px;border:none;padding:0}
+.chapter .sub{display:block;font-size:12.5px;color:var(--muted);font-weight:normal;line-height:1.4}
+h3{color:var(--teal);font-size:17px;margin:26px 0 8px;padding-left:11px;border-left:5px solid var(--teal)}
+section > h3:first-of-type{margin-top:0}
+h4{margin:18px 0 4px;font-size:15px;color:#0d3f66}
+p{margin:9px 0}
+strong{color:#0d3f66}
+code{background:var(--code-bg);border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:.86em;font-family:Consolas,"Cascadia Code",Menlo,monospace;color:#0d3f66;overflow-wrap:anywhere}
+pre{background:#102a3c;color:#e6eef5;border-radius:10px;padding:14px 18px;overflow-x:auto;font-size:13px;line-height:1.6}
+pre code{background:none;border:none;color:inherit;padding:0;font-size:inherit}
+.tablewrap{overflow-x:auto;margin:12px 0}
+table{border-collapse:collapse;width:100%;font-size:13.5px;background:#fff}
+th,td{border:1px solid var(--line);padding:7px 11px;text-align:left;vertical-align:top}
+th{background:linear-gradient(180deg,#eaf2f9,#dfeaf4);color:var(--blue)}
+thead th{white-space:nowrap}
+tr:nth-child(even) td{background:#f7fafc}
+ul,ol{padding-left:1.55em;margin:9px 0}
+li{margin:4px 0}
+.note,.warn,.danger,.tip,.point{border-radius:10px;padding:12px 17px;margin:14px 0;border-left:6px solid;font-size:14.5px}
+.note{background:#eef5fc;border-color:var(--teal)}
+.warn{background:#fdf3e7;border-color:var(--orange)}
+.danger{background:#fdeeee;border-color:var(--red)}
+.tip{background:#edf8f2;border-color:var(--green)}
+.point{background:#f2f6fb;border-color:var(--blue)}
+.note::before{content:"補足";display:block;font-weight:bold;color:var(--teal);margin-bottom:2px;font-size:13px}
+.warn::before{content:"注意";display:block;font-weight:bold;color:var(--orange);margin-bottom:2px;font-size:13px}
+.danger::before{content:"重要";display:block;font-weight:bold;color:var(--red);margin-bottom:2px;font-size:13px}
+.tip::before{content:"推奨";display:block;font-weight:bold;color:var(--green);margin-bottom:2px;font-size:13px}
+.point::before{content:"ポイント";display:block;font-weight:bold;color:var(--blue);margin-bottom:2px;font-size:13px}
+figure.fig{margin:18px 0;text-align:center;background:#fbfdff;border:1px solid var(--line);border-radius:12px;padding:16px 12px 8px}
+figure.fig svg{max-width:100%;height:auto}
+figcaption{font-size:12.5px;color:var(--muted);margin-top:6px}
+.lede{font-size:16px;background:#f2f8fd;border:1px solid #cfe2f0;border-radius:10px;padding:14px 20px;margin:0 0 16px;color:#0d3f66}
+.reason{border:1px solid var(--line);border-left:6px solid var(--green);border-radius:10px;padding:14px 18px;margin:14px 0;background:#fcfefd}
+.reason h4{margin:0 0 4px;font-size:16px;color:var(--green)}
+.reason .src{font-size:12.5px;color:var(--muted);margin-top:8px;border-top:1px dashed var(--line);padding-top:6px}
+.badge{display:inline-block;background:#e6f0f8;border:1px solid #b9d3e6;color:var(--blue);border-radius:5px;padding:0 7px;font-size:12px;margin-right:6px;white-space:nowrap}
+.ok{color:var(--green);font-weight:bold}
+.ng{color:var(--red);font-weight:bold}
+.mid{color:var(--orange);font-weight:bold}
+footer{max-width:920px;margin:0 auto;padding:0 20px 46px;color:var(--muted);font-size:12.5px;text-align:center}
+a{color:var(--teal)}
+@media (max-width:720px){nav.toc ol{columns:1} section{padding:20px 16px} .chapter h2{font-size:19px}}
+@media print{body{background:#fff}section,nav.toc{box-shadow:none;border-color:#bbb;break-inside:avoid-page}.hero{background:var(--blue)}}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="inner">
+    <h1>SFTP と FTPS の違い</h1>
+    <p class="sub">名前は似ているが別物の 2 つのプロトコルを整理し、FtpTransferAgent が SFTP を標準とした理由を説明します</p>
+    <div class="meta">
+      <span>社内利用限定</span>
+      <span>第 1.0 版</span>
+      <span>作成日 2026-08-22</span>
+      <span>想定閲覧時間 10 分</span>
+    </div>
+  </div>
+</header>
+<main>
+
+<section>
+<h3>本資料の位置づけ</h3>
+<div class="tablewrap">
+<table>
+<tr><th style="width:120px">目的</th><td>「SFTP と FTPS はどう違うのか」「なぜ本ツールは SFTP を標準としたのか」を、技術背景のない方にも判断できる形で説明すること</td></tr>
+<tr><th>対象読者</th><td>連携方式を決める立場の方／運用担当／ネットワーク・セキュリティ担当</td></tr>
+<tr><th>範囲</th><td>プロトコルの仕組みの違い、運用上の差、本ツールの採用理由と現在の対応状況。設定手順そのものは扱わない</td></tr>
+<tr><th>関連資料</th><td><a href="spec.html">詳細仕様書</a> / <a href="user-guide.html">ユーザーガイド</a> / <a href="internal-overview.html">仕様確認資料</a> / <a href="../sftp-performance-analysis.md">SFTP 転送性能の調査レポート</a></td></tr>
+</table>
+</div>
+
+<div class="lede">
+<strong>結論を先に 3 行で。</strong>
+<ol style="margin:6px 0 0">
+  <li><strong>SFTP と FTPS は別物です。</strong>「FTP を暗号化したもの」が FTPS、「SSH の上でファイルを操作する別プロトコル」が SFTP で、共通点は名前だけです。</li>
+  <li><strong>暗号強度そのものに実質的な優劣はありません。</strong>差が出るのは、ファイアウォール・鍵/証明書の管理・サーバ実装のばらつきといった<strong>運用面</strong>です。</li>
+  <li><strong>本ツールは SFTP を標準としました。</strong>社内基準・連携先の要件・単一ポートで完結する運用性・鍵認証とホスト鍵検証の実装しやすさが理由で、FTPS は現時点で実装していません（<a href="#c5">5 章</a>・<a href="#c6">6 章</a>）。</li>
+</ol>
+</div>
+</section>
+
+<nav class="toc">
+  <h2>目次</h2>
+  <ol>
+    <li><a href="#c1">まず用語を整理する</a></li>
+    <li><a href="#c2">仕組みの違い（プロトコル構造）</a></li>
+    <li><a href="#c3">通信経路とファイアウォール</a></li>
+    <li><a href="#c4">項目別の比較表</a></li>
+    <li><a href="#c5">本ツールが SFTP を標準とした 6 つの理由</a></li>
+    <li><a href="#c6">FTPS を採用しなかった理由と、FTPS が適するケース</a></li>
+    <li><a href="#c7">SFTP の弱点と本ツールでの対策</a></li>
+    <li><a href="#c8">本ツールの対応状況と設定例</a></li>
+    <li><a href="#c9">選定フローと FAQ</a></li>
+    <li><a href="#apx">付録（用語集）</a></li>
+  </ol>
+</nav>
+
+<!-- ============ 1 ============ -->
+<section id="c1">
+<div class="chapter"><div class="num">1</div><h2>まず用語を整理する<span class="sub">FTP / FTPS / SFTP / SCP の関係</span></h2></div>
+
+<p>この 3 つは名前が似ているため現場でしばしば混同されますが、<strong>成り立ちがまったく異なります</strong>。ここを取り違えると「SFTP 対応と言われたので FTPS サーバを立てた」といった手戻りが起きます。</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th style="width:90px">呼び方</th><th style="width:190px">正式名称</th><th>中身</th><th style="width:110px">標準</th></tr></thead>
+<tr><td><strong>FTP</strong></td><td>File Transfer Protocol</td><td>1971 年から続く<strong>暗号化なし</strong>のファイル転送プロトコル。ID・パスワード・データがそのままネットワークを流れる</td><td>RFC 959</td></tr>
+<tr><td><strong>FTPS</strong></td><td>FTP over TLS/SSL</td><td><strong>FTP をそのまま TLS でくるんだもの</strong>。コマンド体系（USER / PASS / PASV / STOR …）は FTP と同一で、通信路だけが暗号化される。HTTP に対する HTTPS と同じ関係</td><td>RFC 4217 ほか</td></tr>
+<tr><td><strong>SFTP</strong></td><td>SSH File Transfer Protocol</td><td><strong>FTP とは無関係の別プロトコル</strong>。SSH（サーバへのリモートログインに使う仕組み）の上で動くサブシステムとして、ファイルの読み書き・属性取得を行う</td><td>IETF ドラフト<br>（事実上 OpenSSH 実装が標準）</td></tr>
+<tr><td>SCP</td><td>Secure Copy Protocol</td><td>同じく SSH 上で動くが、単純なコピーのみで一覧取得や再開ができない旧方式。OpenSSH でも現在は内部的に SFTP へ置き換えられている</td><td>―</td></tr>
+</table>
+</div>
+
+<div class="danger">
+<strong>「S」の意味が違います。</strong>FTPS の S は <strong>Secure（TLS で保護された FTP）</strong>、SFTP の S は <strong>SSH</strong> です。<br>
+FTPS サーバに SFTP クライアントで接続することはできませんし、その逆もできません。<strong>相手先とは必ず「SFTP（SSH・22 番）ですか、FTPS（FTP over TLS・21 番）ですか」と明示的に確認</strong>してください。
+</div>
+
+<p>なお FTPS には接続の開始方法が 2 種類あります。この違いも相手先との確認事項です。</p>
+<ul>
+  <li><strong>Explicit FTPS（明示的、RFC 4217）</strong> ─ 通常の FTP と同じ 21 番に平文で接続し、<code>AUTH TLS</code> コマンドで TLS へ切り替える。現在の主流。</li>
+  <li><strong>Implicit FTPS（暗黙的）</strong> ─ 990 番に接続した時点で最初から TLS。古い方式で、正式な標準化はされていない。</li>
+</ul>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="c2">
+<div class="chapter"><div class="num">2</div><h2>仕組みの違い<span class="sub">何の上に何が載っているか</span></h2></div>
+
+<p>3 方式を層構造で並べると、FTPS と SFTP が「似て非なるもの」である理由がはっきりします。<strong>FTPS は FTP に暗号の層を足したもの、SFTP は SSH の中に間借りしている別のプロトコル</strong>です。</p>
+
+<figure class="fig">
+<svg viewBox="0 0 880 340" role="img" aria-labelledby="fig1title fig1desc" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig1title">FTP・FTPS・SFTP のプロトコルスタック比較</title>
+  <desc id="fig1desc">FTP は TCP の上に FTP コマンドが直接載る。FTPS は TCP と FTP コマンドの間に TLS 層が入る。SFTP は TCP の上に SSH-2 トランスポート層と認証・チャネル層があり、その上のサブシステムとして SFTP が載る。</desc>
+  <style>
+    .t{font-family:"BIZ UDPGothic","Yu Gothic UI","Hiragino Sans",sans-serif}
+    .h{font-size:15px;font-weight:bold;fill:#0b548c}
+    .l{font-size:13px;fill:#1f2f3d}
+    .ls{font-size:11.5px;fill:#5a6b7a}
+    .lw{font-size:13px;fill:#ffffff;font-weight:bold}
+    .lws{font-size:11px;fill:#eaf3fa}
+  </style>
+  <rect x="0" y="0" width="880" height="340" fill="#fbfdff"/>
+
+  <!-- FTP column -->
+  <text class="t h" x="145" y="28" text-anchor="middle">FTP（平文）</text>
+  <rect x="30" y="42" width="230" height="52" rx="7" fill="#fdeeee" stroke="#b3261e" stroke-width="1.5"/>
+  <text class="t l" x="145" y="66" text-anchor="middle">FTP コマンド／データ</text>
+  <text class="t ls" x="145" y="84" text-anchor="middle">USER / PASS / PASV / STOR</text>
+  <rect x="30" y="104" width="230" height="46" rx="7" fill="#f1f5f9" stroke="#c3d3e0" stroke-dasharray="5 4"/>
+  <text class="t ls" x="145" y="132" text-anchor="middle" fill="#b3261e">暗号化の層なし</text>
+  <rect x="30" y="160" width="230" height="42" rx="7" fill="#e8eef4" stroke="#c3d3e0"/>
+  <text class="t l" x="145" y="186" text-anchor="middle">TCP</text>
+  <rect x="30" y="214" width="230" height="58" rx="7" fill="#fdeeee" stroke="#e2b6b3"/>
+  <text class="t ls" x="145" y="236" text-anchor="middle" fill="#b3261e">ID・パスワード・データが</text>
+  <text class="t ls" x="145" y="254" text-anchor="middle" fill="#b3261e">そのまま流れる</text>
+  <text class="t ls" x="145" y="292" text-anchor="middle">ポート 21 ＋ データ用ポート</text>
+
+  <!-- FTPS column -->
+  <text class="t h" x="440" y="28" text-anchor="middle">FTPS（FTP over TLS）</text>
+  <rect x="325" y="42" width="230" height="52" rx="7" fill="#eef5fc" stroke="#15729e" stroke-width="1.5"/>
+  <text class="t l" x="440" y="66" text-anchor="middle">FTP コマンド／データ</text>
+  <text class="t ls" x="440" y="84" text-anchor="middle">FTP と同一（変更なし）</text>
+  <rect x="325" y="104" width="230" height="46" rx="7" fill="#15729e" stroke="#0f5c80"/>
+  <text class="t lw" x="440" y="124" text-anchor="middle">TLS</text>
+  <text class="t lws" x="440" y="141" text-anchor="middle">サーバ証明書で相手を確認</text>
+  <rect x="325" y="160" width="230" height="42" rx="7" fill="#e8eef4" stroke="#c3d3e0"/>
+  <text class="t l" x="440" y="186" text-anchor="middle">TCP</text>
+  <rect x="325" y="214" width="230" height="58" rx="7" fill="#eef5fc" stroke="#b9d3e6"/>
+  <text class="t ls" x="440" y="236" text-anchor="middle">FTP を「そのまま」包むため</text>
+  <text class="t ls" x="440" y="254" text-anchor="middle">接続の張り方は FTP のまま</text>
+  <text class="t ls" x="440" y="292" text-anchor="middle">ポート 21（または 990）＋ データ用ポート</text>
+
+  <!-- SFTP column -->
+  <text class="t h" x="735" y="28" text-anchor="middle">SFTP（SSH File Transfer）</text>
+  <rect x="620" y="42" width="230" height="52" rx="7" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.5"/>
+  <text class="t l" x="735" y="66" text-anchor="middle">SFTP サブシステム</text>
+  <text class="t ls" x="735" y="84" text-anchor="middle">OPEN / WRITE / RENAME / STAT</text>
+  <rect x="620" y="104" width="230" height="46" rx="7" fill="#0f7a57" stroke="#0b5c42"/>
+  <text class="t lw" x="735" y="124" text-anchor="middle">SSH-2（認証・チャネル・暗号）</text>
+  <text class="t lws" x="735" y="141" text-anchor="middle">ホスト鍵で相手を確認／鍵認証</text>
+  <rect x="620" y="160" width="230" height="42" rx="7" fill="#e8eef4" stroke="#c3d3e0"/>
+  <text class="t l" x="735" y="186" text-anchor="middle">TCP</text>
+  <rect x="620" y="214" width="230" height="58" rx="7" fill="#edf8f2" stroke="#a8d8c4"/>
+  <text class="t ls" x="735" y="236" text-anchor="middle">FTP の仕様を一切引き継がない</text>
+  <text class="t ls" x="735" y="254" text-anchor="middle">1 本の接続の中で全操作が完結</text>
+  <text class="t ls" x="735" y="292" text-anchor="middle">ポート 22 の 1 本のみ</text>
+
+  <!-- bottom band -->
+  <rect x="30" y="310" width="820" height="22" rx="6" fill="#f2f6fb" stroke="#d4e0ea"/>
+  <text class="t ls" x="440" y="325" text-anchor="middle">FTPS は「FTP ＋ TLS」／ SFTP は「SSH の一機能」── 両者に互換性はない</text>
+</svg>
+<figcaption>図 1: プロトコルスタックの比較。FTPS は FTP を TLS で包んだもの、SFTP は SSH の上で動く別プロトコル。</figcaption>
+</figure>
+
+<div class="point">
+FTPS が「FTP をそのまま包む」ということは、<strong>FTP が抱えていた構造上のクセ（制御用とデータ用で接続を分ける方式）もそのまま引き継ぐ</strong>ということです。これが次章のファイアウォールの話につながります。
+</div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="c3">
+<div class="chapter"><div class="num">3</div><h2>通信経路とファイアウォール<span class="sub">運用でいちばん差が出るところ</span></h2></div>
+
+<h3>3.1 FTP／FTPS は接続を 2 本使う</h3>
+<p>FTP 系は、コマンドをやり取りする<strong>制御接続</strong>と、ファイルの中身を流す<strong>データ接続</strong>を分けます。データ接続はファイル 1 件ごと（一覧取得ごと）に張り直され、そのポート番号は<strong>接続のたびにサーバが動的に決めます</strong>（パッシブモードの場合）。</p>
+<p>そのため FTP/FTPS を通すには、ファイアウォールで <strong>21 番に加えてデータ用のポート範囲（例: 50000〜50100）を開放</strong>する必要があります。SFTP は制御もデータも 22 番の 1 本の接続の中で多重化されるため、開けるポートは 22 番だけです。</p>
+
+<figure class="fig">
+<svg viewBox="0 0 880 360" role="img" aria-labelledby="fig2title fig2desc" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig2title">FTPS と SFTP のコネクションとファイアウォール開放範囲の比較</title>
+  <desc id="fig2desc">FTPS は 21 番の制御接続に加え、ファイルごとに動的ポートのデータ接続を張るため、ファイアウォールで広いポート範囲の開放が必要。TLS で暗号化されるとファイアウォールの FTP 支援機能がポート番号を読み取れず自動開放も効かない。SFTP は 22 番一本の中に複数のやり取りを多重化するため、開放は 22 番のみ。</desc>
+  <style>
+    .t{font-family:"BIZ UDPGothic","Yu Gothic UI","Hiragino Sans",sans-serif}
+    .h{font-size:15px;font-weight:bold}
+    .l{font-size:12.5px;fill:#1f2f3d}
+    .ls{font-size:11.5px;fill:#5a6b7a}
+    .p{font-size:12px;fill:#0d3f66;font-weight:bold}
+  </style>
+  <rect x="0" y="0" width="880" height="360" fill="#fbfdff"/>
+
+  <!-- ===== FTPS (top) ===== -->
+  <text class="t h" x="24" y="26" fill="#b35c12">FTPS</text>
+  <text class="t ls" x="80" y="26">制御 1 本 ＋ ファイルごとにデータ接続を張り直す</text>
+
+  <rect x="24" y="40" width="120" height="112" rx="9" fill="#eef5fc" stroke="#15729e" stroke-width="1.5"/>
+  <text class="t l" x="84" y="90" text-anchor="middle">本ツール</text>
+  <text class="t ls" x="84" y="108" text-anchor="middle">クライアント</text>
+
+  <!-- firewall FTPS -->
+  <rect x="380" y="30" width="86" height="132" rx="9" fill="#fdf3e7" stroke="#b35c12" stroke-width="1.5"/>
+  <text class="t l" x="423" y="82" text-anchor="middle" fill="#b35c12">ファイア</text>
+  <text class="t l" x="423" y="100" text-anchor="middle" fill="#b35c12">ウォール</text>
+
+  <rect x="700" y="40" width="156" height="112" rx="9" fill="#eef5fc" stroke="#15729e" stroke-width="1.5"/>
+  <text class="t l" x="778" y="90" text-anchor="middle">FTPS サーバ</text>
+  <text class="t ls" x="778" y="108" text-anchor="middle">21 ＋ 動的ポート</text>
+
+  <!-- control line -->
+  <line x1="144" y1="62" x2="700" y2="62" stroke="#15729e" stroke-width="2.5"/>
+  <polygon points="700,62 690,57.5 690,66.5" fill="#15729e"/>
+  <rect x="500" y="48" width="150" height="20" rx="5" fill="#ffffff" stroke="#15729e"/>
+  <text class="t p" x="575" y="63" text-anchor="middle">制御接続 : 21 番</text>
+
+  <!-- data lines -->
+  <line x1="144" y1="98" x2="700" y2="98" stroke="#b35c12" stroke-width="2" stroke-dasharray="7 4"/>
+  <polygon points="700,98 690,93.5 690,102.5" fill="#b35c12"/>
+  <line x1="144" y1="122" x2="700" y2="122" stroke="#b35c12" stroke-width="2" stroke-dasharray="7 4"/>
+  <polygon points="700,122 690,117.5 690,126.5" fill="#b35c12"/>
+  <line x1="144" y1="146" x2="700" y2="146" stroke="#b35c12" stroke-width="2" stroke-dasharray="7 4"/>
+  <polygon points="700,146 690,141.5 690,150.5" fill="#b35c12"/>
+  <rect x="486" y="108" width="178" height="20" rx="5" fill="#ffffff" stroke="#b35c12"/>
+  <text class="t p" x="575" y="123" text-anchor="middle" fill="#b35c12">データ接続 : 動的ポート × N</text>
+  <text class="t ls" x="220" y="146" fill="#b35c12">ファイル 1 件ごとに張り直し</text>
+
+  <rect x="24" y="168" width="832" height="26" rx="6" fill="#fdf3e7" stroke="#e2c08d"/>
+  <text class="t ls" x="40" y="185" fill="#8a5a12">開放が必要: <tspan font-weight="bold">21 番 ＋ データ用ポート範囲（例 50000-50100）</tspan> ／ TLS で暗号化されるとファイアウォールの FTP 支援機能がポート番号を読めず、自動開放が効かない</text>
+
+  <!-- divider -->
+  <line x1="24" y1="212" x2="856" y2="212" stroke="#d4e0ea" stroke-dasharray="4 4"/>
+
+  <!-- ===== SFTP (bottom) ===== -->
+  <text class="t h" x="24" y="244" fill="#0f7a57">SFTP</text>
+  <text class="t ls" x="80" y="244">1 本の SSH 接続の中に全部のやり取りを多重化</text>
+
+  <rect x="24" y="258" width="120" height="72" rx="9" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.5"/>
+  <text class="t l" x="84" y="290" text-anchor="middle">本ツール</text>
+  <text class="t ls" x="84" y="308" text-anchor="middle">クライアント</text>
+
+  <rect x="380" y="252" width="86" height="84" rx="9" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.5"/>
+  <text class="t l" x="423" y="288" text-anchor="middle" fill="#0f7a57">ファイア</text>
+  <text class="t l" x="423" y="306" text-anchor="middle" fill="#0f7a57">ウォール</text>
+
+  <rect x="700" y="258" width="156" height="72" rx="9" fill="#edf8f2" stroke="#0f7a57" stroke-width="1.5"/>
+  <text class="t l" x="778" y="290" text-anchor="middle">SFTP サーバ</text>
+  <text class="t ls" x="778" y="308" text-anchor="middle">22 番のみ</text>
+
+  <line x1="144" y1="294" x2="700" y2="294" stroke="#0f7a57" stroke-width="9" stroke-linecap="round"/>
+  <polygon points="706,294 692,287 692,301" fill="#0f7a57"/>
+  <rect x="486" y="272" width="178" height="20" rx="5" fill="#ffffff" stroke="#0f7a57"/>
+  <text class="t p" x="575" y="287" text-anchor="middle" fill="#0f7a57">SSH 接続 1 本 : 22 番</text>
+  <text class="t ls" x="176" y="286" fill="#0f7a57">制御もデータも同じ 1 本の中</text>
+
+  <text class="t ls" x="24" y="352" fill="#0b5c42">開放が必要: <tspan font-weight="bold">22 番のみ</tspan> ／ 申請も接続確認もシンプルで、NAT 越しでも構成が変わらない</text>
+</svg>
+<figcaption>図 2: コネクション構成とファイアウォール開放範囲。FTPS は 2 種類の接続、SFTP は 1 本で完結する。</figcaption>
+</figure>
+
+<h3>3.2 FTPS 特有のやっかいごと</h3>
+<ul>
+  <li><strong>ファイアウォールの「FTP 支援機能」が効かなくなる</strong> ─ 平文 FTP なら、ファイアウォールが <code>PASV</code> の応答（サーバが指定するデータ用ポート番号）を読み取って自動的に穴を開けてくれます。FTPS ではその応答が暗号化されて読めないため、この仕組みが働かず、<strong>ポート範囲を静的に開放しておく必要</strong>があります。</li>
+  <li><strong>データ接続の TLS セッション再利用</strong> ─ セキュリティ上の理由から、制御接続の TLS セッションをデータ接続でも再利用することを必須とするサーバ実装があります（例: vsftpd の <code>require_ssl_reuse</code>）。クライアント側がこれに対応していないと、認証は通るのに<strong>ファイル転送だけが失敗</strong>するという切り分けの難しい事象になります。</li>
+  <li><strong>証明書の運用</strong> ─ サーバ証明書の発行・更新・信頼設定が必要です。社内 CA の証明書や自己署名証明書を使う場合は、クライアント側にも信頼設定を配る運用が発生します。</li>
+</ul>
+
+<div class="note">
+SFTP 側にも相手を確認する仕組みはあり、それが<strong>ホスト鍵</strong>です。証明書と違って有効期限や CA が不要な代わりに、<strong>初回接続時に正しい鍵かどうかを利用者が確認する</strong>という運用が必要になります。本ツールではこれを設定ファイルで固定できるようにしています（<a href="#r3">5 章 理由 3</a>）。
+</div>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="c4">
+<div class="chapter"><div class="num">4</div><h2>項目別の比較表<span class="sub">FTP・FTPS・SFTP を横並びで</span></h2></div>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th style="width:150px">観点</th><th style="width:215px">FTP（平文）</th><th style="width:215px">FTPS</th><th>SFTP</th></tr></thead>
+<tr><td><strong>基盤</strong></td><td>FTP（RFC 959）</td><td>FTP ＋ TLS</td><td>SSH-2</td></tr>
+<tr><td><strong>既定ポート</strong></td><td>21 ＋ データ用ポート</td><td>21（明示的）/ 990（暗黙的）<br>＋ データ用ポート</td><td class="ok">22 のみ</td></tr>
+<tr><td><strong>コネクション数</strong></td><td>制御 1 ＋ データ N</td><td>制御 1 ＋ データ N</td><td class="ok">1 本（多重化）</td></tr>
+<tr><td><strong>通信の暗号化</strong></td><td class="ng">なし</td><td class="ok">あり（TLS）</td><td class="ok">あり（SSH）</td></tr>
+<tr><td><strong>改ざん検知</strong></td><td class="ng">なし</td><td class="ok">あり（TLS の MAC）</td><td class="ok">あり（SSH の HMAC / AEAD）</td></tr>
+<tr><td><strong>サーバの真正性確認</strong></td><td class="ng">なし</td><td>サーバ証明書（CA 前提）</td><td>ホスト鍵（指紋を固定して照合）</td></tr>
+<tr><td><strong>認証方式</strong></td><td>パスワード</td><td>パスワード（＋ クライアント証明書）</td><td class="ok">パスワード ／ <strong>公開鍵認証</strong></td></tr>
+<tr><td><strong>ファイアウォール</strong></td><td class="mid">ポート範囲の開放が必要</td><td class="ng">ポート範囲の開放が必要（かつ支援機能が効かない）</td><td class="ok">22 番 1 つ</td></tr>
+<tr><td><strong>ファイル一覧の形式</strong></td><td class="mid">サーバごとに文字列形式が異なり、クライアント側で解析が必要</td><td class="mid">同左</td><td class="ok">サイズ・更新日時などが構造化データで返る</td></tr>
+<tr><td><strong>アトミックなリネーム</strong></td><td>RNFR/RNTO（上書き可否はサーバ依存）</td><td>同左</td><td>RENAME ／ 上書き付きは <code>posix-rename</code> 拡張</td></tr>
+<tr><td><strong>サーバ側ハッシュ</strong></td><td>XCRC/XSHA などの独自拡張（対応はまちまち）</td><td>同左</td><td class="mid">標準機能としては無い</td></tr>
+<tr><td><strong>レイテンシ耐性</strong></td><td>データ接続の張り直しコストあり</td><td>張り直し＋ TLS ハンドシェイクのコストあり</td><td class="mid">1 ファイルあたりの往復回数が多い（<a href="#c7">7 章</a>で対策）</td></tr>
+<tr><td><strong>サーバの入手性</strong></td><td>広く普及</td><td>広く普及</td><td class="ok">Linux/UNIX なら OpenSSH に標準搭載</td></tr>
+<tr><td><strong>本ツールの対応</strong></td><td><code>Mode: "ftp"</code>（起動時に警告）</td><td class="ng">未対応</td><td class="ok"><code>Mode: "sftp"</code>（標準・推奨）</td></tr>
+</table>
+</div>
+
+<div class="warn">
+<strong>「SFTP のほうが暗号として強い」わけではありません。</strong>FTPS も SFTP も、現代的な設定であれば暗号強度・改ざん検知の水準に実質的な差はありません。<strong>差が出るのは運用面</strong>（開けるポート、証明書か鍵か、サーバ実装のばらつき、クライアント実装の相互運用性）です。本ツールの選定も、この運用面の比較にもとづいています。
+</div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="c5">
+<div class="chapter"><div class="num">5</div><h2>本ツールが SFTP を標準とした 6 つの理由<span class="sub">FtpTransferAgent の設計判断</span></h2></div>
+
+<p>本ツールは、旧ツール FileTransFTP（FTP / CIFS のみ対応）の後継として開発されました。<strong>新規・更改案件の標準を「SFTP ＋ 鍵認証 ＋ ホスト鍵検証」に置く</strong>という方針で設計しており、その根拠は次の 6 点です。</p>
+
+<div class="reason">
+<h4>理由 1 ─ 社内基準と連携先の要件が SFTP を求めている</h4>
+<p>新規サーバ構築時の社内基準が厳格化され、<strong>平文 FTP の利用には除外申請と承認が必要</strong>になりました。SFTP であれば申請そのものが不要です。加えて、外部連携先から <strong>SFTP を必須条件として提示される案件</strong>が増えており、旧ツールでは対応できず案件を受けられない状況が発生していました。</p>
+<p>ここで重要なのは、<strong>相手先が求めているのは「暗号化された FTP」ではなく、名指しで「SFTP」であることが大半</strong>という点です。FTPS を実装しても、この要件は満たせません。</p>
+<div class="src">根拠: <a href="internal-overview.html#c1">仕様確認資料 1 章「現行ツールが抱える課題」</a></div>
+</div>
+
+<div class="reason">
+<h4>理由 2 ─ 開けるポートが 1 つで済み、運用・申請コストが小さい</h4>
+<p>本ツールは<strong>複数の宛先へ同時に配信（ファンアウト）し、最大 16 並列で転送</strong>します。FTPS ではこの並列転送のたびにデータ接続が張られるため、ネットワーク申請では余裕を見たポート範囲の開放が必要で、拠点や連携先が増えるたびに同じ調整を繰り返すことになります。</p>
+<p>SFTP なら<strong>並列度をいくつに上げても開放するのは 22 番だけ</strong>です。接続の疎通確認も 22 番 1 つを見ればよく、トラブル時の切り分けが容易になります。</p>
+<div class="src">根拠: <a href="../fanout-and-parallelism.md">ファンアウトと並列処理 実装詳細</a> / <a href="#c3">本資料 3 章</a></div>
+</div>
+
+<div class="reason" id="r3">
+<h4>理由 3 ─ 鍵認証とホスト鍵検証を、ツール側で完結して提供できる</h4>
+<p>本ツールは SFTP について、次のセキュリティ機能を実装済みです。</p>
+<ul>
+  <li><strong>公開鍵認証</strong>（<code>PrivateKeyPath</code>）─ 設定ファイルにパスワードを置かずに運用できる。起動時に鍵ファイルの存在と読み取り権限を検証し、問題があれば起動を中止する</li>
+  <li><strong>ホスト鍵指紋の照合</strong>（<code>HostKeyFingerprint</code>）─ 接続先サーバの指紋を設定に固定し、一致しなければ接続を中断する。中間者攻撃への対策となる。未設定の場合は「検証せずに接続した」旨を警告としてログに残す</li>
+  <li><strong>脆弱なホスト鍵アルゴリズムの除外</strong> ─ 接続時に <code>ssh-rsa</code>(SHA-1) と <code>ssh-dss</code> を候補から取り除く</li>
+</ul>
+<p>FTPS で同等のことをするには、証明書チェーンの検証方針・信頼ストアの扱い・クライアント証明書の配布といった仕組みを別途設計・実装する必要があります。<strong>「鍵ファイル 1 つと指紋 1 行」で完結する SFTP のほうが、実装も運用手順書も単純</strong>になります。</p>
+<div class="src">根拠: <code>Services/SftpClientWrapper.cs</code>（<code>AttachHostKeyValidation</code>）/ <code>Configuration/ConfigurationValidator.cs</code></div>
+</div>
+
+<div class="reason">
+<h4>理由 4 ─ 転送レイヤーで完全性が担保され、運用を簡素にできる</h4>
+<p>SSH は<strong>パケットごとに HMAC / AEAD による改ざん検知</strong>を行い、SFTP は書き込み・クローズ・リネームの各操作に対してサーバからの成功応答を確認します。そのため本ツールでは、<strong>SFTP 利用時はハッシュ検証（<code>Hash:Enabled</code>）を無効にした運用を推奨</strong>しています。ハッシュ検証は転送のたびに送信元・送信先の両方でファイル全体を読み直すため、無効化できると転送時間とサーバ負荷を大きく削減できます。</p>
+<p>アップロードは<strong>一時ファイル名で書き込み、完了後にアトミックにリネーム</strong>する方式です。受信側のバッチが書きかけのファイルを拾う事故を防ぎます。</p>
+<figure class="fig">
+<svg viewBox="0 0 860 300" role="img" aria-labelledby="fig3title fig3desc" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig3title">本ツールの SFTP アップロード手順と完全性の担保</title>
+  <desc id="fig3desc">一時ファイル名で書き込み、サーバの成功応答を確認したうえでアトミックにリネームする。SSH のパケットごとの改ざん検知と SFTP の応答確認により、転送レイヤーで完全性が担保される。</desc>
+  <style>
+    .t{font-family:"BIZ UDPGothic","Yu Gothic UI","Hiragino Sans",sans-serif}
+    .l{font-size:12.5px;fill:#1f2f3d}
+    .ls{font-size:11.5px;fill:#5a6b7a}
+    .n{font-size:13px;fill:#ffffff;font-weight:bold}
+    .cap{font-size:12.5px;font-weight:bold;fill:#0b548c}
+  </style>
+  <rect x="0" y="0" width="860" height="300" fill="#fbfdff"/>
+
+  <text class="t cap" x="24" y="26">送信元（本ツール）</text>
+  <text class="t cap" x="640" y="26">宛先 SFTP サーバ</text>
+
+  <!-- steps -->
+  <g>
+    <circle cx="52" cy="66" r="15" fill="#0f7a57"/><text class="t n" x="52" y="71" text-anchor="middle">1</text>
+    <rect x="80" y="48" width="330" height="36" rx="7" fill="#edf8f2" stroke="#0f7a57"/>
+    <text class="t l" x="96" y="71">一時ファイル名で書き込み開始</text>
+    <line x1="410" y1="66" x2="620" y2="66" stroke="#0f7a57" stroke-width="2"/>
+    <polygon points="626,66 612,60 612,72" fill="#0f7a57"/>
+    <rect x="632" y="48" width="204" height="36" rx="7" fill="#ffffff" stroke="#a8d8c4"/>
+    <text class="t ls" x="646" y="71">data.csv.tmp.a1b2… として保存</text>
+  </g>
+  <g>
+    <circle cx="52" cy="122" r="15" fill="#0f7a57"/><text class="t n" x="52" y="127" text-anchor="middle">2</text>
+    <rect x="80" y="104" width="330" height="36" rx="7" fill="#edf8f2" stroke="#0f7a57"/>
+    <text class="t l" x="96" y="127">書き込み完了・クローズ</text>
+    <line x1="620" y1="122" x2="416" y2="122" stroke="#15729e" stroke-width="2" stroke-dasharray="6 4"/>
+    <polygon points="410,122 424,116 424,128" fill="#15729e"/>
+    <rect x="632" y="104" width="204" height="36" rx="7" fill="#ffffff" stroke="#b9d3e6"/>
+    <text class="t ls" x="646" y="127">成功応答（SSH_FX_OK）を返す</text>
+  </g>
+  <g>
+    <circle cx="52" cy="178" r="15" fill="#0f7a57"/><text class="t n" x="52" y="183" text-anchor="middle">3</text>
+    <rect x="80" y="160" width="330" height="36" rx="7" fill="#edf8f2" stroke="#0f7a57"/>
+    <text class="t l" x="96" y="183">本番ファイル名へアトミックにリネーム</text>
+    <line x1="410" y1="178" x2="620" y2="178" stroke="#0f7a57" stroke-width="2"/>
+    <polygon points="626,178 612,172 612,184" fill="#0f7a57"/>
+    <rect x="632" y="160" width="204" height="36" rx="7" fill="#ffffff" stroke="#a8d8c4"/>
+    <text class="t ls" x="646" y="183">data.csv として一瞬で出現</text>
+  </g>
+
+  <!-- integrity band -->
+  <rect x="24" y="216" width="812" height="30" rx="8" fill="#0f7a57"/>
+  <text class="t" x="430" y="236" text-anchor="middle" font-size="12.5" fill="#ffffff" font-weight="bold">全区間で SSH のパケット単位の改ざん検知（HMAC / AEAD）が働く</text>
+  <rect x="24" y="254" width="812" height="30" rx="8" fill="#eef5fc" stroke="#b9d3e6"/>
+  <text class="t ls" x="430" y="274" text-anchor="middle">書き込み・クローズ・リネームはいずれもサーバの成功応答を確認 ── ハッシュ検証を無効にしても完了保証は変わらない</text>
+</svg>
+<figcaption>図 3: SFTP アップロードの流れ。一時名 → アトミックリネームで、受信側が書きかけのファイルを拾わない。</figcaption>
+</figure>
+<div class="src">根拠: <a href="../sftp-performance-analysis.md">SFTP 転送性能の調査レポート §5</a> / README「ハッシュ検証」節</div>
+</div>
+
+<div class="reason">
+<h4>理由 5 ─ ファイル一覧・属性が構造化されて取れる（get 方向で効く）</h4>
+<p>FTP / FTPS のファイル一覧は、サーバの種類（UNIX 系・Windows 系・製品固有）によって<strong>文字列の書式が異なり、クライアント側で解析する必要</strong>があります。日付表記やロケールの違いで誤解析が起きると、ファイルの取りこぼしや二重取得につながります。</p>
+<p>SFTP はサイズ・更新日時・種別が<strong>構造化されたデータとして返る</strong>ため、この種の解析起因の不具合が原理的に発生しません。本ツールはダウンロード（<code>Direction: "get"</code>）や、宛先ごとの配信済み判定（サイズ・更新日時による署名）で一覧情報を使うため、この違いは信頼性に直結します。</p>
+<div class="src">根拠: <a href="../per-destination-delivery-tracking.md">宛先別配信トラッキングのドキュメント</a></div>
+</div>
+
+<div class="reason">
+<h4>理由 6 ─ 実装・テスト・チューニングを 1 方式に集中できる</h4>
+<p>本ツールは SFTP について、<strong>実測にもとづく性能改善まで作り込んでいます</strong>。リモートディレクトリ存在確認のキャッシュ、リネーム後の存在確認を省略するオプション、書き込みバッファサイズの調整などで、高レイテンシ回線において<strong>1.4〜1.57 倍の高速化</strong>を確認しました（整合性は全ケース SHA256 全数比較で検証済み）。また Docker を用いた SFTP 統合テストも整備しています。</p>
+<p>FTPS を追加すると、暗号化モード（明示的／暗黙的）・証明書検証方針・データ接続の TLS セッション再利用といった<strong>設定項目とテストの組み合わせが一気に増えます</strong>。対応方式を絞ることで、限られた工数を品質と性能に振り向ける判断をしました。</p>
+<div class="src">根拠: <a href="../sftp-performance-analysis.md">SFTP 転送性能の調査レポート</a> / README「SFTP 統合テスト（Docker）」節</div>
+</div>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="c6">
+<div class="chapter"><div class="num">6</div><h2>FTPS を採用しなかった理由と、FTPS が適するケース<span class="sub">公平に見た場合の整理</span></h2></div>
+
+<h3>6.1 採用しなかった理由</h3>
+<p>FTPS は<strong>プロトコルとして劣っているわけではありません</strong>。採用しなかったのは、次のとおり「本ツールが解決したい課題に対して優先度が低い」という判断です。</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th style="width:190px">観点</th><th>判断</th></tr></thead>
+<tr><td><strong>要件を満たさない</strong></td><td>連携先や社内基準が求めているのは名指しで「SFTP」であることが大半。FTPS を実装しても、旧ツールが受注できなかった案件は受注できるようにならない</td></tr>
+<tr><td><strong>運用コストが減らない</strong></td><td>データ用ポート範囲の開放という、FTP 時代からのネットワーク申請の手間が残る。むしろ TLS 化でファイアウォールの FTP 支援機能が効かなくなる分、構成の難易度は上がる</td></tr>
+<tr><td><strong>証明書運用が必要になる</strong></td><td>発行・更新・信頼設定という継続的な作業が発生する。SFTP の鍵・指紋運用に比べて手順書と教育のコストが大きい</td></tr>
+<tr><td><strong>相互運用の不確実性</strong></td><td>データ接続の TLS セッション再利用など、サーバ実装によって成否が分かれる要素があり、事前検証の負担が読みにくい</td></tr>
+<tr><td><strong>工数配分</strong></td><td>対応方式を増やすより、SFTP の性能・信頼性・テストに投資するほうが利用者の便益が大きいと判断（<a href="#c5">5 章 理由 6</a>）</td></tr>
+</table>
+</div>
+
+<h3>6.2 それでも FTPS が適するケース</h3>
+<p>次のような場合は FTPS が合理的です。該当する連携が出てきた場合は、本ツールへの機能追加を個別に検討します。</p>
+<ul>
+  <li><strong>連携先が FTPS しか提供していない</strong>（相手先の都合で選択の余地がない）</li>
+  <li><strong>既存の FTP 資産を最小の変更で暗号化したい</strong> ─ FTPS はコマンド体系が FTP と同一のため、既存のサーバ設定・アカウント・ディレクトリ構成を活かしやすい</li>
+  <li><strong>クライアント証明書による相互認証を、既存の PKI 基盤に乗せて統制したい</strong></li>
+  <li><strong>SSH サーバを立てられない事情がある</strong>（22 番の開放や SSH ログインが組織方針で禁止されているなど）</li>
+</ul>
+
+<div class="note">
+現時点で<strong>本ツールは FTPS に対応していません</strong>。<code>Mode</code> に指定できるのは <code>ftp</code>（平文）・<code>sftp</code>・<code>local</code> の 3 つで、FTPS 用の設定項目（<code>AUTH TLS</code> の有効化、証明書検証方針など）は用意していません。FTPS が必要な案件が発生した場合は、要件を確認のうえ機能追加として検討します。
+</div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="c7">
+<div class="chapter"><div class="num">7</div><h2>SFTP の弱点と本ツールでの対策<span class="sub">良いところだけではない</span></h2></div>
+
+<p>公平を期すため、SFTP を選んだことによる不利な点と、本ツールでの対策も記載します。</p>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th style="width:210px">SFTP の弱点</th><th>内容</th><th style="width:290px">本ツールでの対策</th></tr></thead>
+<tr>
+  <td><strong>1 ファイルあたりの往復が多い</strong></td>
+  <td>ファイルを 1 件送るのに、パス解決・存在確認・オープン・書き込み・クローズ・リネームと複数回のやり取りが発生する。小さなファイルを大量に送る × 遅い回線、の組み合わせで支配的になる</td>
+  <td>リモートディレクトリ存在確認のキャッシュを常時有効化し、<code>VerifyUploadedFileExists: false</code> でリネーム後の追加確認を省略可能に。往復 10 回 → 6 回に削減し、RTT 10ms 環境で最大 1.57 倍の高速化を実測</td>
+</tr>
+<tr>
+  <td><strong>並列化しないと遅い</strong></td>
+  <td>上記の往復コストは 1 本の接続では隠せない</td>
+  <td><code>Concurrency</code>（1〜16）で並列転送。実測では 16 並列までほぼ線形に短縮する</td>
+</tr>
+<tr>
+  <td><strong>バッファ拡大の効果が限定的</strong></td>
+  <td>OpenSSH 系サーバは 32KB のパケット上限を通知するため、<code>BufferSizeKB</code> を上げても効果がない</td>
+  <td>32KB 超を指定した場合は起動時に警告を表示。上限を 64KB に制限し、送信時例外を防止</td>
+</tr>
+<tr>
+  <td><strong>サーバ側ハッシュ機能がない</strong></td>
+  <td>FTP の XCRC/XSHA のような拡張が標準にない</td>
+  <td>ハッシュ検証は常にローカル計算で実施。<code>UseServerCommand</code> を SFTP で有効にした場合は警告のうえローカル計算にフォールバック。そもそも SFTP では<a href="#c5">理由 4</a> のとおりハッシュ検証を無効にする運用を推奨</td>
+</tr>
+<tr>
+  <td><strong>上書きリネームが拡張依存</strong></td>
+  <td>上書きを伴うアトミックリネームは <code>posix-rename@openssh.com</code> 拡張に依存し、非対応サーバでは使えない</td>
+  <td>非対応サーバでは「削除 → リネーム」へ自動フォールバック。往復は増えるが動作は継続する</td>
+</tr>
+</table>
+</div>
+
+<div class="tip">
+小ファイル大量 × WAN の構成では、<code>Concurrency</code> を上げ、<code>VerifyUploadedFileExists: false</code> と <code>Hash:Enabled: false</code> を併用するのが最も効果的です。詳細な指針は <a href="../sftp-performance-analysis.md">SFTP 転送性能の調査レポート §5 チューニングガイド</a> を参照してください。
+</div>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="c8">
+<div class="chapter"><div class="num">8</div><h2>本ツールの対応状況と設定例<span class="sub">実際に何が選べるのか</span></h2></div>
+
+<h3>8.1 対応している転送方式</h3>
+<div class="tablewrap">
+<table>
+<thead><tr><th style="width:110px"><code>Mode</code></th><th style="width:110px">方式</th><th>位置づけ</th></tr></thead>
+<tr><td><code>"sftp"</code></td><td>SFTP</td><td class="ok">標準・推奨。新規／更改案件はこれを基本とする</td></tr>
+<tr><td><code>"ftp"</code></td><td>FTP（平文）</td><td>既存連携の互換用。パスワードを設定すると起動時に「FTP はパスワードを平文で送信する」旨の警告が出る</td></tr>
+<tr><td><code>"local"</code></td><td>ローカル / UNC 共有</td><td>社内 LAN の共有フォルダ向け（put 専用）。OS のファイル I/O で書き込む</td></tr>
+<tr><td>―</td><td>FTPS</td><td class="ng">未対応（<a href="#c6">6 章</a>）</td></tr>
+</table>
+</div>
+
+<h3>8.2 推奨構成の設定例（SFTP ＋ 鍵認証 ＋ ホスト鍵検証）</h3>
+<pre><code>{
+  "Transfer": {
+    "Mode": "sftp",
+    "Host": "sftp.example.com",
+    "Port": 22,
+    "Username": "transfer-user",
+    "PrivateKeyPath": "C:\\keys\\transfer_id_ed25519",
+    "HostKeyFingerprint": "SHA256:AbCdEf0123...",
+    "RemotePath": "/upload",
+    "Concurrency": 4,
+    "VerifyUploadedFileExists": false
+  },
+  "Hash": {
+    "Enabled": false
+  }
+}</code></pre>
+<ul>
+  <li><code>Password</code> を書かずに <code>PrivateKeyPath</code> だけで認証できます（設定ファイルに平文パスワードを残さない）</li>
+  <li><code>HostKeyFingerprint</code> は接続先サーバで <code>ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub</code> を実行して得られる SHA-256 指紋を <code>SHA256:</code> 付きで指定します</li>
+  <li><code>Hash:Enabled</code> を <code>false</code> にできるのは、SSH が転送レイヤーで改ざん検知を行うためです（<a href="#c5">5 章 理由 4</a>）</li>
+</ul>
+
+<div class="warn">
+<strong>ホスト鍵指紋は、必ず信頼できる経路で入手してください。</strong>初回接続時のログに出力された指紋をそのまま設定に写す運用は、その 1 回目が中間者攻撃だった場合に攻撃者の鍵を固定してしまいます。サーバ管理者から別経路（構築手順書・対面・別チャネル）で受け取った値と照合してください。
+</div>
+
+<h3>8.3 やむを得ず平文 FTP を使う場合</h3>
+<ul>
+  <li>相手先が FTP しか提供しておらず、かつ社内の除外申請が承認されている場合に限ります</li>
+  <li>転送レイヤーに完全性の保証がないため、<strong><code>Hash:Enabled: true</code> によるハッシュ検証の有効化を推奨</strong>します。とくに <code>Cleanup:DeleteAfterVerify: true</code>（転送後に元ファイルを削除）と併用する場合は、検証なしでの削除になるため必ず有効にしてください</li>
+  <li>専用アカウントを用意し、他システムとパスワードを共用しないでください</li>
+</ul>
+</section>
+
+<!-- ============ 9 ============ -->
+<section id="c9">
+<div class="chapter"><div class="num">9</div><h2>選定フローと FAQ<span class="sub">迷ったときの判断手順</span></h2></div>
+
+<figure class="fig">
+<svg viewBox="0 0 860 400" role="img" aria-labelledby="fig4title fig4desc" xmlns="http://www.w3.org/2000/svg">
+  <title id="fig4title">転送方式の選定フロー</title>
+  <desc id="fig4desc">相手先が方式を指定しているかを確認し、SFTP 指定ならモード sftp、FTPS 指定なら個別検討、指定がない場合は社内 LAN の共有フォルダならモード local、それ以外は SFTP を提案し、相手先が FTP しか提供できない場合のみ除外申請のうえモード ftp を使う。</desc>
+  <style>
+    .t{font-family:"BIZ UDPGothic","Yu Gothic UI","Hiragino Sans",sans-serif}
+    .q{font-size:12.5px;fill:#0d3f66}
+    .a{font-size:12.5px;fill:#ffffff;font-weight:bold}
+    .e{font-size:11.5px;fill:#5a6b7a}
+  </style>
+  <rect x="0" y="0" width="860" height="400" fill="#fbfdff"/>
+
+  <!-- Q1 -->
+  <rect x="270" y="18" width="320" height="46" rx="9" fill="#eef5fc" stroke="#15729e" stroke-width="1.5"/>
+  <text class="t q" x="430" y="40" text-anchor="middle">相手先が方式を指定しているか？</text>
+  <text class="t e" x="430" y="57" text-anchor="middle">まず必ずここを確認する</text>
+
+  <!-- branch to FTPS -->
+  <line x1="590" y1="41" x2="700" y2="41" stroke="#b35c12" stroke-width="2"/>
+  <polygon points="706,41 692,35 692,47" fill="#b35c12"/>
+  <text class="t e" x="645" y="33" text-anchor="middle" fill="#b35c12">FTPS 指定</text>
+  <rect x="706" y="20" width="140" height="44" rx="9" fill="#fdf3e7" stroke="#b35c12" stroke-width="1.5"/>
+  <text class="t q" x="776" y="40" text-anchor="middle" fill="#8a5a12">個別に検討</text>
+  <text class="t e" x="776" y="56" text-anchor="middle">現状は未対応</text>
+
+  <!-- branch to SFTP -->
+  <line x1="270" y1="41" x2="170" y2="41" stroke="#0f7a57" stroke-width="2"/>
+  <polygon points="164,41 178,35 178,47" fill="#0f7a57"/>
+  <text class="t e" x="218" y="33" text-anchor="middle" fill="#0f7a57">SFTP 指定</text>
+  <rect x="20" y="20" width="144" height="44" rx="9" fill="#0f7a57"/>
+  <text class="t a" x="92" y="40" text-anchor="middle">Mode: "sftp"</text>
+  <text class="t" x="92" y="56" text-anchor="middle" font-size="11" fill="#e3f4ec">鍵認証 ＋ 指紋検証</text>
+
+  <!-- down to Q2 -->
+  <line x1="430" y1="64" x2="430" y2="108" stroke="#15729e" stroke-width="2"/>
+  <polygon points="430,114 424,100 436,100" fill="#15729e"/>
+  <text class="t e" x="470" y="90" text-anchor="middle">指定なし</text>
+
+  <!-- Q2 -->
+  <rect x="270" y="114" width="320" height="46" rx="9" fill="#eef5fc" stroke="#15729e" stroke-width="1.5"/>
+  <text class="t q" x="430" y="136" text-anchor="middle">宛先は社内 LAN の共有フォルダか？</text>
+  <text class="t e" x="430" y="153" text-anchor="middle">UNC / SMB 共有への書き込み</text>
+
+  <line x1="590" y1="137" x2="700" y2="137" stroke="#5d4380" stroke-width="2"/>
+  <polygon points="706,137 692,131 692,143" fill="#5d4380"/>
+  <text class="t e" x="645" y="129" text-anchor="middle" fill="#5d4380">はい</text>
+  <rect x="706" y="116" width="140" height="44" rx="9" fill="#5d4380"/>
+  <text class="t a" x="776" y="136" text-anchor="middle">Mode: "local"</text>
+  <text class="t" x="776" y="152" text-anchor="middle" font-size="11" fill="#efeaf6">put 専用</text>
+
+  <!-- down to Q3 -->
+  <line x1="430" y1="160" x2="430" y2="204" stroke="#15729e" stroke-width="2"/>
+  <polygon points="430,210 424,196 436,196" fill="#15729e"/>
+  <text class="t e" x="462" y="186" text-anchor="middle">いいえ</text>
+
+  <!-- Q3 -->
+  <rect x="270" y="210" width="320" height="46" rx="9" fill="#eef5fc" stroke="#15729e" stroke-width="1.5"/>
+  <text class="t q" x="430" y="232" text-anchor="middle">相手先は SFTP を提供できるか？</text>
+  <text class="t e" x="430" y="249" text-anchor="middle">まず SFTP での接続を提案する</text>
+
+  <line x1="270" y1="233" x2="170" y2="233" stroke="#0f7a57" stroke-width="2"/>
+  <polygon points="164,233 178,227 178,239" fill="#0f7a57"/>
+  <text class="t e" x="218" y="225" text-anchor="middle" fill="#0f7a57">はい</text>
+  <rect x="20" y="212" width="144" height="44" rx="9" fill="#0f7a57"/>
+  <text class="t a" x="92" y="232" text-anchor="middle">Mode: "sftp"</text>
+  <text class="t" x="92" y="248" text-anchor="middle" font-size="11" fill="#e3f4ec">これを標準とする</text>
+
+  <!-- down to FTP -->
+  <line x1="430" y1="256" x2="430" y2="298" stroke="#b3261e" stroke-width="2"/>
+  <polygon points="430,304 424,290 436,290" fill="#b3261e"/>
+  <text class="t e" x="500" y="280" text-anchor="middle" fill="#b3261e">いいえ（FTP のみ）</text>
+
+  <rect x="270" y="304" width="320" height="46" rx="9" fill="#b3261e"/>
+  <text class="t a" x="430" y="324" text-anchor="middle">Mode: "ftp"（例外運用）</text>
+  <text class="t" x="430" y="340" text-anchor="middle" font-size="11" fill="#fbe6e5">除外申請 ＋ ハッシュ検証を有効化</text>
+
+  <rect x="20" y="366" width="820" height="24" rx="6" fill="#f2f6fb" stroke="#d4e0ea"/>
+  <text class="t e" x="430" y="382" text-anchor="middle">迷ったら SFTP。方式の確認は「SFTP（SSH・22 番）ですか、FTPS（FTP over TLS・21 番）ですか」と明示的に聞く</text>
+</svg>
+<figcaption>図 4: 転送方式の選定フロー。原則は SFTP、平文 FTP は例外運用と位置づける。</figcaption>
+</figure>
+
+<h3>FAQ</h3>
+
+<h4>Q. 相手先から「FTP を暗号化したい」と言われました。SFTP でよいですか？</h4>
+<p>A. 確認が必要です。相手先が想定しているのが FTPS（既存 FTP サーバに TLS を有効化する）である可能性があります。<strong>「SFTP（SSH・22 番）ですか、FTPS（FTP over TLS・21 番）ですか」と明示的に確認</strong>してください。SFTP であれば本ツールでそのまま対応できます。</p>
+
+<h4>Q. SFTP のほうがセキュリティが高いのですか？</h4>
+<p>A. <strong>暗号の強度としては同等</strong>です。本ツールが SFTP を選んだのは、社内基準・連携先要件・ファイアウォール運用・鍵管理の簡潔さといった運用面の理由です（<a href="#c5">5 章</a>）。ただし、比較対象が<strong>平文 FTP</strong> であれば、SFTP のほうが明確に安全です。</p>
+
+<h4>Q. ハッシュ検証を無効にして本当に大丈夫ですか？</h4>
+<p>A. SFTP であれば実用上の問題は小さいと判断しています。SSH がパケット単位で改ざんを検知し、書き込み・クローズ・リネームの各操作についてサーバの成功応答を確認しているためです。一方、<strong>平文 FTP では転送レイヤーに完全性の保証がないため、ハッシュ検証の有効化を推奨</strong>します。</p>
+
+<h4>Q. FTPS への対応予定はありますか？</h4>
+<p>A. 現時点で予定はありません。FTPS でしか接続できない連携先が出てきた場合に、要件を確認のうえ個別に検討します（<a href="#c6">6 章</a>）。</p>
+
+<h4>Q. ポート 22 が開けられない場合は？</h4>
+<p>A. 社内 LAN の共有フォルダが宛先であれば <code>Mode: "local"</code> が使えます。外部連携で 22 番が開けられない場合は、ネットワーク・セキュリティ担当と個別にご相談ください。</p>
+</section>
+
+<!-- ============ 付録 ============ -->
+<section id="apx">
+<div class="chapter"><div class="num">付</div><h2>付録：用語集<span class="sub">本資料に出てくる用語</span></h2></div>
+
+<div class="tablewrap">
+<table>
+<thead><tr><th style="width:190px">用語</th><th>意味</th></tr></thead>
+<tr><td><strong>制御接続 / データ接続</strong></td><td>FTP 系が使う 2 種類の接続。コマンドをやり取りするのが制御接続、ファイルの中身を流すのがデータ接続</td></tr>
+<tr><td><strong>パッシブモード</strong></td><td>データ接続をクライアントからサーバへ張る方式。サーバが使用ポートを都度通知する。ファイアウォール越しでは事実上こちらを使う</td></tr>
+<tr><td><strong>TLS</strong></td><td>通信を暗号化し改ざんを検知する仕組み。HTTPS でも使われている。サーバ証明書で接続先の正当性を確認する</td></tr>
+<tr><td><strong>ホスト鍵</strong></td><td>SSH サーバが持つ、サーバ自身を証明する鍵。クライアントはその<strong>指紋</strong>（鍵を短い文字列に要約したもの）を照合して接続先を確認する</td></tr>
+<tr><td><strong>公開鍵認証</strong></td><td>パスワードの代わりに秘密鍵ファイルで認証する方式。設定ファイルにパスワードを残さずに済む</td></tr>
+<tr><td><strong>HMAC / AEAD</strong></td><td>通信データが途中で改ざんされていないことを検知する仕組み。SSH はパケットごとにこれを付与する</td></tr>
+<tr><td><strong>アトミックなリネーム</strong></td><td>ファイル名の変更が「途中の状態」を作らずに一瞬で完了すること。受信側が書きかけのファイルを拾う事故を防げる</td></tr>
+<tr><td><strong>RTT（往復遅延）</strong></td><td>通信の往復にかかる時間。SFTP は 1 ファイルあたりの往復回数が多いため、RTT が大きい回線では性能に影響する</td></tr>
+<tr><td><strong>ファンアウト</strong></td><td>1 つの送信元ファイルを複数の宛先へ配信する本ツールの機能</td></tr>
+<tr><td><strong>UNC / SMB 共有</strong></td><td><code>\\server\share</code> 形式でアクセスする Windows のファイル共有。本ツールでは <code>Mode: "local"</code> で扱う</td></tr>
+</table>
+</div>
+
+<h3>参考リンク（社内資料）</h3>
+<ul>
+  <li><a href="spec.html">詳細仕様書</a> ─ 設定項目の全量と動作仕様</li>
+  <li><a href="user-guide.html">ユーザーガイド</a> ─ 導入・設定・運用手順</li>
+  <li><a href="internal-overview.html">仕様確認資料</a> ─ 置き換えの背景と導入計画</li>
+  <li><a href="../sftp-performance-analysis.md">SFTP 転送性能の調査・実験レポート</a> ─ 往復回数の実測とチューニングガイド</li>
+  <li><a href="../local-destination.md">ローカル / UNC 宛先の設計と制約</a></li>
+</ul>
+</section>
+
+</main>
+<footer>
+FtpTransferAgent ／ SFTP と FTPS の違い ― 本ツールが SFTP を標準とした理由 ／ 第 1.0 版（2026-08-22）／ 社内利用限定
+</footer>
+</body>
+</html>
