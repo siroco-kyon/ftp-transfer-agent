@@ -18,6 +18,7 @@
 | [詳細仕様書](docs/html/spec.html) | 機能仕様・設定・動作仕様の全量（[Markdown 版](ftp-transfer-agent-spec.md)） |
 | [ユーザーガイド](docs/html/user-guide.html) | 導入・設定リファレンス・運用手順 |
 | [仕様確認資料](docs/html/internal-overview.html) | 置き換えの背景・仕様概要・導入スケジュール（承認判断向け） |
+| [SFTP と FTPS の違い](docs/html/sftp-vs-ftps.html) | 2 つのプロトコルの違いと、本ツールが SFTP を標準とした理由（方式選定向け） |
 
 ## 主な機能
 
