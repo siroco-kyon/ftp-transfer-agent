@@ -144,6 +144,10 @@ public class FtpFaultInjectionTests
         };
         var proc = Process.Start(psi)!;
 
+        // パイプバッファが埋まってサーバがブロックしないよう読み捨てる
+        _ = Task.Run(() => proc.StandardOutput.ReadToEndAsync());
+        _ = Task.Run(() => proc.StandardError.ReadToEndAsync());
+
         var deadline = DateTime.UtcNow.AddSeconds(10);
         var connected = false;
         while (DateTime.UtcNow < deadline && !connected)

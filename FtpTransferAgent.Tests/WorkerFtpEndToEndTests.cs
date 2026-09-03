@@ -239,6 +239,92 @@ public class WorkerFtpEndToEndTests
         }
     }
 
+    /// <summary>
+    /// 実運用で現れるファイル名・サイズを実サーバへ往復させる。
+    /// これまで日本語名/スペース入り名/0 バイト/大きめのファイルは、レコードが文字列を
+    /// 保持することを確認するだけで、実際に転送するテストが無かった。
+    /// </summary>
+    [Fact]
+    public async Task Worker_PutThenGet_HandlesUnicodeSpacedEmptyAndLargeFiles()
+    {
+        var (watchDir, serverRoot, port, server) = await StartAsync();
+        try
+        {
+            var payloads = new Dictionary<string, string>
+            {
+                ["alpha.txt"] = "alpha-content",
+                ["empty.txt"] = "",
+                ["日本語 スペース.txt"] = "にほんご ないよう",
+                ["large.txt"] = new string('x', 2 * 1024 * 1024),
+            };
+            foreach (var (name, content) in payloads)
+            {
+                await File.WriteAllTextAsync(Path.Combine(watchDir, name), content);
+            }
+
+            var putWorker = CreateWorker(
+                watchDir,
+                new TransferOptions
+                {
+                    Mode = "ftp",
+                    Direction = "put",
+                    Host = "localhost",
+                    Port = port,
+                    Username = "user",
+                    Password = "pass",
+                    RemotePath = "/",
+                    Concurrency = 2
+                },
+                allowedExtensions: new[] { ".txt" },
+                hash: new HashOptions { Enabled = true, Algorithm = "SHA256" },
+                cleanup: new CleanupOptions { DeleteAfterVerify = false });
+
+            await putWorker.RunAsync();
+
+            foreach (var (name, content) in payloads)
+            {
+                var uploaded = Path.Combine(serverRoot, name);
+                Assert.True(File.Exists(uploaded), $"{name} was not uploaded.");
+                Assert.Equal(content, await File.ReadAllTextAsync(uploaded));
+            }
+            Assert.Empty(Directory.GetFiles(serverRoot, "*.tmp.*"));
+
+            // 取り出して内容が一致することも確認する
+            var downloadDir = Path.Combine(Path.GetDirectoryName(watchDir)!, "download");
+            Directory.CreateDirectory(downloadDir);
+
+            var getWorker = CreateWorker(
+                downloadDir,
+                new TransferOptions
+                {
+                    Mode = "ftp",
+                    Direction = "get",
+                    Host = "localhost",
+                    Port = port,
+                    Username = "user",
+                    Password = "pass",
+                    RemotePath = "/",
+                    Concurrency = 2
+                },
+                allowedExtensions: new[] { ".txt" },
+                hash: new HashOptions { Enabled = true, Algorithm = "SHA256" },
+                cleanup: new CleanupOptions { DeleteAfterVerify = false });
+
+            await getWorker.RunAsync();
+
+            foreach (var (name, content) in payloads)
+            {
+                var downloaded = Path.Combine(downloadDir, name);
+                Assert.True(File.Exists(downloaded), $"{name} was not downloaded.");
+                Assert.Equal(content, await File.ReadAllTextAsync(downloaded));
+            }
+        }
+        finally
+        {
+            Cleanup(server, watchDir, serverRoot);
+        }
+    }
+
     [Fact]
     public async Task Worker_Put_PreservesFolderStructure_AgainstRealFtpServer()
     {
@@ -334,7 +420,7 @@ public class WorkerFtpEndToEndTests
 
         public async Task RunAsync()
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
             await ExecuteAsync(cts.Token);
         }
     }
@@ -371,6 +457,11 @@ public class WorkerFtpEndToEndTests
             UseShellExecute = false,
         };
         var proc = Process.Start(psi)!;
+
+        // リダイレクトした標準出力/標準エラーを読み捨てる。読まないとパイプバッファが埋まった
+        // 時点でサーバプロセスがログ出力でブロックし、転送が進まなくなる
+        _ = Task.Run(() => proc.StandardOutput.ReadToEndAsync());
+        _ = Task.Run(() => proc.StandardError.ReadToEndAsync());
 
         var maxWaitTime = TimeSpan.FromSeconds(5);
         var startTime = DateTime.Now;

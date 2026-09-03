@@ -241,37 +241,6 @@ public class EdgeCaseTests : IDisposable
         Assert.Equal(item1.GetHashCode(), item2.GetHashCode());
     }
 
-    [Fact]
-    public void FileOperations_ShouldHandlePathTraversal()
-    {
-        // Arrange
-        var maliciousPaths = new[]
-        {
-            "../../../etc/passwd",
-            "..\\..\\windows\\system32\\config\\sam",
-            "/../../../../etc/shadow",
-            "C:\\..\\..\\sensitive.txt"
-        };
-
-        foreach (var maliciousPath in maliciousPaths)
-        {
-            // Path.GetFullPath と Path.GetDirectoryName はパストラバーサル攻撃を防ぐ
-            var fullPath = Path.GetFullPath(Path.Combine(_tempDir, maliciousPath));
-            var expectedDir = Path.GetFullPath(_tempDir);
-
-            // Assert - On Windows, path traversal might resolve to different drives
-            // The important thing is that we're aware of the resolved path
-            var isContained = fullPath.StartsWith(expectedDir, StringComparison.OrdinalIgnoreCase);
-            if (!isContained)
-            {
-                // Log the traversal for awareness, but don't fail the test on Windows
-                // as Path.GetFullPath behavior varies by OS
-                System.Diagnostics.Debug.WriteLine($"Path traversal detected: {maliciousPath} -> {fullPath}");
-            }
-            // Test passes if we successfully detect and resolve the path
-            Assert.True(true, "Path traversal detection completed");
-        }
-    }
 
     [Fact]
     public async Task ConcurrencyStress_ShouldNotCauseDeadlocks()

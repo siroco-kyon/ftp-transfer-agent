@@ -349,35 +349,6 @@ public class SftpClientWrapperTests : IDisposable
         Assert.Equal(expected, actual);
     }
 
-    [Fact]
-    public void PathSecurity_ShouldPreventTraversal()
-    {
-        // Arrange
-        var maliciousPaths = new[]
-        {
-            "../../../etc/passwd",
-            "..\\..\\windows\\system32\\config\\sam",
-            "/../../../../etc/shadow",
-            "C:\\..\\..\\sensitive.txt"
-        };
-
-        foreach (var maliciousPath in maliciousPaths)
-        {
-            // Path.GetFullPath と Path.GetDirectoryName はパストラバーサル攻撃を防ぐ
-            var fullPath = Path.GetFullPath(Path.Combine(_tempDir, maliciousPath));
-            var expectedDir = Path.GetFullPath(_tempDir);
-
-            // Assert - On Windows, path traversal might resolve to different drives
-            var isContained = fullPath.StartsWith(expectedDir, StringComparison.OrdinalIgnoreCase);
-            if (!isContained)
-            {
-                // Log the traversal for awareness, but don't fail the test on Windows
-                System.Diagnostics.Debug.WriteLine($"Path traversal detected: {maliciousPath} -> {fullPath}");
-            }
-            // Test passes if we successfully detect and resolve the path
-            Assert.True(true, "Path traversal detection completed");
-        }
-    }
 
     [Fact]
     public async Task GetRemoteHashAsync_ShouldLogWarning_WhenUseServerCommandIsTrue()

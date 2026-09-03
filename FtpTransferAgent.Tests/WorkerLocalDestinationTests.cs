@@ -142,10 +142,9 @@ public class WorkerLocalDestinationTests : IDisposable
     [Fact]
     public async Task Put_WhenDataDeletionFails_RetainsEndFileAndMarksFailure()
     {
-        if (!OperatingSystem.IsWindows())
-        {
-            return;
-        }
+        // 削除失敗の再現に FileShare によるロックを使うため Windows でのみ意味がある。
+        // 黙って成功扱いにせず、スキップとして可視化する
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "File locking that blocks deletion is Windows-specific.");
 
         var data = Path.Combine(_watchDir, "batch.csv");
         var end = data + ".END";
@@ -197,6 +196,8 @@ public class WorkerLocalDestinationTests : IDisposable
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
         {
+            // シンボリックリンクを作成できない環境。黙って成功扱いにせずスキップとして可視化する
+            Assert.Skip($"Cannot create a directory symbolic link in this environment: {ex.Message}");
             return;
         }
 
