@@ -2,6 +2,7 @@ using FluentFTP;
 using System.IO;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using FluentFTP.Exceptions;
 using FtpTransferAgent.Configuration;
 using Microsoft.Extensions.Logging;
@@ -15,11 +16,13 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
 {
     private readonly AsyncFtpClient _client;
     private readonly ILogger<AsyncFtpClientWrapper> _logger;
+    private readonly DestinationOptions _options;
 
     // テスト用に既存の AsyncFtpClient を渡せるようオーバーロードを追加
     public AsyncFtpClientWrapper(DestinationOptions options, ILogger<AsyncFtpClientWrapper> logger, AsyncFtpClient? client = null)
     {
         _logger = logger;
+        _options = options;
         _client = client ?? new AsyncFtpClient(options.Host, options.Username, options.Password, options.Port);
 
         // タイムアウト設定を適用
@@ -75,17 +78,106 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
         // 一意な一時ファイル名で衝突防止
         var tempPath = $"{remotePath}.tmp.{Guid.NewGuid():N}";
 
+        // フォールバック経路で宛先を削除済みかどうか。true の場合、失敗しても一時ファイルを
+        // 消してはならない (旧ファイルと新ファイルの両方を失うため)
+        var destinationRemoved = new StrongBox<bool>(false);
+
         try
         {
-            await _client.UploadFile(localPath, tempPath, FtpRemoteExists.Overwrite, true, FtpVerify.None, null, ct).ConfigureAwait(false);
-            await _client.MoveFile(tempPath, remotePath, FtpRemoteExists.Overwrite, ct).ConfigureAwait(false);
+            // FluentFTP は 4xx/5xx 応答やデータ接続断でも例外を投げず FtpStatus.Failed を返すため、
+            // 戻り値を必ず検査する。これを怠るとサーバに保存されていないのに成功扱いとなり、
+            // Cleanup.DeleteAfterVerify によってローカル原本が削除される
+            var status = await _client.UploadFile(localPath, tempPath, FtpRemoteExists.NoCheck, true, FtpVerify.None, null, ct).ConfigureAwait(false);
+            if (status != FtpStatus.Success)
+            {
+                throw new TransferFailedException(
+                    $"FTP upload did not complete successfully (status={status}): {localPath} -> {remotePath}");
+            }
+
+            await RenameOverwriteAsync(tempPath, remotePath, destinationRemoved, ct).ConfigureAwait(false);
+
+            await VerifyUploadedAsync(localPath, remotePath, ct).ConfigureAwait(false);
         }
         catch
         {
-            // MoveFile 失敗時にリモートの一時ファイルが蓄積しないよう削除を試みる
-            try { await _client.DeleteFile(tempPath, ct).ConfigureAwait(false); } catch { }
+            if (destinationRemoved.Value)
+            {
+                // 宛先を削除した後にリネームが失敗した状態。一時ファイルを消すと復旧不能になるため
+                // 意図的に残し、手動復旧できるようパスをログに出す
+                _logger.LogError(
+                    "FTP rename failed after the existing destination file was removed. The uploaded data is retained at {TempPath} and must be renamed to {RemotePath} manually if the retry does not recover it.",
+                    tempPath, remotePath);
+            }
+            else
+            {
+                // 一時ファイルがリモートに蓄積しないよう削除を試みる。
+                // 失敗要因がキャンセルでも掃除できるよう CancellationToken.None を使う
+                try { await _client.DeleteFile(tempPath, CancellationToken.None).ConfigureAwait(false); } catch { }
+            }
             throw;
         }
+    }
+
+    /// <summary>
+    /// 一時ファイルを宛先名へリネームする。RNTO で既存ファイルを上書きできるサーバでは
+    /// 原子的に置き換わる。上書きを拒否するサーバのみ削除 + リネームにフォールバックし、
+    /// 宛先を削除したことを <paramref name="destinationRemoved"/> で呼び出し元へ伝える。
+    /// </summary>
+    private async Task RenameOverwriteAsync(string tempPath, string remotePath, StrongBox<bool> destinationRemoved, CancellationToken ct)
+    {
+        // 宛先が存在しなければ上書きの考慮は不要。存在する場合のみフォールバックを許可することで、
+        // 接続断などリネーム以外の理由で失敗したときに既存の宛先を削除してしまう事故を防ぐ
+        var destinationExists = await _client.FileExists(remotePath, ct).ConfigureAwait(false);
+
+        try
+        {
+            await _client.Rename(tempPath, remotePath, ct).ConfigureAwait(false);
+            return;
+        }
+        catch (FtpException ex) when (destinationExists)
+        {
+            // RNTO による上書きを拒否するサーバ向けのフォールバック。
+            // Delete と Rename の間に障害が起きると宛先が存在しない瞬間が生じる
+            _logger.LogDebug("FTP rename over an existing file failed, falling back to delete+rename: {Error}", ex.Message);
+        }
+
+        await _client.DeleteFile(remotePath, ct).ConfigureAwait(false);
+        destinationRemoved.Value = true;
+        await _client.Rename(tempPath, remotePath, ct).ConfigureAwait(false);
+        destinationRemoved.Value = false;
+    }
+
+    /// <summary>
+    /// アップロード後に宛先ファイルの存在とサイズを確認する。
+    /// ハッシュ検証を無効にしている構成でも「保存されていないのに成功扱い」を検出できるようにする。
+    /// </summary>
+    private async Task VerifyUploadedAsync(string localPath, string remotePath, CancellationToken ct)
+    {
+        if (!_options.VerifyUploadedFileExists)
+        {
+            return;
+        }
+
+        // SIZE 非対応のサーバは -1 を返す。その場合は存在確認までに留める
+        var remoteSize = await _client.GetFileSize(remotePath, -1, ct).ConfigureAwait(false);
+        if (remoteSize < 0)
+        {
+            if (!await _client.FileExists(remotePath, ct).ConfigureAwait(false))
+            {
+                throw new TransferFailedException(
+                    $"FTP upload completed without error but the destination file was not found: {remotePath}");
+            }
+            _logger.LogDebug("FTP upload confirmed at (existence only, SIZE unsupported): {RemotePath}", remotePath);
+            return;
+        }
+
+        var localSize = new FileInfo(localPath).Length;
+        if (remoteSize != localSize)
+        {
+            throw new TransferFailedException(
+                $"FTP upload size mismatch for {remotePath}: local={localSize} bytes, remote={remoteSize} bytes");
+        }
+        _logger.LogDebug("FTP upload confirmed at: {RemotePath} ({Size} bytes)", remotePath, remoteSize);
     }
 
     // ダウンロードも一時ファイル経由で行う
@@ -95,7 +187,14 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
         var temp = $"{localPath}.tmp.{Guid.NewGuid():N}";
         try
         {
-            await _client.DownloadFile(temp, remotePath, FtpLocalExists.Overwrite, FtpVerify.None, null, ct).ConfigureAwait(false);
+            // アップロードと同様、FluentFTP は転送中断や 4xx/5xx 応答を戻り値で通知する。
+            // 戻り値を検査しないと途中までのファイルを正常扱いで配置してしまう
+            var status = await _client.DownloadFile(temp, remotePath, FtpLocalExists.Overwrite, FtpVerify.None, null, ct).ConfigureAwait(false);
+            if (status != FtpStatus.Success)
+            {
+                throw new TransferFailedException(
+                    $"FTP download did not complete successfully (status={status}): {remotePath} -> {localPath}");
+            }
             File.Move(temp, localPath, true);
         }
         catch

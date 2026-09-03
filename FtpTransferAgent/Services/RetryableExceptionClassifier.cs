@@ -38,6 +38,9 @@ public static class RetryableExceptionClassifier
             SshException => true,
             // ハッシュ不一致は転送中の一過性破損で起きるため再転送で回復し得る
             HashMismatchException => true,
+            // 転送ライブラリが戻り値で通知した失敗・転送後検証の失敗。
+            // 一時的なサーバ拒否 (4xx) や転送中断で発生するため再転送で回復し得る
+            TransferFailedException => true,
             FtpException ftpEx when IsRetryableFtpException(ftpEx) => true,
 
             // ファイルシステム関連の一時的な例外（リトライ可能）

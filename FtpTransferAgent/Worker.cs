@@ -947,9 +947,7 @@ public class Worker : BackgroundService
             return Array.Empty<string>();
         }
 
-        var directory = Path.GetDirectoryName(dataFilePath);
-        var fileName = Path.GetFileName(dataFilePath);
-        if (string.IsNullOrEmpty(directory) || string.IsNullOrEmpty(fileName))
+        if (string.IsNullOrEmpty(Path.GetFileName(dataFilePath)))
         {
             return Array.Empty<string>();
         }
@@ -966,7 +964,13 @@ public class Worker : BackgroundService
             }
 
             var normalizedEndExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
-            var candidate = Path.Combine(directory, fileName + normalizedEndExt);
+            // END ファイルはデータファイルと同一ディレクトリの "<データファイル名>.<拡張子>" なので、
+            // データファイルのパス文字列にそのまま拡張子を連結する。
+            // Path.GetDirectoryName + Path.Combine で組み立てると、Watch.Path に "/" が含まれる場合
+            // ("./watch" 等) に GetDirectoryName がセパレータを "\" へ正規化する一方、
+            // Directory.EnumerateFiles は元の "/" を保持するため文字列比較が一致せず、
+            // END ファイルが存在するのに見つからない (= 黙って転送されない) 事故が起きる。
+            var candidate = dataFilePath + normalizedEndExt;
 
             // 集合から実名 (格納時の大小) を取り出す。大小無視で一致し、実ファイル名を保持する。
             if (knownEndFiles.TryGetValue(candidate, out var actual) && seen.Add(actual))

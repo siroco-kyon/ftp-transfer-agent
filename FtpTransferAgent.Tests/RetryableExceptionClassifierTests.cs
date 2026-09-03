@@ -44,6 +44,16 @@ public class RetryableExceptionClassifierTests
             new IOException("local file error", new ArgumentException("bad path"))));
 
     [Fact]
+    public void IsRetryable_TransferFailed_True()
+        => Assert.True(RetryableExceptionClassifier.IsRetryable(
+            new TransferFailedException("FTP upload did not complete successfully (status=Failed)")));
+
+    [Fact]
+    public void IsConnectionBroken_TransferFailed_False()
+        => Assert.False(RetryableExceptionClassifier.IsConnectionBroken(
+            new TransferFailedException("upload size mismatch")));
+
+    [Fact]
     public void IsConnectionBroken_HashMismatch_False()
         => Assert.False(RetryableExceptionClassifier.IsConnectionBroken(new HashMismatchException("hash mismatch")));
 
