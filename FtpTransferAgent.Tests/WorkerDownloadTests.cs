@@ -1206,6 +1206,84 @@ public class WorkerDownloadTests
         }
     }
 
+    /// <summary>
+    /// データファイルが 1 つでも、大小のみ異なる END が複数ある場合 (/foo, /foo.END, /FOO.END) は
+    /// どちらが本来のマーカーか判別できない。両方を関連付けるとローカルで同一パスに着地して
+    /// 転送が失敗し続け、DeleteRemoteEndFiles 有効時は先に片方を削除してしまう。
+    /// そのため、このデータファイルは転送しない。
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_EndFilesDifferingOnlyByCase_AreNotTransferred()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var watch = Options.Create(new WatchOptions
+            {
+                Path = dir,
+                AllowedExtensions = new[] { ".txt" },
+                TransferEndFiles = true,
+                EndFileExtensions = new[] { ".END" }
+            });
+            var transfer = Options.Create(new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "get",
+                Host = "host",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/remote",
+                Concurrency = 1
+            });
+            var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+            var hashOpt = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+            var cleanup = Options.Create(new CleanupOptions { DeleteRemoteAfterDownload = true, DeleteRemoteEndFiles = true });
+
+            // データは 1 つ。END は大小のみ異なるものが 2 つ
+            var remoteFiles = new[] { "/remote/foo.txt", "/remote/foo.txt.END", "/remote/FOO.TXT.END" };
+            var downloaded = new List<string>();
+            var deleted = new List<string>();
+
+            var mock = new Mock<IFileTransferClient>();
+            mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
+                .ReturnsAsync(remoteFiles);
+            mock.Setup(c => c.ExistsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(true);
+            mock.Setup(c => c.DownloadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Callback<string, string, CancellationToken>((remote, local, _) =>
+                {
+                    lock (downloaded) { downloaded.Add(remote); }
+                    File.WriteAllText(local, remote);
+                })
+                .Returns(Task.CompletedTask);
+            mock.Setup(c => c.DeleteAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Callback<string, CancellationToken>((remote, _) => { lock (deleted) { deleted.Add(remote); } })
+                .Returns(Task.CompletedTask);
+            mock.Setup(c => c.Dispose());
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            using var provider = services.BuildServiceProvider();
+            using var lifetime = new DummyLifetime();
+            var exitCode = new ApplicationExitCode();
+            var worker = new TestWorker(
+                watch, transfer, retry, hashOpt, cleanup, provider,
+                provider.GetRequiredService<ILogger<Worker>>(), lifetime,
+                new NoDisposeClient(mock.Object), exitCode);
+
+            await worker.RunAsync(CancellationToken.None);
+
+            // データも END も転送されず、リモートからも消されない
+            Assert.Empty(downloaded);
+            Assert.Empty(deleted);
+            Assert.NotEqual(0, exitCode.Code);
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
     /// <summary>製品コードと同じく、対象ボリュームの大小区別を実測する。</summary>
     private static bool CaseInsensitiveFileSystem(string directory)
     {

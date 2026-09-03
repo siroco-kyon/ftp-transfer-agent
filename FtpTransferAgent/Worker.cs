@@ -683,7 +683,7 @@ public class Worker : BackgroundService
     /// 大小のみ異なるデータファイルが同居すると、1 つの END がどちらのものか判別できない。
     /// 取り違えたまま DeleteRemoteEndFiles を適用すると、一方が他方の END を消してしまう。
     /// </summary>
-    private HashSet<string> FindAmbiguousEndFileAssociations(IReadOnlyList<string> remotePaths)
+    private HashSet<string> FindAmbiguousEndFileAssociations(IReadOnlyList<string> dataFiles, IReadOnlyList<string> endFiles)
     {
         var result = new HashSet<string>(StringComparer.Ordinal);
 
@@ -693,28 +693,61 @@ public class Worker : BackgroundService
             return result;
         }
 
-        var byNormalized = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var remotePath in remotePaths)
+        // データファイルを「大小無視の正規化パス」でまとめる。関連付けはこのキーで行うため、
+        // 1 つのキーに複数のデータファイルや複数の END が集まると帰属を判別できない
+        var dataByKey = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var dataFile in dataFiles)
         {
-            var key = NormalizeRemotePath(remotePath);
-            if (!byNormalized.TryGetValue(key, out var group))
+            var key = NormalizeRemotePath(dataFile);
+            if (!dataByKey.TryGetValue(key, out var group))
             {
                 group = new List<string>();
-                byNormalized[key] = group;
+                dataByKey[key] = group;
             }
-            group.Add(remotePath);
+            group.Add(dataFile);
         }
 
-        foreach (var (_, group) in byNormalized)
+        // END ファイル側も同じキーでまとめる。/foo.END と /FOO.END は同じキーに落ちるため、
+        // データファイルが 1 つでも「どちらの END か」を決められない
+        var endByKey = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var endFile in endFiles)
         {
-            if (group.Count < 2)
+            var dataForEnd = GetDataFileForEndFileRemote(NormalizeRemotePath(endFile));
+            if (string.IsNullOrEmpty(dataForEnd))
             {
                 continue;
             }
 
-            _logger.LogError(
-                "{Count} remote files differ only by case ({Remotes}), so END files cannot be matched to them unambiguously. None of them will be downloaded; rename them on the server so the names do not differ only by case.",
-                group.Count, string.Join(", ", group));
+            var key = NormalizeRemotePath(dataForEnd);
+            if (!endByKey.TryGetValue(key, out var group))
+            {
+                group = new List<string>();
+                endByKey[key] = group;
+            }
+            group.Add(endFile);
+        }
+
+        foreach (var (key, group) in dataByKey)
+        {
+            var ambiguousData = group.Count > 1;
+            var ambiguousEnd = endByKey.TryGetValue(key, out var relatedEnds) && relatedEnds.Count > 1;
+            if (!ambiguousData && !ambiguousEnd)
+            {
+                continue;
+            }
+
+            if (ambiguousData)
+            {
+                _logger.LogError(
+                    "{Count} remote data files differ only by case ({Remotes}), so END files cannot be matched to them unambiguously. None of them will be downloaded; rename them on the server so the names do not differ only by case.",
+                    group.Count, string.Join(", ", group));
+            }
+            else
+            {
+                _logger.LogError(
+                    "{Count} remote END files differ only by case ({Ends}) and all match the data file(s) {Remotes}, so the marker cannot be identified unambiguously. They will not be downloaded; rename them on the server so the names do not differ only by case.",
+                    relatedEnds!.Count, string.Join(", ", relatedEnds!), string.Join(", ", group));
+            }
 
             foreach (var remotePath in group)
             {
@@ -2154,7 +2187,7 @@ public class Worker : BackgroundService
                     // END を扱う構成では、大小のみ異なるデータファイルが同居すると
                     // どの END がどちらのものか判別できない。取り違えると一方が他方の
                     // END を削除し得るため、曖昧なものは転送対象から外す
-                    var ambiguousRemotePaths = FindAmbiguousEndFileAssociations(dataFiles);
+                    var ambiguousRemotePaths = FindAmbiguousEndFileAssociations(dataFiles, endFiles);
                     if (ambiguousRemotePaths.Count > 0)
                     {
                         dataFiles.RemoveAll(ambiguousRemotePaths.Contains);
