@@ -2,6 +2,7 @@ using System.IO;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using FtpTransferAgent.Configuration;
 using Microsoft.Extensions.Logging;
 using Renci.SshNet;
@@ -267,6 +268,10 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         var temp = $"{remotePath}.tmp.{Guid.NewGuid():N}";
         _logger.LogDebug("SFTP upload: {LocalPath} -> temp={TempPath}", localPath, temp);
 
+        // フォールバック経路で宛先を削除済みかどうか。true の場合、失敗しても一時ファイルを
+        // 消してはならない (旧ファイルと新ファイルの両方を失うため)
+        var destinationRemoved = new StrongBox<bool>(false);
+
         try
         {
             ct.ThrowIfCancellationRequested();
@@ -278,12 +283,23 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
             }
             ct.ThrowIfCancellationRequested();
 
-            await RenameOverwriteAsync(temp, remotePath, ct).ConfigureAwait(false);
+            await RenameOverwriteAsync(temp, remotePath, destinationRemoved, ct).ConfigureAwait(false);
         }
         catch
         {
-            // リネーム失敗時にリモートの一時ファイルが蓄積しないよう削除を試みる
-            try { if (_client.Exists(temp)) _client.DeleteFile(temp); } catch { }
+            if (destinationRemoved.Value)
+            {
+                // 宛先を削除した後にリネームが失敗した状態。一時ファイルを消すと復旧不能になるため
+                // 意図的に残し、手動復旧できるようパスをログに出す
+                _logger.LogError(
+                    "SFTP rename failed after the existing destination file was removed. The uploaded data is retained at {TempPath} and must be renamed to {RemotePath} manually if the retry does not recover it.",
+                    temp, remotePath);
+            }
+            else
+            {
+                // リネーム失敗時にリモートの一時ファイルが蓄積しないよう削除を試みる
+                try { if (_client.Exists(temp)) _client.DeleteFile(temp); } catch { }
+            }
             throw;
         }
 
@@ -306,7 +322,7 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     /// 宛先が存在していても原子的に置き換える (既存ファイルが消失する瞬間を作らない)。
     /// 拡張未対応のサーバのみ従来の削除 + リネームにフォールバックする。
     /// </summary>
-    private async Task RenameOverwriteAsync(string tempPath, string remotePath, CancellationToken ct)
+    private async Task RenameOverwriteAsync(string tempPath, string remotePath, StrongBox<bool> destinationRemoved, CancellationToken ct)
     {
         if (_posixRenameSupported != false)
         {
@@ -340,8 +356,10 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
         {
             _logger.LogDebug("SFTP: Remote file exists, deleting before rename: {RemotePath}", remotePath);
             await _client.DeleteFileAsync(remotePath, ct).ConfigureAwait(false);
+            destinationRemoved.Value = true;
         }
         await _client.RenameFileAsync(tempPath, remotePath, ct).ConfigureAwait(false);
+        destinationRemoved.Value = false;
     }
 
     private bool SafeExists(string path)

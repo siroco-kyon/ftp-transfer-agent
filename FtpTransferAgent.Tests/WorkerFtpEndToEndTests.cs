@@ -189,6 +189,56 @@ public class WorkerFtpEndToEndTests
         }
     }
 
+    /// <summary>
+    /// Watch.Path にスラッシュ区切りを指定しても END ファイルが転送されることを保証する。
+    /// Windows では Directory.EnumerateFiles が設定値の "/" をそのまま保持する一方、
+    /// Path.GetDirectoryName は "\" へ正規化するため、両者を文字列比較していた実装では
+    /// END ファイルが存在するのに見つからず、データファイルだけが相手先へ届いていた。
+    /// 同梱 appsettings.json の既定値が "./watch" のため、既定構成で発現する。
+    /// </summary>
+    [Fact]
+    public async Task Worker_Put_TransfersEndFile_WhenWatchPathUsesForwardSlashes()
+    {
+        var (watchDir, serverRoot, port, server) = await StartAsync();
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(watchDir, "data.txt"), "payload");
+            await File.WriteAllTextAsync(Path.Combine(watchDir, "data.txt.END"), "done");
+
+            // 設定ファイルに "./watch" のようなスラッシュ区切りを書いた状態を再現する
+            var forwardSlashWatchDir = watchDir.Replace('\\', '/');
+
+            var worker = CreateWorker(
+                forwardSlashWatchDir,
+                new TransferOptions
+                {
+                    Mode = "ftp",
+                    Direction = "put",
+                    Host = "localhost",
+                    Port = port,
+                    Username = "user",
+                    Password = "pass",
+                    RemotePath = "/",
+                    Concurrency = 1
+                },
+                allowedExtensions: new[] { ".txt" },
+                hash: new HashOptions { Enabled = true, Algorithm = "SHA256" },
+                cleanup: new CleanupOptions { DeleteAfterVerify = true },
+                requireEndFile: true,
+                transferEndFiles: true,
+                endFileExtensions: new[] { ".END" });
+
+            await worker.RunAsync();
+
+            Assert.Equal("payload", await File.ReadAllTextAsync(Path.Combine(serverRoot, "data.txt")));
+            Assert.Equal("done", await File.ReadAllTextAsync(Path.Combine(serverRoot, "data.txt.END")));
+        }
+        finally
+        {
+            Cleanup(server, watchDir, serverRoot);
+        }
+    }
+
     [Fact]
     public async Task Worker_Put_PreservesFolderStructure_AgainstRealFtpServer()
     {
