@@ -598,6 +598,24 @@ public class Worker : BackgroundService
         }
     }
 
+    /// <summary>
+    /// 転送単位のタイムアウト用 CancellationTokenSource を作る。
+    /// Transfer.TransferTimeoutSeconds が 0 (無効) の場合は null を返し、呼び出し元は
+    /// 元のトークンをそのまま使う。
+    /// </summary>
+    private CancellationTokenSource? CreateTransferTimeoutSource(CancellationToken token)
+    {
+        var seconds = _transfer.TransferTimeoutSeconds;
+        if (seconds <= 0)
+        {
+            return null;
+        }
+
+        var cts = CancellationTokenSource.CreateLinkedTokenSource(token);
+        cts.CancelAfter(TimeSpan.FromSeconds(seconds));
+        return cts;
+    }
+
     private string GetDownloadTempDirectory() =>
         Path.Combine(Path.GetFullPath(_watch.Path), DownloadTempDirectoryName);
 
@@ -1565,12 +1583,25 @@ public class Worker : BackgroundService
                 var client = context.Pool.Rent(() => isUpload ? CreateClientFor(dest) : CreateClient());
                 // 接続が壊れていなければプールへ返却し、次のアイテム/リトライで再利用する
                 var reusable = true;
+                // 転送単位のタイムアウト。相手が受信を止めた場合などにワンショットのバッチが
+                // 終わらなくなるのを防ぐ (TransferTimeoutSeconds=0 で無効)
+                using var itemCts = CreateTransferTimeoutSource(token);
+                var itemToken = itemCts?.Token ?? token;
                 try
                 {
                     var bytesTransferred = isUpload
-                        ? await ProcessUploadAsync(client, item, id, token).ConfigureAwait(false)
-                        : await ProcessDownloadAsync(client, item, id, token).ConfigureAwait(false);
+                        ? await ProcessUploadAsync(client, item, id, itemToken).ConfigureAwait(false)
+                        : await ProcessDownloadAsync(client, item, id, itemToken).ConfigureAwait(false);
                     context.Queue.RecordBytesTransferred(bytesTransferred);
+                }
+                catch (OperationCanceledException) when (itemCts is { IsCancellationRequested: true } && !token.IsCancellationRequested)
+                {
+                    // 全体停止ではなく転送単位のタイムアウトで打ち切られた場合は、
+                    // 再試行できるよう TimeoutException に変換する (OperationCanceledException は
+                    // 非リトライで扱われ、原因も伝わらないため)
+                    reusable = false;
+                    throw new TimeoutException(
+                        $"Transfer for {item.Path} exceeded Transfer.TransferTimeoutSeconds ({_transfer.TransferTimeoutSeconds}s) and was aborted.");
                 }
                 catch (Exception ex)
                 {

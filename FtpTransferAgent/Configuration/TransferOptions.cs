@@ -20,6 +20,18 @@ public class TransferOptions : DestinationOptions
     public List<DestinationOptions> AdditionalDestinations { get; set; } = new();
 
     /// <summary>
+    /// 1 ファイル (関連する END ファイルを含む) の処理に許す最大秒数。0 で無効 (既定)。
+    /// ライブラリ側のタイムアウト (<see cref="DestinationOptions.TimeoutSeconds"/>) は
+    /// 接続と読み取りにしか掛からず、特に FTP のアップロードで相手が受信を止めた場合
+    /// (TCP ゼロウィンドウ) にワンショットのバッチが終わらなくなる。その保険として
+    /// 転送単位で上限を設ける。
+    /// 注意: 打ち切りは CancellationToken に依存するため、ネイティブのソケット書き込みで
+    /// 完全にブロックしている場合は即座には中断できない (ベストエフォート)。
+    /// </summary>
+    [Range(0, 86400)]
+    public int TransferTimeoutSeconds { get; set; }
+
+    /// <summary>
     /// Enables per-destination delivery tracking for put-direction fanout.
     /// </summary>
     public bool PerDestinationDeliveryTracking { get; set; }

@@ -34,6 +34,7 @@
         "Concurrency": { "type": "integer", "minimum": 1, "maximum": 16 },
         "PreserveFolderStructure": { "type": "boolean" },
         "TimeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 3600 },
+        "TransferTimeoutSeconds": { "type": "integer", "minimum": 0, "maximum": 86400 },
         "KeepAliveSeconds": { "type": "integer", "minimum": 0, "maximum": 3600 },
         "VerifyUploadedFileExists": { "type": "boolean" },
         "BufferSizeKB": { "type": "integer", "minimum": 1, "maximum": 64 },
