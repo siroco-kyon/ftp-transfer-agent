@@ -124,7 +124,7 @@ dotnet run --project FtpTransferAgent -- --Transfer:Concurrency=4 --Hash:Algorit
 | IncludeSubfolders | bool | - | false | サブフォルダも対象にする |
 | AllowedExtensions | string[] | - | `[]` | 対象ファイルのフィルタ。拡張子（`"txt"` / `".txt"`）またはワイルドカード（`"*.txt"` / `"data_*.csv"` / `"?.log"`）を指定可能。空配列は全ファイル対象（起動時に警告）。大文字小文字は区別しない |
 | RequireEndFile | bool | - | false | 対応する END ファイルがあるデータのみ転送対象にする |
-| EndFileExtensions | string[] | - | `[".END", ".end"]` | END ファイルの拡張子一覧（ドット有無いずれも可） |
+| EndFileExtensions | string[] | - | `[".END", ".end"]` | END ファイルの拡張子一覧（ドット有無いずれも可）。**設定ファイルに記述した場合は既定値を置き換える**（追記ではない）。例えば `[".TRG"]` と書くと `.END` / `.end` は END 拡張子として扱われない |
 | TransferEndFiles | bool | - | false | データ転送の成功後に END ファイル自体も転送する |
 
 **ENDファイル機能の詳細**は [5.4](#54-end-ファイル制御) を参照してください。
@@ -147,6 +147,7 @@ dotnet run --project FtpTransferAgent -- --Transfer:Concurrency=4 --Hash:Algorit
 | Concurrency | int | - | 1 | 1–16 | primary 宛先の並列転送数 |
 | PreserveFolderStructure | bool | - | false | - | サブフォルダ構造を保持して転送 |
 | TimeoutSeconds | int | - | 120 | 1–3600 | 接続・転送タイムアウト秒 |
+| TransferTimeoutSeconds | int | - | 0 | 0–86400 | 1 ファイル (関連 END ファイルを含む) の処理に許す最大秒数。`0` で無効。`TimeoutSeconds` は接続と読み取りにしか掛からず、特に FTP のアップロードで相手が受信を止めた場合にバッチが終わらなくなるため、その保険。打ち切りは `CancellationToken` に依存するため、ネイティブのソケット書き込みでブロックしている場合は即座には中断できない (ベストエフォート) |
 | KeepAliveSeconds | int | - | 0 | 0–3600 | 接続再利用時にアイドル切断を防ぐ KeepAlive の間隔（秒）。`0` で無効。`>0` で SFTP は `KeepAliveInterval`、FTP は NOOP 送信 + TCP KeepAlive を有効化。各追加宛先にも個別適用 |
 | VerifyUploadedFileExists | bool | - | true | - | SFTP アップロードのリネーム完了後に宛先パスの存在確認（2 往復）を追加で行うか。リネームの成功応答（SSH_FX_OK）自体がサーバの完了確認のため、`false` でも転送完了の保証はプロトコルレベルで担保される。高レイテンシ回線で小ファイルを多数送る場合は `false` で往復数を削減できる。SFTP のみ使用。各追加宛先にも個別適用 |
 | BufferSizeKB | int | - | 32 | 1–64 | SFTP の 1 書き込み要求（SSH_FXP_WRITE）あたりのバッファサイズ（KB）。実際のチャンクサイズはサーバが告知するチャネルパケット上限との min になるため、OpenSSH 系（上限 32KB）では既定値から上げても効果がない。32KB 超を受け付けるサーバでは `64` でスループットが向上する（32KB 超の設定時は起動時に注意警告を出力）。SFTP のみ使用。各追加宛先にも個別適用 |
@@ -198,10 +199,10 @@ dotnet run --project FtpTransferAgent -- --Transfer:Concurrency=4 --Hash:Algorit
 
 | 項目 | 型 | 必須 | 既定値 | 説明 |
 |------|-----|------|--------|------|
-| DeleteAfterVerify | bool | - | **true** | `put` 成功後にローカルファイルを削除（アウトボックス運用）。ファンアウト時は**全宛先成功時のみ**。`false` で元ファイルを保持（複数宛先トラッキング時は配信マーカーで再送をスキップ） |
+| DeleteAfterVerify | bool | - | **true** | **`put` 専用**。成功後にローカルファイルを削除（アウトボックス運用）。ファンアウト時は**全宛先成功時のみ**。`false` で元ファイルを保持（複数宛先トラッキング時は配信マーカーで再送をスキップ）。**`get` では無視される**（ダウンロードでローカルファイルが削除されることはない）。既定が `true` のため、`get` 構成では起動時に警告を出す |
 | DeleteRemoteAfterDownload | bool | - | false | `get` 成功後にリモートファイルを削除 |
-| DeleteRemoteEndFiles | bool | - | false | END ファイル転送/取得の成功後にリモート END ファイルを削除 |
-| DeleteLocalSkippedEndFiles | bool | - | false | `put` で `TransferEndFiles=false` のとき、転送成功したデータに対応する未転送 END ファイルをローカルから削除 |
+| DeleteRemoteEndFiles | bool | - | false | END ファイル転送/取得の成功後にリモート END ファイルを削除。`get` では `TransferEndFiles: false`（END を取り込まない）の場合も、対応データを取得できた END はサーバから削除する |
+| DeleteLocalSkippedEndFiles | bool | - | false | **`put` 専用**。`TransferEndFiles=false` のとき、転送成功したデータに対応する未転送 END ファイルをローカルから削除。**`get` では無視される**（起動時に警告） |
 
 #### 4.2.7 Smtp（メール通知設定）
 
@@ -263,11 +264,17 @@ dotnet run --project FtpTransferAgent -- --Transfer:Concurrency=4 --Hash:Algorit
    - 各宛先の `Concurrency` 数だけワーカーが起動し、キューから取得して転送
    - 転送ごとに専用クライアントを生成。重複処理を防止
    - 一時ファイル名（`.tmp.{GUID}`）で転送し、完了後に本番名へリネーム（**アトミック転送**）
+   - `put` のリネームはまず通常のリネームを試み、既存の宛先を上書きできないサーバでのみ削除 + リネームにフォールバックする（SFTP は `posix-rename@openssh.com` を優先）。フォールバック中に宛先を削除した後でリネームが失敗した場合は、一時ファイルを削除せずに残し、復旧用のパスを `Error` ログへ出力する
+   - `get` はダウンロード先を直接書かず、`Watch.Path` 配下のエージェント専用ディレクトリ `.ftptransferagent-tmp` に落としてから最終パスへ移動する（同一ボリュームのためリネームはアトミック）。**同名ファイルが既にある場合は無条件に上書きする**
+   - 転送ライブラリが例外ではなく戻り値で失敗を通知する場合（FTP の 4xx/5xx 応答やデータ接続断）も検出し、成功として通過させない
    - 各転送に固有 ID を付与してログで追跡
 
 5. **検証処理**（`Hash.Enabled: true` のとき）
    - ローカル/リモート双方のハッシュをローカル計算（FTP は `UseServerCommand` 有効時のみサーバーコマンドを試行）
    - `StringComparison.OrdinalIgnoreCase` で比較し、不一致は `HashMismatchException`（再試行対象）
+   - **`get` ではリモートファイルを 2 回読む**（ハッシュ計算用 + ダウンロード用）。転送経路での破損を検出するには転送とは独立にリモート側のハッシュを得る必要があるため、この 2 回読みは削減できない。転送量を抑えたい場合は、サーバー側ハッシュコマンドに対応した FTP サーバで `Hash.UseServerCommand: true` を使うか、`Hash.Enabled: false` にする
+   - `put` でも検証のためアップロード後にリモートファイルを読み戻すため、同様に転送量は約 2 倍になる
+   - `Hash.Enabled: false` の場合でも、`Transfer.VerifyUploadedFileExists: true`（既定）なら `put` 後に宛先のサイズ一致を確認する（SIZE 非対応サーバでは存在確認）
 
 6. **後処理**
    - 検証/転送成功時: 設定に従いローカル/リモートファイルや END ファイルを削除（ファンアウト時は全宛先成功が条件）
@@ -318,7 +325,10 @@ END ファイルは「データファイル名 + END 拡張子」（例: `data.t
   - 転送先・転送元の END ファイル名は**ディスク（またはリモート一覧）上の実際の大文字小文字を保持**する。設定 `EndFileExtensions` に大文字 `.END` が含まれていても、実体が小文字 `.end` なら `.end` のまま転送される
   - 転送成功後、ローカルの END ファイルは削除される
   - `Cleanup.DeleteRemoteEndFiles: true` で転送先 END ファイルも削除
-- **TransferEndFiles: false**: END ファイルは転送されずローカルに残る。`Cleanup.DeleteLocalSkippedEndFiles: true` を併用すると、対応データの転送成功後に END ファイルをローカルから削除する
+- **TransferEndFiles: false**
+  - `put`: END ファイルは転送されずローカルに残る。`Cleanup.DeleteLocalSkippedEndFiles: true` を併用すると、対応データの転送成功後に END ファイルをローカルから削除する
+  - `get`: END ファイルはダウンロードされない。`Cleanup.DeleteRemoteEndFiles: true` を併用すると、**取得はせずにサーバ上の END ファイルだけを削除**する（併用しないとデータだけが削除され、END がサーバに残り続ける）
+- **削除の方向**: `Cleanup.DeleteLocalSkippedEndFiles` は `put` のみ、`Cleanup.DeleteRemoteEndFiles` は転送先（`put`）/ 転送元（`get`）のリモート END に作用する
 - **セキュリティ**: 異常に長い拡張子やパス区切りを含む END 拡張子は起動時に検出
 
 ### 5.5 整合性検証（ハッシュ）
@@ -427,17 +437,22 @@ END ファイルは「データファイル名 + END 拡張子」（例: `data.t
 - ✅ **並列転送**: 最大 16 並列（TransferQueue + Channel）
 - ✅ **複数宛先ファンアウト**: put 方向で全宛先同時配信、宛先ごとに独立投入
 - ✅ **宛先別配信トラッキング**: 複数宛先で**既定有効**。未配信の宛先だけ再送、指紋による上書き検出、retry 退避と復元、宛先失敗メールの選択的抑制
-- ✅ **ENDファイル制御**: Put/Get 両対応、順序保証、大文字小文字保持
+- ✅ **ENDファイル制御**: Put/Get 両対応、順序保証、大文字小文字保持（削除系オプションは方向ごとに適用範囲が異なる。[5.4](#54-end-ファイル制御) 参照）
 - ✅ **ハッシュ検証**: SHA256 / SHA512、ローカル計算、不一致は再試行、Enabled 切替
 - ✅ **スマート再試行**: 例外種別でリトライ可否を判定
 - ✅ **二重起動防止**: PID ロックファイル
 - ✅ **ローリングログ + 保持日数**: 日付/サイズローテーション、古いログの自動削除
 - ✅ **SMTP 通知**: 送信数上限・終了時ドレイン
-- ✅ **SFTP 鍵認証・ホスト鍵検証**
+- ✅ **SFTP 鍵認証・ホスト鍵検証**（`HostKeyFingerprint` 未設定時は相手の鍵を無条件に信頼するため、起動時に警告を出す）
 
 ### 6.2 既知の制限
 - **バッチ処理専用**: 一度の実行で完了して終了する（常駐しない）
 - **リアルタイム監視なし**: 新規ファイルの転送には再実行が必要
+- **FTPS（暗号化 FTP）は未対応**: `Mode=ftp` は平文通信のみで、`EncryptionMode` に相当する設定はない。データ接続方式（Active/Passive）も選択できずライブラリ既定の自動判定に従う。暗号化が必要な場合は `Mode=sftp` を使用する（起動時に平文である旨の警告を出す）
+- **`get` に再取得の抑止・履歴が無い**: `put` の配信トラッキングに相当する仕組みは `get` に無く、`Cleanup.DeleteRemoteAfterDownload: false` の場合は**実行のたびにリモートの全対象ファイルを再取得し、ローカルの同名ファイルを無条件で上書きする**。取り込み済みのファイルを再取得したくない場合は `DeleteRemoteAfterDownload: true` にするか、取得後にローカルファイルを別ディレクトリへ移動する運用にする
+- **`get` の宛先衝突は転送しない**: 複数のリモートファイルが同一のローカルパスへ着地する構成（`PreserveFolderStructure: false` でサブディレクトリの同名ファイル、大文字小文字だけ異なる名前など）では、黙って上書きせず後続のファイルを失敗させる。`PreserveFolderStructure: true` にするか対象を絞る
+- **`get` の着地先はエージェント専用ディレクトリと衝突できない**: リモートに `.ftptransferagent-tmp` という名前のディレクトリがあり `PreserveFolderStructure: true` で取得する構成は拒否する（次回起動時の残骸掃除で取得済みデータが消えるため）
+- **ハッシュ検証の転送量**: `put` / `get` とも検証のためにリモートファイルを読み戻すため、転送量は約 2 倍になる（[5.5](#55-整合性検証ハッシュ) 参照）
 - **転送の中断/再開・履歴の永続化は未対応**（部分失敗は次回実行で再送。複数宛先では配信トラッキングにより未配信先のみ再送する）
 - **配信トラッキングの上書き検出は指紋方式に依存**: `sizetime` はサイズ・更新時刻据え置きの上書きを検出できない（関連 END ファイルも同様。`hash` で厳密化可能、[5.9](#59-宛先別配信トラッキングput) 参照）
 - **転送中の元ファイル/関連 END ファイル変更は次回へ持ち越し**: 複数宛先で `EnableUploadSnapshot: true` のときはスナップショットにより宛先間の内容差異を防ぐが、元ファイルや関連 END ファイルが変更された実行では cleanup/retry を確定せず終了コード `1` とする（既定の `false` では、変更があったその回に限り宛先間で内容が割れ得る）
@@ -497,8 +512,21 @@ END ファイルは「データファイル名 + END 拡張子」（例: `data.t
 
 ---
 
-**更新日**: 2026年7月5日
-**バージョン**: 3.4.2
+**更新日**: 2026年9月3日
+**バージョン**: 3.5.0
+**主な更新内容 (3.5.0)**:
+- **FTP の転送失敗が「成功」として通過する問題を修正（無言のデータ消失）**。FluentFTP は転送後のサーバ最終応答が 4xx/5xx の場合やデータ接続断でも例外を投げず `FtpStatus.Failed` を返すが、戻り値を検査していなかった。サーバに保存されていないのに転送成功と判定され、`Hash.Enabled: false` の構成では `Cleanup.DeleteAfterVerify` によってローカル原本まで削除されていた（実サーバへ 552 応答を注入して再現・修正を確認）
+- **`Transfer.VerifyUploadedFileExists` を FTP でも実装**。設定項目は存在したが SFTP にしか実装がなく、FTP では無視されていた。SIZE でサイズ一致を確認し、SIZE 非対応サーバでは存在確認に留める
+- **上書きリネームの手順を変更し、失敗時に旧ファイルと新ファイルの両方を失う経路を解消**。まず通常のリネームを試み、上書きを拒否するサーバでのみ削除 + リネームへフォールバックする。宛先を削除した後にリネームが失敗した場合は一時ファイルを削除せずに残し、復旧用パスを `Error` ログへ出力する（FTP / SFTP 共通）
+- **`Watch.Path` にスラッシュ区切りを指定すると END ファイルが転送されない問題を修正**。`Directory.EnumerateFiles` は設定値の `/` を保持する一方 `Path.GetDirectoryName` は `\` へ正規化するため、パス文字列比較が一致していなかった。`RequireEndFile` の判定は別実装のため通過してしまい、データだけが届いて END マーカーが届かない状態になっていた（同梱 `appsettings.json` の既定値が `./watch` のため既定構成で発現）
+- **配列設定が C# 側の既定値に「追記」される問題を修正**。`EndFileExtensions: [".TRG"]` と書いても既定の `.END` / `.end` が残っていた。設定に配列がある場合は置き換える
+- **Direction によって無視される設定を起動時に警告**（`get`: `DeleteAfterVerify` / `DeleteLocalSkippedEndFiles` / `StateDirectory` / `RetryDirectory`、`put`: `DeleteRemoteAfterDownload`）。「両方削除」警告も方向で分岐させ、実際には作用しない組み合わせで誤った警告を出さないようにした
+- **`get` で使われない `AdditionalDestinations` の接続情報検証を打ち切り**、使わない設定の不備で `get` の起動が失敗しないようにした
+- **`get` で `TransferEndFiles: false` のとき END ファイルがサーバに溜まり続ける問題を修正**。END を常に列挙し、`DeleteRemoteEndFiles: true` なら取得せず削除だけ行う
+- **`get` のデータ消失経路を遮断**。ダウンロード先がエージェント専用一時ディレクトリ配下になる構成を拒否し、複数のリモートファイルが同一ローカルパスへ着地する場合は黙って上書きせず失敗させる
+- **SFTP で `HostKeyFingerprint` 未設定の場合に警告**。未設定だと相手の鍵を無条件に信頼するため MITM を検出できない
+- **`Transfer.TransferTimeoutSeconds`（既定 `0` = 無効）を追加**。相手が受信を止めた場合にバッチが終わらなくなるのを防ぐ保険。打ち切りはキャンセル要求に依存するためベストエフォート
+
 **主な更新内容 (3.4.2)**:
 - **retry ディレクトリからの復元が失敗した場合に、ファイルが隠しフォルダへ取り残されたままになる問題を修正**。`DeleteAfterVerify: false` で全宛先完了時の `Watch.Path` への復元が失敗（復元先に同名ファイルが存在・一時的なロック等）すると、以降のバッチは「配信済みスキップ」経路を通り復元を再試行しなかった。配信済みスキップ時にも復元を再試行し、阻害要因の解消後に自動回復するよう修正
 - **復元を退避と対称の all-or-nothing に変更し、データ/END ペアの分断を防止**。従来はファイル単位のベストエフォートだったため、END だけ復元されてデータ本体が retry に残ると、`RequireEndFile` 構成では retry 側のデータが列挙フィルタ（END 不在）で候補から外れ、復元も再試行されないまま取り残され得た。1 つでも復元できない場合は何も動かさず、途中失敗時は完了分を巻き戻す
