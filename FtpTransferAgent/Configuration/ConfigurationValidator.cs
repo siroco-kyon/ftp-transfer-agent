@@ -805,6 +805,13 @@ public class ConfigurationValidator
         {
             result.Warnings.Add("High concurrency with short timeout may cause connection pool exhaustion.");
         }
+
+        // 転送単位のタイムアウトが接続/読み取りタイムアウトより短いと、正常な通信でも
+        // 打ち切られてリトライを浪費する
+        if (transfer.TransferTimeoutSeconds > 0 && transfer.TransferTimeoutSeconds < transfer.TimeoutSeconds)
+        {
+            result.Warnings.Add($"TransferTimeoutSeconds ({transfer.TransferTimeoutSeconds}s) is shorter than TimeoutSeconds ({transfer.TimeoutSeconds}s). Transfers may be aborted before the underlying connection timeout has a chance to fire.");
+        }
     }
 
     /// <summary>

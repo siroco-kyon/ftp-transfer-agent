@@ -985,6 +985,67 @@ public class WorkerDownloadTests
         }
     }
 
+    /// <summary>
+    /// 相手が応答を止めた場合にワンショットのバッチが終わらなくなるのを防ぐため、
+    /// Transfer.TransferTimeoutSeconds で 1 ファイルの処理を打ち切れることを保証する。
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_StalledTransfer_IsAbortedByTransferTimeout()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var watch = Options.Create(new WatchOptions { Path = dir });
+            var transfer = Options.Create(new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "get",
+                Host = "host",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/remote",
+                Concurrency = 1,
+                TransferTimeoutSeconds = 1
+            });
+            var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+            var hashOpt = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+            var cleanup = Options.Create(new CleanupOptions());
+
+            var mock = new Mock<IFileTransferClient>();
+            mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), false))
+                .ReturnsAsync(new[] { "/remote/stalled.txt" });
+            // 相手が応答しない転送を模擬する。打ち切られなければ 60 秒待ち続ける
+            mock.Setup(c => c.DownloadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Returns<string, string, CancellationToken>((_, _, ct) => Task.Delay(TimeSpan.FromSeconds(60), ct));
+            mock.Setup(c => c.Dispose());
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            using var provider = services.BuildServiceProvider();
+            var logger = provider.GetRequiredService<ILogger<Worker>>();
+
+            using var lifetime = new DummyLifetime();
+            var exitCode = new ApplicationExitCode();
+            var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object), exitCode);
+
+            var started = DateTime.UtcNow;
+            await worker.RunAsync(CancellationToken.None);
+            var elapsed = DateTime.UtcNow - started;
+
+            // TransferTimeoutSeconds=1 で打ち切られる。テストハーネス側の全体キャンセル (5 秒) より
+            // 明確に早いことを確認し、「全体キャンセルで終わっただけ」と区別する
+            Assert.True(elapsed < TimeSpan.FromSeconds(4), $"Transfer was not aborted by the per-transfer timeout (elapsed: {elapsed}).");
+            // 打ち切られた転送は失敗として扱われ、ローカルにファイルは残らない
+            Assert.NotEqual(0, exitCode.Code);
+            Assert.Empty(Directory.GetFiles(dir));
+        }
+        finally
+        {
+            Directory.Delete(dir, true);
+        }
+    }
+
     private class TestWorker : Worker
     {
         private readonly IFileTransferClient _client;
