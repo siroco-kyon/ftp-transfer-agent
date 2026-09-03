@@ -208,14 +208,14 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `IncludeSubfolders` | bool | 任意 | `false` | サブフォルダも対象にする |
 | `AllowedExtensions` | string[] | 任意 | `[]` | 対象ファイルのフィルタ。拡張子 (`"txt"` / `".txt"`) またはワイルドカード (`"*.txt"` / `"data_*.csv"`) を指定可能。空配列は全ファイル対象（起動時警告あり） |
 | `RequireEndFile` | bool | 任意 | `false` | 対応する END ファイルがあるデータのみ転送 |
-| `EndFileExtensions` | string[] | 任意 | `[".END", ".end"]` | END 拡張子一覧 |
+| `EndFileExtensions` | string[] | 任意 | `[".END", ".end"]` | END 拡張子一覧。**設定ファイルに書いた場合は既定値を置き換える**（追記ではない）。`[".TRG"]` と書けば `.END` / `.end` は END として扱われません |
 | `TransferEndFiles` | bool | 任意 | `false` | 対応するデータ転送の成功後に END ファイル自体も転送する |
 
 ### Transfer
 
 | 項目 | 型 | 必須 | 既定値 | 説明 |
 |---|---|---|---|---|
-| `Mode` | string | 必須 | `"ftp"` | `ftp` / `sftp` / `local`。`local` はローカル / UNC（SMB 共有）への書き込み（**put 専用**、CIFS/SMB1 を実装せず OS のファイル I/O。詳細は [docs/local-destination.md](docs/local-destination.md)） |
+| `Mode` | string | 必須 | `"ftp"` | `ftp` / `sftp` / `local`。**`ftp` は平文通信のみで FTPS（暗号化 FTP）には未対応**。暗号化が必要な場合は `sftp` を使用（`ftp` 選択時は起動時に警告）。`local` はローカル / UNC（SMB 共有）への書き込み（**put 専用**、CIFS/SMB1 を実装せず OS のファイル I/O。詳細は [docs/local-destination.md](docs/local-destination.md)） |
 | `Direction` | string | 必須 | `"put"` | `put` / `get`（`local` は `put` のみ） |
 | `Host` | string | 条件付き | `""` | 接続先ホスト。`ftp` / `sftp` で必須、`local` では未使用 |
 | `Port` | int | 任意 | `21` | 接続ポート（SFTP は通常 22。`local` では未使用） |
@@ -228,6 +228,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `Concurrency` | int | 任意 | `1` | primary 宛先の並列転送数（1-16）。`get` と primary への `put` に適用。`AdditionalDestinations` は各要素の `Concurrency` を個別に使用 |
 | `PreserveFolderStructure` | bool | 任意 | `false` | サブフォルダ構造を維持して転送 |
 | `TimeoutSeconds` | int | 任意 | `120` | 接続・転送タイムアウト秒（1-3600） |
+| `TransferTimeoutSeconds` | int | 任意 | `0` | 1 ファイル（関連 END ファイルを含む）の処理に許す最大秒数（0-86400、`0`=無効）。`TimeoutSeconds` は接続と読み取りにしか掛からないため、相手が受信を止めた場合（特に FTP のアップロード）にバッチが終わらなくなるのを防ぐ保険。打ち切りはキャンセル要求に依存するため、ソケット書き込みで完全にブロックしている場合は即座には中断できません（ベストエフォート） |
 | `KeepAliveSeconds` | int | 任意 | `0` | 接続再利用時のアイドル切断防止（秒、0-3600、`0`=無効）。`>0` で SFTP は `KeepAliveInterval`、FTP は NOOP 送信（`NoopInterval`）+ TCP KeepAlive を有効化。`AdditionalDestinations` の各宛先にも個別適用 |
 | `VerifyUploadedFileExists` | bool | 任意 | `true` | SFTP アップロードのリネーム完了後に宛先パスの存在確認（2 往復）を追加で行うか。リネームの成功応答自体がサーバによる完了確認のため、`false` でも転送の完了保証は変わらない。高レイテンシ回線で小ファイル多数なら `false` で往復数を削減できる。SFTP のみ使用 |
 | `BufferSizeKB` | int | 任意 | `32` | SFTP の 1 書き込み要求あたりのバッファサイズ（KB、1-64）。実際のチャンクサイズはサーバが告知するパケット上限との min（OpenSSH 系は 32KB 上限のため既定から上げても効果なし）。SFTP のみ使用 |
@@ -271,6 +272,8 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 - `Enabled: false` と `DeleteAfterVerify: true` は併用できます。この場合ハッシュ検証は行われず、転送（一時名→本番名へのリネーム）成功後にローカルファイルが削除されます。整合性チェックを伴わない削除になるため、FTP など転送レイヤーで整合性保証のない経路では、ハッシュ検証の有効化または SFTP の利用を推奨します。
 - `MD5` は使用できません。`Hash.Algorithm` は `SHA256` / `SHA512` のみ受け付け、それ以外は起動時バリデーション（DataAnnotations）でエラー終了します。
 - SFTP は転送レイヤーで HMAC による整合性保証があるため、`Enabled: false` にしても実用上の問題は少ないです。
+- **検証にはリモートファイルの読み戻しが必要なため、転送量は約 2 倍になります。** `put` はアップロード後に読み戻し、`get` はハッシュ計算用とダウンロード用でリモートを 2 回読みます。転送とは独立にリモート側のハッシュを得ないと経路での破損を検出できないため、この読み戻しは削減できません。転送量を抑えたい場合は、サーバー側ハッシュコマンドに対応した FTP サーバで `UseServerCommand: true` を使ってください。
+- `Enabled: false` でも、`Transfer.VerifyUploadedFileExists: true`（既定）なら `put` の後に宛先ファイルのサイズ一致を確認します（SIZE 非対応サーバでは存在確認）。サーバがファイルを保存せずに拒否した場合も転送失敗として扱われます。
 
 ### 推奨設定テンプレート
 
@@ -381,10 +384,12 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 
 | 項目 | 型 | 必須 | 既定値 | 説明 |
 |---|---|---|---|---|
-| `DeleteAfterVerify` | bool | 任意 | `true` | `put` 成功後（複数宛先では全宛先成功後）、ローカルファイルを削除。`false` で元ファイルを保持 |
-| `DeleteRemoteAfterDownload` | bool | 任意 | `false` | `get` 成功後、リモートファイルを削除 |
-| `DeleteRemoteEndFiles` | bool | 任意 | `false` | END ファイル成功時のリモート END ファイル削除 |
-| `DeleteLocalSkippedEndFiles` | bool | 任意 | `false` | `put` で `TransferEndFiles=false` のとき、転送成功したデータに対応する未転送 END ファイルをローカルから削除する |
+| `DeleteAfterVerify` | bool | 任意 | `true` | **`put` 専用**。成功後（複数宛先では全宛先成功後）、ローカルファイルを削除。`false` で元ファイルを保持。**`get` では無視されます**（ダウンロードでローカルファイルが削除されることはありません）。既定が `true` のため、`get` 構成では起動時に警告を出します |
+| `DeleteRemoteAfterDownload` | bool | 任意 | `false` | **`get` 専用**。成功後、リモートファイルを削除。`put` では無視されます（起動時に警告） |
+| `DeleteRemoteEndFiles` | bool | 任意 | `false` | END ファイル成功時のリモート END ファイル削除。`get` で `TransferEndFiles=false` の場合は、**取得はせずにサーバ上の END ファイルだけを削除**します |
+| `DeleteLocalSkippedEndFiles` | bool | 任意 | `false` | **`put` 専用**。`TransferEndFiles=false` のとき、転送成功したデータに対応する未転送 END ファイルをローカルから削除する。`get` では無視されます（起動時に警告） |
+
+> **方向による違い**: `Direction` を `put` から `get` に変えると、`put` 用の削除設定・配信トラッキング・追加宛先はすべて無効になります。無視される設定は起動時に警告として通知されます。
 
 ### Smtp
 
@@ -445,6 +450,23 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 関連警告:
 
 - `TransferEndFiles: true` かつ `RequireEndFile: false` の組み合わせでは、起動時に警告が表示されます。対応するデータが転送対象になった END ファイルだけが転送されます。
+
+### 起動時エラーで防げない衝突（実行時に検出）
+
+上記の起動時チェックは `IncludeSubfolders` 由来の衝突が対象です。`get` では次のケースも同一のローカルパスへ着地しますが、これは**実行時に検出して、後続のファイルを失敗させます**（黙って上書きしません）。
+
+- 大文字小文字だけが異なるリモートファイル（`/remote/Sample.txt` と `/remote/sample.txt`）を、大小を区別しないファイルシステム（Windows / macOS）へ取得する場合
+
+`Cleanup.DeleteRemoteAfterDownload: true` と併用すると、上書きされた側はリモートからも消えてデータ消失になるため、失敗させる仕様にしています。
+
+### `get` は毎回すべて取得し、ローカルを上書きします
+
+`put` の配信トラッキングに相当する「取得済みを再取得しない」仕組みは `get` にはありません。`Cleanup.DeleteRemoteAfterDownload: false` の場合、**実行のたびにリモートの全対象ファイルを再取得し、ローカルの同名ファイルを無条件で上書き**します。後続処理がローカルファイルを消費・移動していても復活します。
+
+取り込み済みを再取得したくない場合は次のいずれかにしてください。
+
+- `Cleanup.DeleteRemoteAfterDownload: true` にして、取得したファイルをサーバから消す
+- 取得後にローカルファイルを `Watch.Path` の外へ移動する運用にする
 
 ## ENDファイル制御
 
@@ -555,16 +577,20 @@ dotnet run --project FtpTransferAgent -- --Transfer:Concurrency=4 --Hash:Algorit
 dotnet test FtpTransferAgent.sln --verbosity normal
 ```
 
-### FTP統合テスト（ローカルFTPサーバー）
+### FTP / SFTP 統合テスト（Python 製の実サーバ）
+
+FTP は pyftpdlib、SFTP は paramiko の実サーバを起動して検証します。Docker は不要です。
 
 ```bash
-python -m pip install pyftpdlib
+python -m pip install pyftpdlib paramiko
 dotnet test FtpTransferAgent.Tests/FtpTransferAgent.Tests.csproj --verbosity normal
 ```
 
-### SFTP統合テスト（Docker）
+paramiko は `posix-rename@openssh.com` 拡張を告知しないため、SFTP の「削除 + リネーム」フォールバック経路もこのテストで検証されます。
 
-Docker Desktop 起動後に実行:
+### SFTP統合テスト（Docker / OpenSSH）
+
+OpenSSH 実装に対する検証です。Docker Desktop 起動後に実行:
 
 ```bash
 dotnet test FtpTransferAgent.Tests/FtpTransferAgent.Tests.csproj --filter "FullyQualifiedName~SftpClientDockerIntegrationTests"
@@ -572,7 +598,8 @@ dotnet test FtpTransferAgent.Tests/FtpTransferAgent.Tests.csproj --filter "Fully
 
 補足:
 
-- Docker が使えない環境では SFTP Docker テストは自動で Skip されます。
+- Docker が使えない環境では SFTP Docker テストは自動で Skip されます。上記の paramiko テストは Docker 無しでも実行されるため、SFTP が完全に未検証になることはありません。
+- CI では実サーバ統合テストがスキップされた場合にビルドを失敗させています。
 
 ## よくある問題
 
