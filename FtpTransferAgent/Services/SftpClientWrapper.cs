@@ -30,14 +30,14 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     // (この接続は同時に 1 ワーカーしか使用しないため排他制御は不要)
     private readonly HashSet<string> _verifiedRemoteDirs = new();
 
-    // 宛先削除後のリネーム失敗で意図的に残した一時ファイル (宛先パス → 一時パス一覧)。
-    // 再試行は毎回別の一時名を使うため、成功した時点で掃除しないと重複が残り続ける。
-    // 接続はプールから排他的に貸し出されるためロック不要。
-    private readonly Dictionary<string, List<string>> _retainedTempPaths = new(StringComparer.Ordinal);
+    // 宛先削除後のリネーム失敗で意図的に残した一時ファイルの記録。再試行では接続を借り直す
+    // (壊れていれば別インスタンスになる) ため、記録は宛先単位で共有する必要がある。
+    private readonly RetainedTempFileRegistry? _retainedTempFiles;
 
     // テスト用に既存の SftpClient を渡せるようにする
-    public SftpClientWrapper(DestinationOptions options, ILogger<SftpClientWrapper> logger, SftpClient? client = null)
+    public SftpClientWrapper(DestinationOptions options, ILogger<SftpClientWrapper> logger, SftpClient? client = null, RetainedTempFileRegistry? retainedTempFiles = null)
     {
+        _retainedTempFiles = retainedTempFiles;
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(logger);
 
@@ -297,12 +297,7 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
                 // 宛先を削除した後にリネームが失敗した状態。一時ファイルを消すと復旧不能になるため
                 // 意図的に残し、手動復旧できるようパスをログに出す。
                 // 再試行が成功したら CleanupRetainedTempFiles が掃除する
-                if (!_retainedTempPaths.TryGetValue(remotePath, out var retained))
-                {
-                    retained = new List<string>();
-                    _retainedTempPaths[remotePath] = retained;
-                }
-                retained.Add(temp);
+                _retainedTempFiles?.Retain(remotePath, temp);
 
                 _logger.LogError(
                     "SFTP rename failed after the existing destination file was removed. The uploaded data is retained at {TempPath} and must be renamed to {RemotePath} manually if the retry does not recover it.",
@@ -339,12 +334,12 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     /// </summary>
     private void CleanupRetainedTempFiles(string remotePath)
     {
-        if (!_retainedTempPaths.TryGetValue(remotePath, out var retained))
+        var retained = _retainedTempFiles?.TakeRetained(remotePath);
+        if (retained is null || retained.Count == 0)
         {
             return;
         }
 
-        _retainedTempPaths.Remove(remotePath);
         foreach (var path in retained)
         {
             try

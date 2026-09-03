@@ -22,16 +22,16 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
     private readonly ILogger<AsyncFtpClientWrapper> _logger;
     private readonly DestinationOptions _options;
 
-    // 宛先削除後のリネーム失敗で意図的に残した一時ファイル (宛先パス → 一時パス一覧)。
-    // Polly の再試行は毎回別の一時名を使うため、成功した時点で掃除しないとサーバに
-    // 重複ファイルが残り続ける。接続はプールから排他的に貸し出されるためロック不要。
-    private readonly Dictionary<string, List<string>> _retainedTempPaths = new(StringComparer.Ordinal);
+    // 宛先削除後のリネーム失敗で意図的に残した一時ファイルの記録。再試行では接続を借り直す
+    // (壊れていれば別インスタンスになる) ため、記録は宛先単位で共有する必要がある。
+    private readonly RetainedTempFileRegistry? _retainedTempFiles;
 
     // テスト用に既存の AsyncFtpClient を渡せるようオーバーロードを追加
-    public AsyncFtpClientWrapper(DestinationOptions options, ILogger<AsyncFtpClientWrapper> logger, AsyncFtpClient? client = null)
+    public AsyncFtpClientWrapper(DestinationOptions options, ILogger<AsyncFtpClientWrapper> logger, AsyncFtpClient? client = null, RetainedTempFileRegistry? retainedTempFiles = null)
     {
         _logger = logger;
         _options = options;
+        _retainedTempFiles = retainedTempFiles;
         _client = client ?? new AsyncFtpClient(options.Host, options.Username, options.Password, options.Port);
 
         // タイムアウト設定を適用
@@ -117,12 +117,7 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
                 // 宛先を削除した後にリネームが失敗した状態。一時ファイルを消すと復旧不能になるため
                 // 意図的に残し、手動復旧できるようパスをログに出す。
                 // 再試行が成功したら CleanupRetainedTempFilesAsync が掃除する
-                if (!_retainedTempPaths.TryGetValue(remotePath, out var retained))
-                {
-                    retained = new List<string>();
-                    _retainedTempPaths[remotePath] = retained;
-                }
-                retained.Add(tempPath);
+                _retainedTempFiles?.Retain(remotePath, tempPath);
 
                 _logger.LogError(
                     "FTP rename failed after the existing destination file was removed. The uploaded data is retained at {TempPath} and must be renamed to {RemotePath} manually if the retry does not recover it.",
@@ -147,12 +142,12 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
     /// </summary>
     private async Task CleanupRetainedTempFilesAsync(string remotePath)
     {
-        if (!_retainedTempPaths.TryGetValue(remotePath, out var retained))
+        var retained = _retainedTempFiles?.TakeRetained(remotePath);
+        if (retained is null || retained.Count == 0)
         {
             return;
         }
 
-        _retainedTempPaths.Remove(remotePath);
         using var cleanupCts = new CancellationTokenSource(CleanupTimeout);
         foreach (var path in retained)
         {

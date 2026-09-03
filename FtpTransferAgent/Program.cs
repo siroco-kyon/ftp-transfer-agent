@@ -21,8 +21,8 @@ builder.Services.AddOptions<WatchOptions>()
     .BindConfiguration("Watch")
     .PostConfigure(o =>
     {
-        ReplaceArrayFromConfiguration(builder.Configuration, "Watch:AllowedExtensions", v => o.AllowedExtensions = v);
-        ReplaceArrayFromConfiguration(builder.Configuration, "Watch:EndFileExtensions", v => o.EndFileExtensions = v);
+        ConfigurationArrayBinder.ReplaceIfDeclared(builder.Configuration, "Watch:AllowedExtensions", v => o.AllowedExtensions = v);
+        ConfigurationArrayBinder.ReplaceIfDeclared(builder.Configuration, "Watch:EndFileExtensions", v => o.EndFileExtensions = v);
     })
     .ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddOptions<TransferOptions>().BindConfiguration("Transfer").ValidateDataAnnotations().ValidateOnStart();
@@ -157,29 +157,4 @@ catch (Exception ex)
 {
     Console.WriteLine($"Application terminated unexpectedly: {ex.Message}");
     Environment.Exit(1);
-}
-
-// 設定セクションに配列が明示されている場合、C# 側の初期値を「置き換える」。
-// Microsoft.Extensions.Configuration の既定の配列バインドはプロパティの初期値に
-// 設定値を追記するため、初期値が空でない配列 (WatchOptions.EndFileExtensions 等) では
-// 設定に書いていない既定値が残り続けてしまう。設定に書いた内容だけを有効にする。
-static void ReplaceArrayFromConfiguration(IConfiguration configuration, string key, Action<string[]> apply)
-{
-    // 空配列 ("EndFileExtensions": []) は値も子も持たないため section.Exists() は false になる。
-    // それでは「設定に空配列を書いて既定値を無効化する」ことができないので、親セクションの
-    // 子キーに現れるかどうかで「設定ファイルに書かれているか」を判定する。
-    var separatorIndex = key.LastIndexOf(':');
-    var parentKey = separatorIndex < 0 ? string.Empty : key.Substring(0, separatorIndex);
-    var leafKey = separatorIndex < 0 ? key : key.Substring(separatorIndex + 1);
-
-    var parent = string.IsNullOrEmpty(parentKey) ? configuration : configuration.GetSection(parentKey);
-    var declared = parent.GetChildren().Any(c => string.Equals(c.Key, leafKey, StringComparison.OrdinalIgnoreCase));
-    if (!declared)
-    {
-        return;
-    }
-
-    apply(configuration.GetSection(key).GetChildren()
-        .Select(c => c.Value ?? string.Empty)
-        .ToArray());
 }

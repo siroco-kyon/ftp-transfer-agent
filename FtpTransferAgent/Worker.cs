@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.IO;
 using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
@@ -90,12 +91,20 @@ public class Worker : BackgroundService
     {
         return dest.Mode.ToLowerInvariant() switch
         {
-            "sftp" => ActivatorUtilities.CreateInstance<SftpClientWrapper>(_services, dest),
-            "ftp" => ActivatorUtilities.CreateInstance<AsyncFtpClientWrapper>(_services, dest),
+            "sftp" => ActivatorUtilities.CreateInstance<SftpClientWrapper>(_services, dest, GetRetainedTempFiles(dest)),
+            "ftp" => ActivatorUtilities.CreateInstance<AsyncFtpClientWrapper>(_services, dest, GetRetainedTempFiles(dest)),
             "local" => ActivatorUtilities.CreateInstance<LocalFileTransferClient>(_services, dest),
             _ => throw new ArgumentException($"Unsupported transfer mode: {dest.Mode}")
         };
     }
+
+    // 宛先削除後のリネーム失敗で残した一時ファイルの記録は、宛先単位で共有する。
+    // クライアント個体に持たせると、再試行で接続を借り直した際に記録が失われる
+    private readonly ConcurrentDictionary<DestinationOptions, RetainedTempFileRegistry> _retainedTempFilesByDestination =
+        new(ReferenceEqualityComparer.Instance);
+
+    private RetainedTempFileRegistry GetRetainedTempFiles(DestinationOptions dest)
+        => _retainedTempFilesByDestination.GetOrAdd(dest, _ => new RetainedTempFileRegistry());
 
     // DI を活用してクライアントファクトリパターンを実装（primary 用）
     protected virtual IFileTransferClient CreateClient()
@@ -590,8 +599,13 @@ public class Worker : BackgroundService
             // プローブはエージェント専用ディレクトリ内に作る。Watch.Path 直下に作ると、
             // 異常終了で残った場合に put の列挙対象へ紛れ込む恐れがある
             var probeDirectory = EnsureDownloadTempDirectory();
-            var probe = Path.Combine(probeDirectory, $"case-probe-{Guid.NewGuid():N}");
-            var upper = probe.ToUpperInvariant();
+            // 大小を変えるのはファイル名だけにする。絶対パス全体を大文字化すると、
+            // 大小を区別する上位ディレクトリの下に大小を区別しないボリュームがマウント
+            // されている場合 (/Volumes/share/... 等) に、対象ボリュームへ到達する前に
+            // 名前解決が失敗し「区別する」と誤判定してしまう
+            var probeName = $"case-probe-{Guid.NewGuid():N}";
+            var probe = Path.Combine(probeDirectory, probeName);
+            var upper = Path.Combine(probeDirectory, probeName.ToUpperInvariant());
             // 小文字と大文字が別名になる (= 大小を区別する) なら Ordinal
             File.WriteAllBytes(probe, Array.Empty<byte>());
             try
@@ -661,6 +675,87 @@ public class Worker : BackgroundService
         }
 
         return colliding;
+    }
+
+    /// <summary>
+    /// END ファイルの関連付けが曖昧になるリモートファイルを返す。
+    /// END の突き合わせは拡張子の大小差 (.END / .end) を吸収するため大小無視で行うので、
+    /// 大小のみ異なるデータファイルが同居すると、1 つの END がどちらのものか判別できない。
+    /// 取り違えたまま DeleteRemoteEndFiles を適用すると、一方が他方の END を消してしまう。
+    /// </summary>
+    private HashSet<string> FindAmbiguousEndFileAssociations(IReadOnlyList<string> dataFiles, IReadOnlyList<string> endFiles)
+    {
+        var result = new HashSet<string>(StringComparer.Ordinal);
+
+        // END を一切扱わない構成では関連付け自体が発生しない
+        if (!_watch.RequireEndFile && !_watch.TransferEndFiles && !_cleanup.DeleteRemoteEndFiles)
+        {
+            return result;
+        }
+
+        // データファイルを「大小無視の正規化パス」でまとめる。関連付けはこのキーで行うため、
+        // 1 つのキーに複数のデータファイルや複数の END が集まると帰属を判別できない
+        var dataByKey = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var dataFile in dataFiles)
+        {
+            var key = NormalizeRemotePath(dataFile);
+            if (!dataByKey.TryGetValue(key, out var group))
+            {
+                group = new List<string>();
+                dataByKey[key] = group;
+            }
+            group.Add(dataFile);
+        }
+
+        // END ファイル側も同じキーでまとめる。/foo.END と /FOO.END は同じキーに落ちるため、
+        // データファイルが 1 つでも「どちらの END か」を決められない
+        var endByKey = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var endFile in endFiles)
+        {
+            var dataForEnd = GetDataFileForEndFileRemote(NormalizeRemotePath(endFile));
+            if (string.IsNullOrEmpty(dataForEnd))
+            {
+                continue;
+            }
+
+            var key = NormalizeRemotePath(dataForEnd);
+            if (!endByKey.TryGetValue(key, out var group))
+            {
+                group = new List<string>();
+                endByKey[key] = group;
+            }
+            group.Add(endFile);
+        }
+
+        foreach (var (key, group) in dataByKey)
+        {
+            var ambiguousData = group.Count > 1;
+            var ambiguousEnd = endByKey.TryGetValue(key, out var relatedEnds) && relatedEnds.Count > 1;
+            if (!ambiguousData && !ambiguousEnd)
+            {
+                continue;
+            }
+
+            if (ambiguousData)
+            {
+                _logger.LogError(
+                    "{Count} remote data files differ only by case ({Remotes}), so END files cannot be matched to them unambiguously. None of them will be downloaded; rename them on the server so the names do not differ only by case.",
+                    group.Count, string.Join(", ", group));
+            }
+            else
+            {
+                _logger.LogError(
+                    "{Count} remote END files differ only by case ({Ends}) and all match the data file(s) {Remotes}, so the marker cannot be identified unambiguously. They will not be downloaded; rename them on the server so the names do not differ only by case.",
+                    relatedEnds!.Count, string.Join(", ", relatedEnds!), string.Join(", ", group));
+            }
+
+            foreach (var remotePath in group)
+            {
+                result.Add(remotePath);
+            }
+        }
+
+        return result;
     }
 
     /// <summary>
@@ -2089,6 +2184,16 @@ public class Worker : BackgroundService
                         _exitCode?.MarkFailure();
                     }
 
+                    // END を扱う構成では、大小のみ異なるデータファイルが同居すると
+                    // どの END がどちらのものか判別できない。取り違えると一方が他方の
+                    // END を削除し得るため、曖昧なものは転送対象から外す
+                    var ambiguousRemotePaths = FindAmbiguousEndFileAssociations(dataFiles, endFiles);
+                    if (ambiguousRemotePaths.Count > 0)
+                    {
+                        dataFiles.RemoveAll(ambiguousRemotePaths.Contains);
+                        _exitCode?.MarkFailure();
+                    }
+
                     // 1. まずデータファイルを転送キューに追加
                     // キー比較は Ordinal にする (リモートサーバは大文字小文字違いの同名ファイルを
                     // 同時に返し得るため、大小無視の比較だと重複キーで列挙全体が失敗する)
@@ -2101,11 +2206,12 @@ public class Worker : BackgroundService
                     {
                         // END ファイル側から「対応データファイルの正規化パス → END ファイル一覧」の
                         // 辞書を構築し、データ × END の総当たり比較を避ける
-                        // 比較は Ordinal。リモートパスは大小を区別するサーバが一般的で、
-                        // 大小無視だと /foo.END が /foo と /FOO の双方に紐付き、DeleteRemoteEndFiles で
-                        // 一方が他方の END を削除してしまう。
-                        // END 拡張子の大小差 (.END / .end) は GetDataFileForEndFileRemote 側で吸収される
-                        var endFilesByDataNorm = new Dictionary<string, List<string>>(StringComparer.Ordinal);
+                        // 転送可否の判定 (HasEndFileRemote) が大小無視なので、関連付けも同じ規則にする。
+                        // 片方だけ Ordinal にすると、大小を区別しないサーバで「END あり」と判定された
+                        // データに END が紐付かず、END を残したままデータだけ削除され得る。
+                        // 大小のみ異なるデータファイルが同居する場合の取り違えは、
+                        // 事前に FindAmbiguousEndFileAssociations で対象から外して防ぐ
+                        var endFilesByDataNorm = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
                         foreach (var endFile in endFiles)
                         {
                             var endNorm = NormalizeRemotePath(endFile);
