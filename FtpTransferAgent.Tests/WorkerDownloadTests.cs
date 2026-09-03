@@ -653,10 +653,81 @@ public class WorkerDownloadTests
         var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
         await worker.RunAsync(CancellationToken.None);
 
-        // 両ファイルが列挙エラーなく個別に処理される
-        Assert.Equal(2, downloaded.Count);
-        Assert.Contains("/remote/Sample.txt", downloaded);
-        Assert.Contains("/remote/sample.txt", downloaded);
+        // 列挙は重複キー例外を起こさない (この回帰防止が本テストの元の目的)
+        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+        {
+            // 大小を区別しないファイルシステムでは両者が同一のローカルパスへ着地する。
+            // 黙って後勝ちで上書きせず、片方だけを処理してもう片方は失敗させる
+            Assert.Single(downloaded);
+            Assert.Single(Directory.GetFiles(dir));
+        }
+        else
+        {
+            // 大小を区別するファイルシステムでは衝突しないので両方処理される
+            Assert.Equal(2, downloaded.Count);
+            Assert.Contains("/remote/Sample.txt", downloaded);
+            Assert.Contains("/remote/sample.txt", downloaded);
+        }
+
+        Directory.Delete(dir, true);
+    }
+
+    /// <summary>
+    /// PreserveFolderStructure=false では、異なるサブディレクトリの同名ファイルが
+    /// すべて Watch.Path 直下の同じ名前へ着地する。黙って上書きすると内容が失われ、
+    /// DeleteRemoteAfterDownload と併用するとリモート側も消えてデータ消失になるため、
+    /// 衝突を検出して片方を失敗させることを保証する。
+    /// </summary>
+    [Fact]
+    public async Task ExecuteAsync_RemoteFilesCollidingOnLocalPath_DoNotSilentlyOverwrite()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        Directory.CreateDirectory(dir);
+
+        var watch = Options.Create(new WatchOptions { Path = dir, IncludeSubfolders = true });
+        var transfer = Options.Create(new TransferOptions
+        {
+            Mode = "ftp",
+            Direction = "get",
+            Host = "host",
+            Username = "user",
+            Password = "pass",
+            RemotePath = "/remote",
+            Concurrency = 1,
+            PreserveFolderStructure = false
+        });
+        var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+        var hashOpt = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+        var cleanup = Options.Create(new CleanupOptions());
+
+        // 別ディレクトリの同名ファイル。どちらも "<Watch.Path>/result.csv" へ着地する
+        var remoteFiles = new[] { "/remote/a/result.csv", "/remote/b/result.csv" };
+        var downloaded = new List<string>();
+
+        var mock = new Mock<IFileTransferClient>();
+        mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), true))
+            .ReturnsAsync(remoteFiles);
+        mock.Setup(c => c.DownloadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Callback<string, string, CancellationToken>((remote, local, _) =>
+            {
+                lock (downloaded) { downloaded.Add(remote); }
+                File.WriteAllText(local, remote);
+            })
+            .Returns(Task.CompletedTask);
+        mock.Setup(c => c.Dispose());
+
+        var services = new ServiceCollection();
+        services.AddLogging();
+        using var provider = services.BuildServiceProvider();
+        var logger = provider.GetRequiredService<ILogger<Worker>>();
+
+        using var lifetime = new DummyLifetime();
+        var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
+        await worker.RunAsync(CancellationToken.None);
+
+        // 片方だけが処理され、もう片方は上書きを避けるため失敗する
+        Assert.Single(downloaded);
+        Assert.Single(Directory.GetFiles(dir));
 
         Directory.Delete(dir, true);
     }
