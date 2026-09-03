@@ -255,7 +255,9 @@ public class ParallelProcessingIntegrationTests : IDisposable
         Assert.Contains(result.Errors, e => e.Contains("Invalid file extensions"));
         Assert.Contains(result.Warnings, w => w.Contains("FTP transmits passwords"));
         Assert.Contains(result.Warnings, w => w.Contains("High concurrency"));
-        Assert.Contains(result.Warnings, w => w.Contains("Both local and remote file deletion"));
+        // Direction=put では DeleteRemoteAfterDownload は無視されるため、
+        // 「両方削除」ではなく方向に即した警告が出る
+        Assert.Contains(result.Warnings, w => w.Contains("Cleanup.DeleteRemoteAfterDownload is enabled but Direction is 'put'"));
     }
 
     [Fact]

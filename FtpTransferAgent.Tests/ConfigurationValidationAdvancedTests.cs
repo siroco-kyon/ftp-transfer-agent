@@ -35,6 +35,8 @@ public class ConfigurationValidationAdvancedTests : IDisposable
             Host = "example.com",
             Username = "user",
             Password = "pass",
+            // ホスト鍵指紋を設定しないと MITM を検出できないため警告対象になる
+            HostKeyFingerprint = "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
             Concurrency = 2
         };
         var retry = new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 };
@@ -47,6 +49,102 @@ public class ConfigurationValidationAdvancedTests : IDisposable
         // Assert
         Assert.True(result.IsValid);
         Assert.False(result.HasWarnings);
+    }
+
+    [Fact]
+    public void ValidateConfiguration_SftpWithoutHostKeyFingerprint_ShouldWarn()
+    {
+        var watch = new WatchOptions { Path = _testDirectory };
+        var transfer = new TransferOptions
+        {
+            Mode = "sftp",
+            Port = 22,
+            Direction = "put",
+            Host = "example.com",
+            Username = "user",
+            Password = "pass",
+            HostKeyFingerprint = ""
+        };
+
+        var result = _validator.ValidateConfiguration(
+            watch, transfer, new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 },
+            new HashOptions { Algorithm = "SHA256" }, new CleanupOptions { DeleteAfterVerify = false });
+
+        Assert.Contains(result.Warnings, w => w.Contains("HostKeyFingerprint is not set"));
+    }
+
+    [Fact]
+    public void ValidateConfiguration_GetWithDeleteAfterVerify_ShouldWarnItIsIgnored()
+    {
+        var watch = new WatchOptions { Path = _testDirectory };
+        var transfer = new TransferOptions
+        {
+            Mode = "sftp",
+            Port = 22,
+            Direction = "get",
+            Host = "example.com",
+            Username = "user",
+            Password = "pass",
+            HostKeyFingerprint = "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        };
+
+        var result = _validator.ValidateConfiguration(
+            watch, transfer, new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 },
+            new HashOptions { Algorithm = "SHA256" },
+            new CleanupOptions { DeleteAfterVerify = true, DeleteRemoteAfterDownload = true });
+
+        // get ではローカル削除は行われないので、その旨を警告する
+        Assert.Contains(result.Warnings, w => w.Contains("Cleanup.DeleteAfterVerify is enabled but Direction is 'get'"));
+        // 実際には両方向の削除が同時に起こらないため、誤解を招く「両方削除」警告は出さない
+        Assert.DoesNotContain(result.Warnings, w => w.Contains("Both local and remote file deletion"));
+    }
+
+    [Fact]
+    public void ValidateConfiguration_GetWithAdditionalDestinations_ShouldWarnWithoutFailing()
+    {
+        var watch = new WatchOptions { Path = _testDirectory };
+        var transfer = new TransferOptions
+        {
+            Mode = "sftp",
+            Port = 22,
+            Direction = "get",
+            Host = "example.com",
+            Username = "user",
+            Password = "pass",
+            HostKeyFingerprint = "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
+            // ダウンロードでは使われない宛先。接続情報が欠けていても起動を妨げてはならない
+            AdditionalDestinations = new List<DestinationOptions> { new() { Mode = "sftp" } }
+        };
+
+        var result = _validator.ValidateConfiguration(
+            watch, transfer, new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 },
+            new HashOptions { Algorithm = "SHA256" }, new CleanupOptions { DeleteAfterVerify = false });
+
+        Assert.Contains(result.Warnings, w => w.Contains("Additional destinations are used only for uploads"));
+        Assert.DoesNotContain(result.Errors, e => e.Contains("Destination#1"));
+    }
+
+    [Fact]
+    public void ValidateConfiguration_GetDeletingRemoteEndFilesWithoutTransferringThem_ShouldWarn()
+    {
+        var watch = new WatchOptions { Path = _testDirectory, TransferEndFiles = false };
+        var transfer = new TransferOptions
+        {
+            Mode = "sftp",
+            Port = 22,
+            Direction = "get",
+            Host = "example.com",
+            Username = "user",
+            Password = "pass",
+            HostKeyFingerprint = "SHA256:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+        };
+
+        var result = _validator.ValidateConfiguration(
+            watch, transfer, new RetryOptions { MaxAttempts = 3, DelaySeconds = 5 },
+            new HashOptions { Algorithm = "SHA256" },
+            new CleanupOptions { DeleteAfterVerify = false, DeleteRemoteEndFiles = true });
+
+        Assert.Contains(result.Warnings, w => w.Contains("Cleanup.DeleteRemoteEndFiles is enabled"));
     }
 
     [Fact]

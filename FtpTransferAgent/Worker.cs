@@ -39,6 +39,15 @@ public class Worker : BackgroundService
     // 利用者ファイルと混在させず、このディレクトリ単位で残骸を安全に掃除するために使う。
     private const string DownloadTempDirectoryName = ".ftptransferagent-tmp";
 
+    // 今回の実行でダウンロード先として確保したローカルパス (正規化済み) → 取得元リモートパス。
+    // 別々のリモートファイルが同じローカルパスに着地する構成 (PreserveFolderStructure=false で
+    // サブフォルダの同名ファイル、大文字小文字だけ異なる名前など) では、後勝ちで片方が失われる。
+    // DeleteRemoteAfterDownload と併用するとリモート側も消えてデータ消失となるため検出する。
+    private readonly Dictionary<string, string> _claimedDownloadPaths =
+        new(OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal);
+
     // 転送処理用のチャンネル（容量制限でメモリリーク防止）
 
     // DI された各種オプションを受け取る
@@ -546,6 +555,49 @@ public class Worker : BackgroundService
     }
 
     // ダウンロードの検証用一時ファイルを置くエージェント専用ディレクトリのフルパス (Watch.Path 配下)。
+    /// <summary>
+    /// ダウンロードの着地先がエージェント専用の一時ディレクトリ配下になっていないか確認する。
+    /// リモートに ".ftptransferagent-tmp" という名前のディレクトリがあり
+    /// PreserveFolderStructure=true で取得すると、取得したファイルが次回起動時の
+    /// 残骸掃除 (ディレクトリごと削除) で消えてしまうため、事前に拒否する。
+    /// </summary>
+    private void EnsureNotUnderDownloadTempDirectory(string localPath)
+    {
+        var tempPrefix = DirectoryPrefix(GetDownloadTempDirectory());
+        if (IsUnderDirectoryPrefix(localPath, tempPrefix))
+        {
+            throw new ArgumentException(
+                $"The download destination falls inside the agent's temporary directory '{DownloadTempDirectoryName}' and would be deleted by the orphan cleanup on the next run: {localPath}. " +
+                "Rename the remote directory or change Watch.Path.");
+        }
+    }
+
+    /// <summary>
+    /// ダウンロード先のローカルパスを今回の実行で確保する。
+    /// 別のリモートファイルが同じローカルパスへ着地する場合は、黙って上書きせず失敗させる。
+    /// (同一リモートファイルのリトライは再確保を許可する)
+    /// </summary>
+    private void ClaimDownloadPath(string localPath, string remotePath)
+    {
+        var key = Path.GetFullPath(localPath);
+        lock (_claimedDownloadPaths)
+        {
+            if (_claimedDownloadPaths.TryGetValue(key, out var owner))
+            {
+                if (string.Equals(owner, remotePath, StringComparison.Ordinal))
+                {
+                    return;
+                }
+
+                throw new ArgumentException(
+                    $"Two remote files map to the same local path '{localPath}': '{owner}' and '{remotePath}'. " +
+                    "Downloading both would silently overwrite one of them. Enable Transfer.PreserveFolderStructure or narrow Watch.AllowedExtensions so the names do not collide.");
+            }
+
+            _claimedDownloadPaths[key] = remotePath;
+        }
+    }
+
     private string GetDownloadTempDirectory() =>
         Path.Combine(Path.GetFullPath(_watch.Path), DownloadTempDirectoryName);
 
@@ -1874,13 +1926,13 @@ public class Worker : BackgroundService
                     {
                         var originalPath = normalizedMap[normPath];
 
-                        // ENDファイルかどうかを正規化パスで判定
+                        // ENDファイルかどうかを正規化パスで判定。
+                        // put 側と同様、TransferEndFiles の値によらず END 一覧へ収集する。
+                        // 収集しないと DeleteRemoteEndFiles が「転送しなかった END」に届かず、
+                        // データだけ削除されて END がサーバに溜まり続ける
                         if (IsEndFileRemote(normPath))
                         {
-                            if (_watch.TransferEndFiles)
-                            {
-                                endFiles.Add(originalPath);
-                            }
+                            endFiles.Add(originalPath);
                             continue;
                         }
 
@@ -1911,7 +1963,7 @@ public class Worker : BackgroundService
                         file => (IReadOnlyList<string>)Array.Empty<string>(),
                         StringComparer.Ordinal);
 
-                    if (_watch.TransferEndFiles && endFiles.Count > 0)
+                    if ((_watch.TransferEndFiles || _cleanup.DeleteRemoteEndFiles) && endFiles.Count > 0)
                     {
                         // END ファイル側から「対応データファイルの正規化パス → END ファイル一覧」の
                         // 辞書を構築し、データ × END の総当たり比較を避ける
@@ -2347,6 +2399,8 @@ public class Worker : BackgroundService
         }
 
         EnsureNoReparsePointBelowWatch(localPath);
+        EnsureNotUnderDownloadTempDirectory(localPath);
+        ClaimDownloadPath(localPath, item.Path);
 
         _logger.LogInformation("[{Id}] Starting download {Remote} to {Local}", id, item.Path, localPath);
 
@@ -2428,11 +2482,21 @@ public class Worker : BackgroundService
                     continue;
                 }
 
-                bytesTransferred += await ProcessDownloadAsync(
-                    client,
-                    new TransferItem(endFilePath, TransferAction.Download),
-                    id,
-                    token).ConfigureAwait(false);
+                if (_watch.TransferEndFiles)
+                {
+                    bytesTransferred += await ProcessDownloadAsync(
+                        client,
+                        new TransferItem(endFilePath, TransferAction.Download),
+                        id,
+                        token).ConfigureAwait(false);
+                }
+                else if (_cleanup.DeleteRemoteEndFiles)
+                {
+                    // END を取り込まない構成でも、対応データを取得できた END はサーバから消す。
+                    // 消さないとデータだけ削除され END がサーバに溜まり続ける
+                    await client.DeleteAsync(endFilePath, token).ConfigureAwait(false);
+                    _logger.LogInformation("[{Id}] Deleted remote END file {Remote} without downloading it (TransferEndFiles is disabled)", id, endFilePath);
+                }
             }
         }
         var shouldDeleteRemote = isEndFileRemote ? _cleanup.DeleteRemoteEndFiles : _cleanup.DeleteRemoteAfterDownload;

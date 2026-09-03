@@ -5,6 +5,7 @@ using FtpTransferAgent.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Options;
 
 // アプリケーションのエントリーポイント
@@ -13,7 +14,17 @@ using Microsoft.Extensions.Options;
 var builder = Host.CreateApplicationBuilder(args);
 
 // 設定クラスを DI コンテナに登録し、起動時に検証を行う
-builder.Services.AddOptions<WatchOptions>().BindConfiguration("Watch").ValidateDataAnnotations().ValidateOnStart();
+// 配列は PostConfigure で明示的に置き換える。既定の配列バインドは C# 側の初期値に
+// 設定値を「追記」するため、EndFileExtensions: [".TRG"] と書いても既定の
+// ".END"/".end" が残ってしまう (指定した拡張子だけが有効にならない)。
+builder.Services.AddOptions<WatchOptions>()
+    .BindConfiguration("Watch")
+    .PostConfigure(o =>
+    {
+        ReplaceArrayFromConfiguration(builder.Configuration, "Watch:AllowedExtensions", v => o.AllowedExtensions = v);
+        ReplaceArrayFromConfiguration(builder.Configuration, "Watch:EndFileExtensions", v => o.EndFileExtensions = v);
+    })
+    .ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddOptions<TransferOptions>().BindConfiguration("Transfer").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddOptions<RetryOptions>().BindConfiguration("Retry").ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddOptions<HashOptions>().BindConfiguration("Hash").ValidateDataAnnotations().ValidateOnStart();
@@ -146,4 +157,21 @@ catch (Exception ex)
 {
     Console.WriteLine($"Application terminated unexpectedly: {ex.Message}");
     Environment.Exit(1);
+}
+
+// 設定セクションに配列が明示されている場合、C# 側の初期値を「置き換える」。
+// Microsoft.Extensions.Configuration の既定の配列バインドはプロパティの初期値に
+// 設定値を追記するため、初期値が空でない配列 (WatchOptions.EndFileExtensions 等) では
+// 設定に書いていない既定値が残り続けてしまう。設定に書いた内容だけを有効にする。
+static void ReplaceArrayFromConfiguration(IConfiguration configuration, string key, Action<string[]> apply)
+{
+    var section = configuration.GetSection(key);
+    if (!section.Exists())
+    {
+        return;
+    }
+
+    apply(section.GetChildren()
+        .Select(c => c.Value ?? string.Empty)
+        .ToArray());
 }

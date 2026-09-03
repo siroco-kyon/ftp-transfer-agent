@@ -47,6 +47,8 @@ public class ConfigurationValidator
         // 宛先別配信トラッキングのバリデーション
         ValidateDeliveryTracking(watch, transfer, cleanup, result);
 
+        ValidateDirectionSpecificSettings(transfer, watch, cleanup, result);
+
         return result;
     }
 
@@ -210,7 +212,9 @@ public class ConfigurationValidator
 
         if (transfer.Direction is "get")
         {
-            result.Warnings.Add($"AdditionalDestinations is set ({transfer.AdditionalDestinations.Count} entries) but Direction is '{transfer.Direction}'. Additional destinations are used only for uploads.");
+            // 使われない設定の接続情報不足で get の起動が失敗しないよう、警告に留めて検証を打ち切る
+            result.Warnings.Add($"AdditionalDestinations is set ({transfer.AdditionalDestinations.Count} entries) but Direction is '{transfer.Direction}'. Additional destinations are used only for uploads and are not validated.");
+            return;
         }
 
         for (int i = 0; i < transfer.AdditionalDestinations.Count; i++)
@@ -622,10 +626,67 @@ public class ConfigurationValidator
             result.Errors.Add("MD5 hash algorithm is cryptographically insecure and has been disabled. Please use SHA256 or SHA512.");
         }
 
-        // 危険な設定の組み合わせチェック
-        if (cleanup.DeleteAfterVerify && cleanup.DeleteRemoteAfterDownload)
+        // SFTP のホスト鍵検証。未設定だと相手の鍵を無条件に信頼するため MITM を検出できない
+        // (初回信頼して以後固定する TOFU ですらなく、毎回どの鍵でも受け入れる)
+        if (transfer.Mode == "sftp" && string.IsNullOrWhiteSpace(transfer.HostKeyFingerprint))
+        {
+            result.Warnings.Add(
+                "HostKeyFingerprint is not set. The SFTP server's host key will be accepted without verification, so a man-in-the-middle cannot be detected. " +
+                "Obtain the fingerprint with 'ssh-keyscan <host> | ssh-keygen -lf -' and set it (e.g. \"SHA256:...\").");
+        }
+
+        // 危険な設定の組み合わせチェック。削除設定は方向によって片方しか効かないため、
+        // 実際に両方が作用する構成でのみ警告する
+        if (cleanup.DeleteAfterVerify && cleanup.DeleteRemoteAfterDownload
+            && transfer.Direction is not "put" && transfer.Direction is not "get")
         {
             result.Warnings.Add("Both local and remote file deletion are enabled. Ensure you have proper backups.");
+        }
+    }
+
+    /// <summary>
+    /// Direction によって無視される設定を警告する。put 用の設定のまま Direction だけ get に
+    /// 変えると、削除やトラッキングが黙って効かなくなるため明示的に通知する。
+    /// </summary>
+    private void ValidateDirectionSpecificSettings(TransferOptions transfer, WatchOptions watch, CleanupOptions cleanup, ConfigurationValidationResult result)
+    {
+        if (transfer.Direction is not "get")
+        {
+            // put では DeleteRemoteAfterDownload / DeleteRemoteEndFiles は使われない
+            if (cleanup.DeleteRemoteAfterDownload)
+            {
+                result.Warnings.Add($"Cleanup.DeleteRemoteAfterDownload is enabled but Direction is '{transfer.Direction}'. It applies only to downloads (get) and will be ignored.");
+            }
+            return;
+        }
+
+        // get ではローカル側の削除は行われない。DeleteAfterVerify は既定 true のため、
+        // 「ダウンロード後にローカルが消える」と誤解されやすい
+        if (cleanup.DeleteAfterVerify)
+        {
+            result.Warnings.Add("Cleanup.DeleteAfterVerify is enabled but Direction is 'get'. Local files are never deleted when downloading; use Cleanup.DeleteRemoteAfterDownload to remove the source files on the server.");
+        }
+
+        if (cleanup.DeleteLocalSkippedEndFiles)
+        {
+            result.Warnings.Add("Cleanup.DeleteLocalSkippedEndFiles is enabled but Direction is 'get'. It applies only to uploads (put) and will be ignored.");
+        }
+
+        // get の END ファイルは TransferEndFiles=true のときだけ取得対象になる。
+        // 転送しない END を削除する手段が無いため、リモートに END だけが溜まり続ける
+        if (cleanup.DeleteRemoteEndFiles && !watch.TransferEndFiles)
+        {
+            result.Warnings.Add("Cleanup.DeleteRemoteEndFiles is enabled but Watch.TransferEndFiles is disabled. When downloading, END files that are not transferred are still removed from the server only if they belong to a downloaded data file; review this combination so END files do not accumulate on the server.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(transfer.StateDirectory))
+        {
+            result.Warnings.Add("Transfer.StateDirectory is set but Direction is 'get'. Delivery-tracking state applies only to uploads (put) and will be ignored.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(transfer.RetryDirectory))
+        {
+            result.Warnings.Add("Transfer.RetryDirectory is set but Direction is 'get'. The retry directory applies only to uploads (put) and will be ignored.");
         }
     }
 
