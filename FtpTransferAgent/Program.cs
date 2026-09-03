@@ -165,13 +165,21 @@ catch (Exception ex)
 // 設定に書いていない既定値が残り続けてしまう。設定に書いた内容だけを有効にする。
 static void ReplaceArrayFromConfiguration(IConfiguration configuration, string key, Action<string[]> apply)
 {
-    var section = configuration.GetSection(key);
-    if (!section.Exists())
+    // 空配列 ("EndFileExtensions": []) は値も子も持たないため section.Exists() は false になる。
+    // それでは「設定に空配列を書いて既定値を無効化する」ことができないので、親セクションの
+    // 子キーに現れるかどうかで「設定ファイルに書かれているか」を判定する。
+    var separatorIndex = key.LastIndexOf(':');
+    var parentKey = separatorIndex < 0 ? string.Empty : key.Substring(0, separatorIndex);
+    var leafKey = separatorIndex < 0 ? key : key.Substring(separatorIndex + 1);
+
+    var parent = string.IsNullOrEmpty(parentKey) ? configuration : configuration.GetSection(parentKey);
+    var declared = parent.GetChildren().Any(c => string.Equals(c.Key, leafKey, StringComparison.OrdinalIgnoreCase));
+    if (!declared)
     {
         return;
     }
 
-    apply(section.GetChildren()
+    apply(configuration.GetSection(key).GetChildren()
         .Select(c => c.Value ?? string.Empty)
         .ToArray());
 }

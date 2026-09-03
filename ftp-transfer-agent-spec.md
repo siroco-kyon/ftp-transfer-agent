@@ -274,7 +274,7 @@ dotnet run --project FtpTransferAgent -- --Transfer:Concurrency=4 --Hash:Algorit
    - `StringComparison.OrdinalIgnoreCase` で比較し、不一致は `HashMismatchException`（再試行対象）
    - **`get` ではリモートファイルを 2 回読む**（ハッシュ計算用 + ダウンロード用）。転送経路での破損を検出するには転送とは独立にリモート側のハッシュを得る必要があるため、この 2 回読みは削減できない。転送量を抑えたい場合は、サーバー側ハッシュコマンドに対応した FTP サーバで `Hash.UseServerCommand: true` を使うか、`Hash.Enabled: false` にする
    - `put` でも検証のためアップロード後にリモートファイルを読み戻すため、同様に転送量は約 2 倍になる
-   - `Hash.Enabled: false` の場合でも、`Transfer.VerifyUploadedFileExists: true`（既定）なら `put` 後に宛先のサイズ一致を確認する（SIZE 非対応サーバでは存在確認）
+   - `Hash.Enabled: false` の場合でも、`Transfer.VerifyUploadedFileExists: true`（既定）なら `put` 後に宛先を確認する。確認内容はプロトコルで異なり、**FTP は SIZE によるサイズ一致確認**（SIZE 非対応サーバでは存在確認）、**SFTP は存在確認のみ**（サイズは比較しない）
 
 6. **後処理**
    - 検証/転送成功時: 設定に従いローカル/リモートファイルや END ファイルを削除（ファンアウト時は全宛先成功が条件）
@@ -327,7 +327,7 @@ END ファイルは「データファイル名 + END 拡張子」（例: `data.t
   - `Cleanup.DeleteRemoteEndFiles: true` で転送先 END ファイルも削除
 - **TransferEndFiles: false**
   - `put`: END ファイルは転送されずローカルに残る。`Cleanup.DeleteLocalSkippedEndFiles: true` を併用すると、対応データの転送成功後に END ファイルをローカルから削除する
-  - `get`: END ファイルはダウンロードされない。`Cleanup.DeleteRemoteEndFiles: true` を併用すると、**取得はせずにサーバ上の END ファイルだけを削除**する（併用しないとデータだけが削除され、END がサーバに残り続ける）
+  - `get`: END ファイルはダウンロードされない。`Cleanup.DeleteRemoteEndFiles: true` を併用すると、**取得はせずにサーバ上の END ファイルだけを削除**する。`Cleanup.DeleteRemoteAfterDownload: true`（データを取得後にサーバから消す構成）で `DeleteRemoteEndFiles` を併用しないと、データだけが削除されて END がサーバに残り続ける。どちらも既定の `false` の場合はいずれも削除されない
 - **削除の方向**: `Cleanup.DeleteLocalSkippedEndFiles` は `put` のみ、`Cleanup.DeleteRemoteEndFiles` は転送先（`put`）/ 転送元（`get`）のリモート END に作用する
 - **セキュリティ**: 異常に長い拡張子やパス区切りを含む END 拡張子は起動時に検出
 

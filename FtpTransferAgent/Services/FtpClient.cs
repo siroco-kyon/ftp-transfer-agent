@@ -14,9 +14,18 @@ namespace FtpTransferAgent.Services;
 /// </summary>
 public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
 {
+    // 失敗時の一時ファイル掃除に許す時間。相手が停止している場合に掃除自体が
+    // 転送単位のタイムアウトを超えてブロックしないよう区切る
+    private static readonly TimeSpan CleanupTimeout = TimeSpan.FromSeconds(30);
+
     private readonly AsyncFtpClient _client;
     private readonly ILogger<AsyncFtpClientWrapper> _logger;
     private readonly DestinationOptions _options;
+
+    // 宛先削除後のリネーム失敗で意図的に残した一時ファイル (宛先パス → 一時パス一覧)。
+    // Polly の再試行は毎回別の一時名を使うため、成功した時点で掃除しないとサーバに
+    // 重複ファイルが残り続ける。接続はプールから排他的に貸し出されるためロック不要。
+    private readonly Dictionary<string, List<string>> _retainedTempPaths = new(StringComparer.Ordinal);
 
     // テスト用に既存の AsyncFtpClient を渡せるようオーバーロードを追加
     public AsyncFtpClientWrapper(DestinationOptions options, ILogger<AsyncFtpClientWrapper> logger, AsyncFtpClient? client = null)
@@ -97,13 +106,24 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
             await RenameOverwriteAsync(tempPath, remotePath, destinationRemoved, ct).ConfigureAwait(false);
 
             await VerifyUploadedAsync(localPath, remotePath, ct).ConfigureAwait(false);
+
+            // 過去の試行で残した一時ファイルは、宛先が正しく作られた時点で不要になる
+            await CleanupRetainedTempFilesAsync(remotePath).ConfigureAwait(false);
         }
         catch
         {
             if (destinationRemoved.Value)
             {
                 // 宛先を削除した後にリネームが失敗した状態。一時ファイルを消すと復旧不能になるため
-                // 意図的に残し、手動復旧できるようパスをログに出す
+                // 意図的に残し、手動復旧できるようパスをログに出す。
+                // 再試行が成功したら CleanupRetainedTempFilesAsync が掃除する
+                if (!_retainedTempPaths.TryGetValue(remotePath, out var retained))
+                {
+                    retained = new List<string>();
+                    _retainedTempPaths[remotePath] = retained;
+                }
+                retained.Add(tempPath);
+
                 _logger.LogError(
                     "FTP rename failed after the existing destination file was removed. The uploaded data is retained at {TempPath} and must be renamed to {RemotePath} manually if the retry does not recover it.",
                     tempPath, remotePath);
@@ -111,10 +131,40 @@ public class AsyncFtpClientWrapper : IFileTransferClient, IDisposable
             else
             {
                 // 一時ファイルがリモートに蓄積しないよう削除を試みる。
-                // 失敗要因がキャンセルでも掃除できるよう CancellationToken.None を使う
-                try { await _client.DeleteFile(tempPath, CancellationToken.None).ConfigureAwait(false); } catch { }
+                // 失敗要因がキャンセルでも掃除できるよう元のトークンは使わないが、
+                // CancellationToken.None にすると相手が停止した際に掃除自体が
+                // Transfer.TransferTimeoutSeconds を超えてブロックし得るため、時間を区切る
+                using var cleanupCts = new CancellationTokenSource(CleanupTimeout);
+                try { await _client.DeleteFile(tempPath, cleanupCts.Token).ConfigureAwait(false); } catch { }
             }
             throw;
+        }
+    }
+
+    /// <summary>
+    /// 宛先削除後のリネーム失敗で残した一時ファイルを掃除する。
+    /// 再試行が成功して宛先が正しく作られた後に呼ぶこと (それまでは唯一のデータなので消せない)。
+    /// </summary>
+    private async Task CleanupRetainedTempFilesAsync(string remotePath)
+    {
+        if (!_retainedTempPaths.TryGetValue(remotePath, out var retained))
+        {
+            return;
+        }
+
+        _retainedTempPaths.Remove(remotePath);
+        using var cleanupCts = new CancellationTokenSource(CleanupTimeout);
+        foreach (var path in retained)
+        {
+            try
+            {
+                await _client.DeleteFile(path, cleanupCts.Token).ConfigureAwait(false);
+                _logger.LogInformation("Removed the temporary file retained by a previous failed rename: {TempPath}", path);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Could not remove the temporary file retained by a previous failed rename: {TempPath} ({Error})", path, ex.Message);
+            }
         }
     }
 

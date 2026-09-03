@@ -30,6 +30,11 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     // (この接続は同時に 1 ワーカーしか使用しないため排他制御は不要)
     private readonly HashSet<string> _verifiedRemoteDirs = new();
 
+    // 宛先削除後のリネーム失敗で意図的に残した一時ファイル (宛先パス → 一時パス一覧)。
+    // 再試行は毎回別の一時名を使うため、成功した時点で掃除しないと重複が残り続ける。
+    // 接続はプールから排他的に貸し出されるためロック不要。
+    private readonly Dictionary<string, List<string>> _retainedTempPaths = new(StringComparer.Ordinal);
+
     // テスト用に既存の SftpClient を渡せるようにする
     public SftpClientWrapper(DestinationOptions options, ILogger<SftpClientWrapper> logger, SftpClient? client = null)
     {
@@ -290,7 +295,15 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
             if (destinationRemoved.Value)
             {
                 // 宛先を削除した後にリネームが失敗した状態。一時ファイルを消すと復旧不能になるため
-                // 意図的に残し、手動復旧できるようパスをログに出す
+                // 意図的に残し、手動復旧できるようパスをログに出す。
+                // 再試行が成功したら CleanupRetainedTempFiles が掃除する
+                if (!_retainedTempPaths.TryGetValue(remotePath, out var retained))
+                {
+                    retained = new List<string>();
+                    _retainedTempPaths[remotePath] = retained;
+                }
+                retained.Add(temp);
+
                 _logger.LogError(
                     "SFTP rename failed after the existing destination file was removed. The uploaded data is retained at {TempPath} and must be renamed to {RemotePath} manually if the retry does not recover it.",
                     temp, remotePath);
@@ -314,6 +327,38 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
                     $"SFTP RenameFile completed without error but destination file not found: {remotePath}.");
             }
             _logger.LogDebug("SFTP upload confirmed at: {RemotePath}", remotePath);
+        }
+
+        // 過去の試行で残した一時ファイルは、宛先が正しく作られた時点で不要になる
+        CleanupRetainedTempFiles(remotePath);
+    }
+
+    /// <summary>
+    /// 宛先削除後のリネーム失敗で残した一時ファイルを掃除する。
+    /// 再試行が成功して宛先が正しく作られた後に呼ぶこと (それまでは唯一のデータなので消せない)。
+    /// </summary>
+    private void CleanupRetainedTempFiles(string remotePath)
+    {
+        if (!_retainedTempPaths.TryGetValue(remotePath, out var retained))
+        {
+            return;
+        }
+
+        _retainedTempPaths.Remove(remotePath);
+        foreach (var path in retained)
+        {
+            try
+            {
+                if (_client.Exists(path))
+                {
+                    _client.DeleteFile(path);
+                }
+                _logger.LogInformation("Removed the temporary file retained by a previous failed rename: {TempPath}", path);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning("Could not remove the temporary file retained by a previous failed rename: {TempPath} ({Error})", path, ex.Message);
+            }
         }
     }
 

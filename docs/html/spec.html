@@ -70,8 +70,8 @@ a{color:var(--teal)}
     <h1>FtpTransferAgent 詳細仕様書</h1>
     <p>フォルダ内ファイルを FTP / SFTP / ローカル・UNC 共有へ一括転送するバッチ型転送ツールの機能仕様</p>
     <div class="meta">
-      <span>バージョン 3.4.2</span>
-      <span>更新日 2026-07-05</span>
+      <span>バージョン 3.5.0</span>
+      <span>更新日 2026-09-03</span>
       <span>.NET 10 / Windows・Linux・macOS</span>
       <span>関連: <a href="user-guide.html" style="color:#fff">ユーザーガイド</a> / <a href="internal-overview.html" style="color:#fff">仕様確認資料</a></span>
     </div>
@@ -330,6 +330,7 @@ dotnet publish -c Release -r osx-x64 --self-contained /p:PublishSingleFile=true
 <tr><td><code>Concurrency</code></td><td>int</td><td>-</td><td>1</td><td>1–16</td><td>primary 宛先の並列転送数</td></tr>
 <tr><td><code>PreserveFolderStructure</code></td><td>bool</td><td>-</td><td>false</td><td>-</td><td>サブフォルダ構造を保持して転送</td></tr>
 <tr><td><code>TimeoutSeconds</code></td><td>int</td><td>-</td><td>120</td><td>1–3600</td><td>接続・転送タイムアウト秒</td></tr>
+<tr><td><code>TransferTimeoutSeconds</code></td><td>int</td><td>-</td><td>0</td><td>0–86400</td><td>1 ファイル（関連 END ファイルを含む）の処理に許す最大秒数。<code>0</code> で無効。<code>TimeoutSeconds</code> は接続と読み取りにしか掛からず、特に FTP のアップロードで相手が受信を止めた場合にバッチが終わらなくなるため、その保険。打ち切りはキャンセル要求に依存するため、ソケット書き込みでブロックしている場合は即座には中断できない（ベストエフォート）</td></tr>
 <tr><td><code>KeepAliveSeconds</code></td><td>int</td><td>-</td><td>0</td><td>0–3600</td><td>接続再利用時にアイドル切断を防ぐ KeepAlive の間隔（秒）。<code>0</code> で無効。<code>&gt;0</code> で SFTP は <code>KeepAliveInterval</code>、FTP は NOOP 送信 + TCP KeepAlive を有効化。各追加宛先にも個別適用</td></tr>
 <tr><td><code>VerifyUploadedFileExists</code></td><td>bool</td><td>-</td><td>true</td><td>-</td><td>SFTP アップロードのリネーム完了後に宛先パスの存在確認（2 往復）を追加で行うか。リネームの成功応答（SSH_FX_OK）自体がサーバの完了確認のため、<code>false</code> でも転送完了の保証はプロトコルレベルで担保される。高レイテンシ回線で小ファイルを多数送る場合は <code>false</code> で往復数を削減できる。SFTP のみ使用。各追加宛先にも個別適用</td></tr>
 <tr><td><code>BufferSizeKB</code></td><td>int</td><td>-</td><td>32</td><td>1–64</td><td>SFTP の 1 書き込み要求（SSH_FXP_WRITE）あたりのバッファサイズ（KB）。実際のチャンクサイズはサーバが告知するチャネルパケット上限との min になるため、OpenSSH 系（上限 32KB）では既定値から上げても効果がない。32KB 超を受け付けるサーバでは <code>64</code> でスループットが向上する（32KB 超の設定時は起動時に注意警告を出力）。SFTP のみ使用。各追加宛先にも個別適用</td></tr>
@@ -377,7 +378,7 @@ dotnet publish -c Release -r osx-x64 --self-contained /p:PublishSingleFile=true
 <h3>4.2.6 Cleanup（クリーンアップ設定）</h3>
 <table>
 <tr><th>項目</th><th>型</th><th>必須</th><th>既定値</th><th>説明</th></tr>
-<tr><td><code>DeleteAfterVerify</code></td><td>bool</td><td>-</td><td><strong>true</strong></td><td><code>put</code> 成功後にローカルファイルを削除（アウトボックス運用）。ファンアウト時は<strong>全宛先成功時のみ</strong>。<code>false</code> で元ファイルを保持（複数宛先トラッキング時は配信マーカーで再送をスキップ）</td></tr>
+<tr><td><code>DeleteAfterVerify</code></td><td>bool</td><td>-</td><td><strong>true</strong></td><td><strong><code>put</code> 専用</strong>。成功後にローカルファイルを削除（アウトボックス運用）。ファンアウト時は<strong>全宛先成功時のみ</strong>。<code>false</code> で元ファイルを保持（複数宛先トラッキング時は配信マーカーで再送をスキップ）。<strong><code>get</code> では無視される</strong>（ダウンロードでローカルファイルが削除されることはない）。既定が <code>true</code> のため、<code>get</code> 構成では起動時に警告を出す</td></tr>
 <tr><td><code>DeleteRemoteAfterDownload</code></td><td>bool</td><td>-</td><td>false</td><td><code>get</code> 成功後にリモートファイルを削除</td></tr>
 <tr><td><code>DeleteRemoteEndFiles</code></td><td>bool</td><td>-</td><td>false</td><td>END ファイル転送/取得の成功後にリモート END ファイルを削除</td></tr>
 <tr><td><code>DeleteLocalSkippedEndFiles</code></td><td>bool</td><td>-</td><td>false</td><td><code>put</code> で <code>TransferEndFiles=false</code> のとき、転送成功したデータに対応する未転送 END ファイルをローカルから削除</td></tr>
@@ -985,6 +986,12 @@ dotnet publish -c Release -r osx-x64 --self-contained /p:PublishSingleFile=true
 </ul>
 <h3>6.2 既知の制限</h3>
 <ul>
+<li><strong>FTPS（暗号化 FTP）は未対応</strong>: <code>Mode=ftp</code> は平文通信のみで、<code>EncryptionMode</code> に相当する設定はない。データ接続方式（Active/Passive）も選択できない。暗号化が必要な場合は <code>Mode=sftp</code> を使用する</li>
+<li><strong><code>get</code> に再取得の抑止・履歴が無い</strong>: <code>Cleanup.DeleteRemoteAfterDownload: false</code> の場合、実行のたびにリモートの全対象ファイルを再取得し、ローカルの同名ファイルを無条件で上書きする</li>
+<li><strong><code>get</code> の宛先衝突は転送しない</strong>: 複数のリモートファイルが同一のローカルパスへ着地する構成では、黙って上書きせず<strong>グループ全員</strong>を転送対象から外す</li>
+<li><strong>ハッシュ検証の転送量</strong>: <code>put</code> / <code>get</code> とも検証のためにリモートファイルを読み戻すため、転送量は約 2 倍になる</li>
+</ul>
+<ul>
   <li><strong>バッチ処理専用</strong>: 一度の実行で完了して終了する（常駐しない）</li>
   <li><strong>リアルタイム監視なし</strong>: 新規ファイルの転送には再実行が必要</li>
   <li><strong>転送の中断/再開・履歴の永続化は未対応</strong>（部分失敗は次回実行で再送。複数宛先では配信トラッキングにより未配信先のみ再送する）</li>
@@ -1062,6 +1069,7 @@ dotnet publish -c Release -r osx-x64 --self-contained /p:PublishSingleFile=true
 <tr><td><strong>3.4.2</strong><br>(2026-07-05)</td><td>retry ディレクトリからの復元が失敗した場合にファイルが取り残される問題を修正（配信済みスキップ時にも復元を再試行し、阻害要因の解消後に自動回復）。復元を退避と対称の all-or-nothing に変更し、データ/END ペアの分断を防止</td></tr>
 <tr><td><strong>3.4.1</strong></td><td>SFTP の一時的なサーバエラー（汎用 <code>SshException</code>）をリトライ対象に変更（認証・権限・パス不在は引き続き非リトライ）。posix-rename の一時失敗を「拡張非対応」と誤判定して原子性を失うバグを修正。リモートディレクトリが実行中に削除された場合の自己修復（キャッシュ無効化・再作成・1 回だけ自動再実行）を追加</td></tr>
 <tr><td><strong>3.4.0</strong></td><td>SFTP アップロードの往復数を 11 → 7〜9 回/ファイルに削減（レイテンシ 10ms で実測 1.4〜1.55 倍高速化）。ディレクトリ存在確認のキャッシュ、<code>VerifyUploadedFileExists</code>・<code>BufferSizeKB</code> を追加</td></tr>
+<tr><td><strong>3.5.0</strong></td><td>FTP の転送失敗が「成功」として通過する問題（無言のデータ消失）を修正。<code>VerifyUploadedFileExists</code> を FTP でも実装。上書きリネームの手順を見直し。<code>Watch.Path</code> にスラッシュを含む場合に END ファイルが転送されない問題を修正。配列設定が既定値に追記される問題を修正。Direction 依存で無視される設定を起動時に警告。<code>get</code> のデータ消失経路を遮断。<code>TransferTimeoutSeconds</code> を追加</td></tr>
 <tr><td><strong>3.3.0</strong></td><td>ローカル / UNC（SMB 共有）宛先モード（<code>Mode=local</code>）を追加。<code>KeepAliveSeconds</code> を追記。<code>EnableUploadSnapshot</code>（opt-in）を反映</td></tr>
 <tr><td><strong>3.2.x</strong></td><td>複数宛先の put で宛先別配信トラッキングを既定有効化（all-or-nothing 再送を廃止）。<code>DeleteAfterVerify</code> の既定を <code>true</code> に変更。キュー投入の宛先独立化、完了処理失敗の critical error 化、保持マーカー指紋の修正（3.2.1）ほか</td></tr>
 <tr><td><strong>3.1.0</strong></td><td>宛先別配信トラッキング（任意機能として）追加。<code>SuppressPerDestinationFailureDetailEmails</code> 追加</td></tr>
