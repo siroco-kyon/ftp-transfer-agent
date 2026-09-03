@@ -43,10 +43,11 @@ public class Worker : BackgroundService
     // 別々のリモートファイルが同じローカルパスに着地する構成 (PreserveFolderStructure=false で
     // サブフォルダの同名ファイル、大文字小文字だけ異なる名前など) では、後勝ちで片方が失われる。
     // DeleteRemoteAfterDownload と併用するとリモート側も消えてデータ消失となるため検出する。
-    private readonly Dictionary<string, string> _claimedDownloadPaths =
-        new(OperatingSystem.IsWindows() || OperatingSystem.IsMacOS()
-            ? StringComparer.OrdinalIgnoreCase
-            : StringComparer.Ordinal);
+    private Dictionary<string, string>? _claimedDownloadPaths;
+
+    // ローカルパスの同一性判定に使う比較子。大小の区別は OS ではなくボリュームの性質なので
+    // (大小を区別する APFS、区別しない Linux 上のマウント等)、Watch.Path 上で実測して決める。
+    private StringComparer? _localPathComparer;
 
     // 転送処理用のチャンネル（容量制限でメモリリーク防止）
 
@@ -573,6 +574,96 @@ public class Worker : BackgroundService
     }
 
     /// <summary>
+    /// Watch.Path のファイルシステムが大文字小文字を区別するかを実測し、
+    /// ローカルパスの比較子を決める。判定できない場合は安全側 (区別しない = 衝突を検出する) に倒す。
+    /// </summary>
+    private StringComparer GetLocalPathComparer()
+    {
+        if (_localPathComparer is not null)
+        {
+            return _localPathComparer;
+        }
+
+        var comparer = StringComparer.OrdinalIgnoreCase;
+        try
+        {
+            // プローブはエージェント専用ディレクトリ内に作る。Watch.Path 直下に作ると、
+            // 異常終了で残った場合に put の列挙対象へ紛れ込む恐れがある
+            var probeDirectory = EnsureDownloadTempDirectory();
+            var probe = Path.Combine(probeDirectory, $"case-probe-{Guid.NewGuid():N}");
+            var upper = probe.ToUpperInvariant();
+            // 小文字と大文字が別名になる (= 大小を区別する) なら Ordinal
+            File.WriteAllBytes(probe, Array.Empty<byte>());
+            try
+            {
+                comparer = File.Exists(upper) ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
+            }
+            finally
+            {
+                File.Delete(probe);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug("Could not determine the case sensitivity of {Path}; assuming case-insensitive: {Error}", _watch.Path, ex.Message);
+        }
+
+        _localPathComparer = comparer;
+        return comparer;
+    }
+
+    /// <summary>
+    /// ダウンロード対象のうち、同一のローカルパスへ着地するリモートファイルの集合を返す。
+    /// 1 つでも取得すると残りを上書きしてしまい、DeleteRemoteAfterDownload と併用すると
+    /// リモート側も失われるため、グループの全員を転送対象から外す必要がある。
+    /// (片方だけ失敗させると、次回実行では衝突相手が既に消えていて上書きが成立してしまう)
+    /// </summary>
+    private HashSet<string> FindCollidingDownloadPaths(IReadOnlyList<string> remotePaths)
+    {
+        var byLocalPath = new Dictionary<string, List<string>>(GetLocalPathComparer());
+        foreach (var remotePath in remotePaths)
+        {
+            string localPath;
+            try
+            {
+                localPath = Path.GetFullPath(ResolveLocalDownloadPath(remotePath));
+            }
+            catch (ArgumentException)
+            {
+                // 安全性検証で弾かれるパスは個別の転送時にエラーとなる。ここでは衝突判定の対象外
+                continue;
+            }
+
+            if (!byLocalPath.TryGetValue(localPath, out var group))
+            {
+                group = new List<string>();
+                byLocalPath[localPath] = group;
+            }
+            group.Add(remotePath);
+        }
+
+        var colliding = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (localPath, group) in byLocalPath)
+        {
+            if (group.Count < 2)
+            {
+                continue;
+            }
+
+            _logger.LogError(
+                "{Count} remote files map to the same local path '{LocalPath}': {Remotes}. None of them will be downloaded, because transferring any one of them would overwrite the others (and Cleanup.DeleteRemoteAfterDownload would then remove the source). Enable Transfer.PreserveFolderStructure or narrow Watch.AllowedExtensions so the names do not collide.",
+                group.Count, localPath, string.Join(", ", group));
+
+            foreach (var remotePath in group)
+            {
+                colliding.Add(remotePath);
+            }
+        }
+
+        return colliding;
+    }
+
+    /// <summary>
     /// ダウンロード先のローカルパスを今回の実行で確保する。
     /// 別のリモートファイルが同じローカルパスへ着地する場合は、黙って上書きせず失敗させる。
     /// (同一リモートファイルのリトライは再確保を許可する)
@@ -580,9 +671,10 @@ public class Worker : BackgroundService
     private void ClaimDownloadPath(string localPath, string remotePath)
     {
         var key = Path.GetFullPath(localPath);
-        lock (_claimedDownloadPaths)
+        var claimed = _claimedDownloadPaths ??= new Dictionary<string, string>(GetLocalPathComparer());
+        lock (claimed)
         {
-            if (_claimedDownloadPaths.TryGetValue(key, out var owner))
+            if (claimed.TryGetValue(key, out var owner))
             {
                 if (string.Equals(owner, remotePath, StringComparison.Ordinal))
                 {
@@ -594,7 +686,7 @@ public class Worker : BackgroundService
                     "Downloading both would silently overwrite one of them. Enable Transfer.PreserveFolderStructure or narrow Watch.AllowedExtensions so the names do not collide.");
             }
 
-            _claimedDownloadPaths[key] = remotePath;
+            claimed[key] = remotePath;
         }
     }
 
@@ -1986,6 +2078,17 @@ public class Worker : BackgroundService
                         dataFiles.Add(originalPath);
                     }
 
+                    // 同一のローカルパスへ着地するリモートファイルは、グループ全員を対象から外す。
+                    // 1 つでも取得すると残りを上書きし、DeleteRemoteAfterDownload と併用すると
+                    // 上書きされた側がリモートからも消える。片方だけ失敗させると次回実行では
+                    // 衝突相手が既に無いため上書きが成立してしまう
+                    var collidingRemotePaths = FindCollidingDownloadPaths(dataFiles);
+                    if (collidingRemotePaths.Count > 0)
+                    {
+                        dataFiles.RemoveAll(collidingRemotePaths.Contains);
+                        _exitCode?.MarkFailure();
+                    }
+
                     // 1. まずデータファイルを転送キューに追加
                     // キー比較は Ordinal にする (リモートサーバは大文字小文字違いの同名ファイルを
                     // 同時に返し得るため、大小無視の比較だと重複キーで列挙全体が失敗する)
@@ -1998,7 +2101,11 @@ public class Worker : BackgroundService
                     {
                         // END ファイル側から「対応データファイルの正規化パス → END ファイル一覧」の
                         // 辞書を構築し、データ × END の総当たり比較を避ける
-                        var endFilesByDataNorm = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+                        // 比較は Ordinal。リモートパスは大小を区別するサーバが一般的で、
+                        // 大小無視だと /foo.END が /foo と /FOO の双方に紐付き、DeleteRemoteEndFiles で
+                        // 一方が他方の END を削除してしまう。
+                        // END 拡張子の大小差 (.END / .end) は GetDataFileForEndFileRemote 側で吸収される
+                        var endFilesByDataNorm = new Dictionary<string, List<string>>(StringComparer.Ordinal);
                         foreach (var endFile in endFiles)
                         {
                             var endNorm = NormalizeRemotePath(endFile);
@@ -2345,17 +2452,46 @@ public class Worker : BackgroundService
     /// </summary>
     private async Task<long> ProcessDownloadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token)
     {
+        var localPath = ResolveLocalDownloadPath(item.Path);
+
+        if (_transfer.PreserveFolderStructure && _watch.IncludeSubfolders)
+        {
+            // ディレクトリが存在しない場合は作成
+            var localDir = Path.GetDirectoryName(localPath);
+            if (!string.IsNullOrEmpty(localDir) && !Directory.Exists(localDir))
+            {
+                EnsureNoReparsePointBelowWatch(localDir);
+                Directory.CreateDirectory(localDir);
+                EnsureNoReparsePointBelowWatch(localDir);
+                _logger.LogDebug("[{Id}] Created directory: {Directory}", id, localDir);
+            }
+        }
+
+        EnsureNoReparsePointBelowWatch(localPath);
+        EnsureNotUnderDownloadTempDirectory(localPath);
+        ClaimDownloadPath(localPath, item.Path);
+
+        _logger.LogInformation("[{Id}] Starting download {Remote} to {Local}", id, item.Path, localPath);
+        return await DownloadToLocalPathAsync(client, item, id, localPath, token).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// リモートパスから着地先のローカルパスを決める。副作用 (ディレクトリ作成など) は持たず、
+    /// パスの安全性検証だけを行うため、列挙時の事前チェックからも呼べる。
+    /// </summary>
+    private string ResolveLocalDownloadPath(string remotePath)
+    {
         string localPath;
 
         if (_transfer.PreserveFolderStructure && _watch.IncludeSubfolders)
         {
             // サブディレクトリ構造を保持する場合
-            // ListFilesAsync で生成した item.Path は先頭に '/' を付加している場合があるが、
+            // ListFilesAsync で生成した remotePath は先頭に '/' を付加している場合があるが、
             // Transfer.RemotePath は必ず '/' 始まりとは限らないため、RelativePath の計算時にベースパスも正規化する。
             var remoteBase = _transfer.RemotePath ?? string.Empty;
             var normalizedRemoteBase = remoteBase.StartsWith("/") ? remoteBase : "/" + remoteBase;
-            // item.Path が先頭に '/' を持たない場合は付与して正規化する
-            var normalizedItemPath = item.Path.StartsWith("/") ? item.Path : "/" + item.Path;
+            // remotePath が先頭に '/' を持たない場合は付与して正規化する
+            var normalizedItemPath = remotePath.StartsWith("/") ? remotePath : "/" + remotePath;
             var relativePath = Path.GetRelativePath(normalizedRemoteBase, normalizedItemPath);
 
             // パストラバーサル攻撃対策: ".." はパスセグメント単位で検査する
@@ -2377,24 +2513,14 @@ public class Worker : BackgroundService
             }
 
             localPath = safePath;
-
-            // ディレクトリが存在しない場合は作成
-            var localDir = Path.GetDirectoryName(localPath);
-            if (!string.IsNullOrEmpty(localDir) && !Directory.Exists(localDir))
-            {
-                EnsureNoReparsePointBelowWatch(localDir);
-                Directory.CreateDirectory(localDir);
-                EnsureNoReparsePointBelowWatch(localDir);
-                _logger.LogDebug("[{Id}] Created directory: {Directory}", id, localDir);
-            }
         }
         else
         {
             // 従来の動作（ファイル名のみ使用）
-            var fileName = Path.GetFileName(item.Path);
+            var fileName = Path.GetFileName(remotePath);
             if (string.IsNullOrEmpty(fileName))
             {
-                throw new ArgumentException($"Invalid file name: {item.Path}");
+                throw new ArgumentException($"Invalid file name: {remotePath}");
             }
 
             // ファイル名の安全性をチェック（パストラバーサル攻撃対策）
@@ -2429,12 +2555,14 @@ public class Worker : BackgroundService
             localPath = safePath;
         }
 
-        EnsureNoReparsePointBelowWatch(localPath);
-        EnsureNotUnderDownloadTempDirectory(localPath);
-        ClaimDownloadPath(localPath, item.Path);
+        return localPath;
+    }
 
-        _logger.LogInformation("[{Id}] Starting download {Remote} to {Local}", id, item.Path, localPath);
-
+    /// <summary>
+    /// 解決済みのローカルパスへ実際にダウンロードし、設定に応じて検証・後処理を行う。
+    /// </summary>
+    private async Task<long> DownloadToLocalPathAsync(IFileTransferClient client, TransferItem item, Guid id, string localPath, CancellationToken token)
+    {
         long fileSize;
         if (_hash.Enabled)
         {

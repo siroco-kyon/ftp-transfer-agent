@@ -71,7 +71,7 @@ a{color:var(--teal)}
     <h1>FtpTransferAgent ユーザーガイド</h1>
     <p>導入・設定・運用のためのガイド ─ フォルダのファイルを FTP / SFTP / 共有フォルダへ「確実に」届ける</p>
     <div class="meta">
-      <span>対象バージョン 3.4.x</span>
+      <span>対象バージョン 3.5.x</span>
       <span>更新日 2026-07-06</span>
       <span>関連: <a href="spec.html" style="color:#fff">詳細仕様書</a> / <a href="internal-overview.html" style="color:#fff">仕様確認資料</a></span>
     </div>
@@ -371,6 +371,7 @@ dotnet run --project FtpTransferAgent</code></pre>
 <tr><td><code>Concurrency</code></td><td>int</td><td>任意</td><td><code>1</code></td><td>primary 宛先の並列転送数（1–16）。<code>get</code> と primary への <code>put</code> に適用。<code>AdditionalDestinations</code> は各要素の <code>Concurrency</code> を個別に使用</td></tr>
 <tr><td><code>PreserveFolderStructure</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td>サブフォルダ構造を維持して転送</td></tr>
 <tr><td><code>TimeoutSeconds</code></td><td>int</td><td>任意</td><td><code>120</code></td><td>接続・転送タイムアウト秒（1–3600）</td></tr>
+<tr><td><code>TransferTimeoutSeconds</code></td><td>int</td><td>任意</td><td><code>0</code></td><td>1 ファイル（関連 END ファイルを含む）の処理に許す最大秒数（0–86400、<code>0</code>=無効）。相手が受信を止めた場合にバッチが終わらなくなるのを防ぐ保険（ベストエフォート）</td></tr>
 <tr><td><code>KeepAliveSeconds</code></td><td>int</td><td>任意</td><td><code>0</code></td><td>接続再利用時のアイドル切断防止（秒、0–3600、<code>0</code>=無効）。<code>&gt;0</code> で SFTP は <code>KeepAliveInterval</code>、FTP は NOOP 送信 + TCP KeepAlive を有効化。各追加宛先にも個別適用</td></tr>
 <tr><td><code>VerifyUploadedFileExists</code></td><td>bool</td><td>任意</td><td><code>true</code></td><td>SFTP アップロードのリネーム完了後に宛先パスの存在確認（2 往復）を追加で行うか。<code>false</code> でも転送の完了保証は変わらない。高レイテンシ回線で小ファイル多数なら <code>false</code> で往復数を削減できる。SFTP のみ使用</td></tr>
 <tr><td><code>BufferSizeKB</code></td><td>int</td><td>任意</td><td><code>32</code></td><td>SFTP の 1 書き込み要求あたりのバッファサイズ（KB、1–64）。実際のチャンクサイズはサーバが告知するパケット上限との min（OpenSSH 系は 32KB 上限のため既定から上げても効果なし）。SFTP のみ使用</td></tr>
@@ -412,7 +413,7 @@ dotnet run --project FtpTransferAgent</code></pre>
 <h3>Cleanup</h3>
 <table>
 <tr><th>項目</th><th>型</th><th>必須</th><th>既定値</th><th>説明</th></tr>
-<tr><td><code>DeleteAfterVerify</code></td><td>bool</td><td>任意</td><td><code>true</code></td><td><code>put</code> 成功後（複数宛先では全宛先成功後）、ローカルファイルを削除。<code>false</code> で元ファイルを保持</td></tr>
+<tr><td><code>DeleteAfterVerify</code></td><td>bool</td><td>任意</td><td><code>true</code></td><td><strong><code>put</code> 専用</strong>。成功後（複数宛先では全宛先成功後）、ローカルファイルを削除。<code>false</code> で元ファイルを保持。<strong><code>get</code> では無視されます</strong>（起動時に警告）</td></tr>
 <tr><td><code>DeleteRemoteAfterDownload</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td><code>get</code> 成功後、リモートファイルを削除</td></tr>
 <tr><td><code>DeleteRemoteEndFiles</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td>END ファイル成功時のリモート END ファイル削除</td></tr>
 <tr><td><code>DeleteLocalSkippedEndFiles</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td><code>put</code> で <code>TransferEndFiles=false</code> のとき、転送成功したデータに対応する未転送 END ファイルをローカルから削除する</td></tr>

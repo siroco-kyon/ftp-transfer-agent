@@ -41,7 +41,56 @@ public class ProgramStartupTests
         }
     }
 
-    private static async Task<(int ExitCode, string Output)> RunProgramAsync(string arguments)
+    /// <summary>
+    /// 設定ファイルに空配列を書いたら C# 側の既定値を置き換えることを保証する。
+    /// 空配列は値も子も持たないため IConfigurationSection.Exists() が false になり、
+    /// 素朴に実装すると「書いていない」と区別できず既定の .END / .end が残ってしまう。
+    /// </summary>
+    [Fact]
+    public async Task Program_ShouldTreatExplicitlyEmptyArray_AsReplacingTheDefaults()
+    {
+        var workDir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var watchDir = Path.Combine(workDir, "watch");
+        Directory.CreateDirectory(watchDir);
+        var lockFile = Path.Combine(workDir, "agent.lock");
+
+        try
+        {
+            // EndFileExtensions を空配列にしたうえで RequireEndFile を有効にする。
+            // 空配列が既定値を置き換えていれば「END 拡張子が未設定」としてエラーになる。
+            // 置き換えられていなければ既定の .END / .end が残り、そのまま起動してしまう。
+            var watchJson = System.Text.Json.JsonSerializer.Serialize(watchDir);
+            var lockJson = System.Text.Json.JsonSerializer.Serialize(lockFile);
+            var settings =
+                "{" +
+                "  \"Watch\": { \"Path\": " + watchJson + ", \"AllowedExtensions\": [ \".txt\" ]," +
+                "               \"RequireEndFile\": true, \"EndFileExtensions\": [] }," +
+                "  \"Transfer\": { \"Mode\": \"ftp\", \"Direction\": \"put\", \"Host\": \"localhost\", \"Port\": 21," +
+                "                  \"Username\": \"user\", \"Password\": \"pass\", \"RemotePath\": \"/remote\", \"Concurrency\": 1 }," +
+                "  \"App\": { \"LockFilePath\": " + lockJson + " }," +
+                "  \"Retry\": { \"MaxAttempts\": 1, \"DelaySeconds\": 1 }," +
+                "  \"Hash\": { \"Enabled\": false, \"Algorithm\": \"SHA256\" }," +
+                "  \"Cleanup\": { \"DeleteAfterVerify\": false }," +
+                "  \"Smtp\": { \"Enabled\": false, \"From\": \"a@example.com\", \"To\": [ \"b@example.com\" ] }," +
+                "  \"Logging\": { \"Level\": \"Information\", \"RollingFilePath\": \"\" }" +
+                "}";
+            await File.WriteAllTextAsync(Path.Combine(workDir, "appsettings.json"), settings);
+
+            var result = await RunProgramAsync(string.Empty, workDir);
+
+            Assert.NotEqual(0, result.ExitCode);
+            Assert.Contains("END file extensions must be specified", result.Output, StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            try { Directory.Delete(workDir, true); } catch { /* ベストエフォート */ }
+        }
+    }
+
+    private static Task<(int ExitCode, string Output)> RunProgramAsync(string arguments)
+        => RunProgramAsync(arguments, AppContext.BaseDirectory);
+
+    private static async Task<(int ExitCode, string Output)> RunProgramAsync(string arguments, string workingDirectory)
     {
         var programDllPath = Path.Combine(AppContext.BaseDirectory, "FtpTransferAgent.dll");
         Assert.True(File.Exists(programDllPath), $"Program DLL not found: {programDllPath}");
@@ -51,7 +100,7 @@ public class ProgramStartupTests
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
-            WorkingDirectory = AppContext.BaseDirectory
+            WorkingDirectory = workingDirectory
         };
 
         using var process = Process.Start(psi)!;

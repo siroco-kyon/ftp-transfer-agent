@@ -657,12 +657,13 @@ public class WorkerDownloadTests
         await worker.RunAsync(CancellationToken.None);
 
         // 列挙は重複キー例外を起こさない (この回帰防止が本テストの元の目的)
-        if (OperatingSystem.IsWindows() || OperatingSystem.IsMacOS())
+        if (CaseInsensitiveFileSystem(dir))
         {
             // 大小を区別しないファイルシステムでは両者が同一のローカルパスへ着地する。
-            // 黙って後勝ちで上書きせず、片方だけを処理してもう片方は失敗させる
-            Assert.Single(downloaded);
-            Assert.Single(Directory.GetFiles(dir));
+            // 片方だけ通すと、次回実行では衝突相手が消えていて上書きが成立してしまうため、
+            // グループの全員を転送対象から外す
+            Assert.Empty(downloaded);
+            Assert.Empty(Directory.GetFiles(dir));
         }
         else
         {
@@ -728,9 +729,10 @@ public class WorkerDownloadTests
         var worker = new TestWorker(watch, transfer, retry, hashOpt, cleanup, provider, logger, lifetime, new NoDisposeClient(mock.Object));
         await worker.RunAsync(CancellationToken.None);
 
-        // 片方だけが処理され、もう片方は上書きを避けるため失敗する
-        Assert.Single(downloaded);
-        Assert.Single(Directory.GetFiles(dir));
+        // どちらも転送されない。片方だけ通すと、次回実行では衝突相手が消えていて
+        // 上書きが成立し、DeleteRemoteAfterDownload と併用するとデータ消失になる
+        Assert.Empty(downloaded);
+        Assert.Empty(Directory.GetFiles(dir));
 
         Directory.Delete(dir, true);
     }
@@ -1122,6 +1124,21 @@ public class WorkerDownloadTests
         finally
         {
             Directory.Delete(root, true);
+        }
+    }
+
+    /// <summary>製品コードと同じく、対象ボリュームの大小区別を実測する。</summary>
+    private static bool CaseInsensitiveFileSystem(string directory)
+    {
+        var probe = Path.Combine(directory, $".case-probe-{Guid.NewGuid():N}");
+        File.WriteAllBytes(probe, Array.Empty<byte>());
+        try
+        {
+            return File.Exists(probe.ToUpperInvariant());
+        }
+        finally
+        {
+            File.Delete(probe);
         }
     }
 

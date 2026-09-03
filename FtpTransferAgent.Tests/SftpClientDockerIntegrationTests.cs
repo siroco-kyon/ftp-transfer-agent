@@ -97,7 +97,7 @@ public sealed class DockerSftpFixture : IAsyncLifetime
         }
 
         var run = await RunDockerAsync(
-            $"run -d --rm -p {Port}:22 --name {_containerName} atmoz/sftp {Username}:{Password}:1001:1001:upload",
+            $"run -d --rm -p {Port}:22 --name {_containerName} atmoz/sftp:alpine {Username}:{Password}:1001:1001:upload",
             TimeSpan.FromMinutes(2));
         if (!run.Success)
         {
