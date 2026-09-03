@@ -28,4 +28,9 @@
     <ProjectReference Include="..\FtpTransferAgent\FtpTransferAgent.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Docker が無い環境でも SFTP の実サーバ検証を行うためのテスト用サーバ -->
+    <None Include="TestServers\*.py" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

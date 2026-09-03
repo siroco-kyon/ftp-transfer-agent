@@ -13,7 +13,15 @@ jobs:
         with:
           dotnet-version: '10.0.x'
       - name: Install test dependencies
-        run: python3 -m pip install pyftpdlib
+        # pyftpdlib: FTP 実サーバ / paramiko: SFTP 実サーバ (Docker なしでも SFTP を検証するため)
+        run: python3 -m pip install pyftpdlib paramiko
+      - name: Verify Docker is available
+        # SFTP の OpenSSH 実サーバテストは Docker 前提。使えない場合は静かにスキップされて
+        # 「緑だが SFTP は未検証」となるため、ここで明示的に失敗させる
+        run: docker version
+      - name: Pre-pull SFTP server image
+        # テスト内の pull がタイムアウト (2 分) してスキップへ転落するのを防ぐ
+        run: docker pull atmoz/sftp:alpine
       - name: Restore
         run: dotnet restore
       - name: Format
@@ -21,4 +29,48 @@ jobs:
       - name: Build
         run: dotnet build --no-restore --configuration Release
       - name: Test
-        run: dotnet test FtpTransferAgent.Tests/FtpTransferAgent.Tests.csproj --no-build --configuration Release --verbosity normal
+        run: >
+          dotnet test FtpTransferAgent.Tests/FtpTransferAgent.Tests.csproj
+          --no-build --configuration Release --verbosity normal
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+      - name: Ensure real-server tests were not skipped
+        if: always()
+        # 実サーバ (FTP/SFTP) の統合テストがスキップされたまま緑になるのを防ぐ。
+        # 環境依存で妥当にスキップされるもの (シンボリックリンク作成不可など) は除外する。
+        run: |
+          python3 - <<'PY'
+          import glob, sys, xml.etree.ElementTree as ET
+
+          ns = {'t': 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010'}
+          files = glob.glob('TestResults/**/*.trx', recursive=True)
+          if not files:
+              print('No .trx result file found; cannot verify skipped tests.')
+              sys.exit(1)
+
+          # 実サーバへ接続する統合テスト。これらのスキップは検証の欠落を意味する
+          required = ('Docker', 'Paramiko', 'FtpClientIntegration', 'FtpClientAdvancedIntegration',
+                      'WorkerFtpEndToEnd', 'FtpFaultInjection')
+
+          skipped, offenders = [], []
+          for path in files:
+              for result in ET.parse(path).findall('.//t:UnitTestResult', ns):
+                  if result.get('outcome') == 'NotExecuted':
+                      name = result.get('testName') or ''
+                      skipped.append(name)
+                      if any(marker in name for marker in required):
+                          offenders.append(name)
+
+          if skipped:
+              print('Skipped tests:')
+              for name in skipped:
+                  print(f'  - {name}')
+
+          if offenders:
+              print('\nERROR: real-server integration tests were skipped:')
+              for name in offenders:
+                  print(f'  - {name}')
+              sys.exit(1)
+
+          print(f'\nOK: no real-server integration test was skipped ({len(skipped)} environment-dependent skip(s)).')
+          PY

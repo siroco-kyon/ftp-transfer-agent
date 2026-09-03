@@ -159,6 +159,9 @@ public class WorkerDownloadTests
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
             {
+                // シンボリックリンクを作成できない環境 (Windows で開発者モード/管理者権限が無い等)。
+                // 黙って成功扱いにせず、スキップとして可視化する
+                Assert.Skip($"Cannot create a directory symbolic link in this environment: {ex.Message}");
                 return;
             }
 
@@ -1043,6 +1046,82 @@ public class WorkerDownloadTests
         finally
         {
             Directory.Delete(dir, true);
+        }
+    }
+
+    /// <summary>
+    /// 悪意のあるリモートパスが Watch.Path の外へ書き出されないことを、
+    /// 実際に Worker のダウンロード経路を通して検証する。
+    /// (以前はこの領域に Assert.True(true) だけの、製品コードを一切呼ばないテストが
+    ///  2 箇所に重複して存在していた)
+    /// </summary>
+    [Theory]
+    [InlineData("/remote/../../../etc/passwd")]
+    [InlineData("/remote/../../outside.txt")]
+    [InlineData("/remote/sub/../../../escape.txt")]
+    public async Task ExecuteAsync_MaliciousRemotePath_DoesNotWriteOutsideWatchDirectory(string maliciousRemotePath)
+    {
+        var root = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+        var watchDirectory = Path.Combine(root, "watch");
+        Directory.CreateDirectory(watchDirectory);
+        try
+        {
+            var watch = Options.Create(new WatchOptions { Path = watchDirectory, IncludeSubfolders = true });
+            var transfer = Options.Create(new TransferOptions
+            {
+                Mode = "ftp",
+                Direction = "get",
+                Host = "host",
+                Username = "user",
+                Password = "pass",
+                RemotePath = "/remote",
+                PreserveFolderStructure = true,
+                Concurrency = 1
+            });
+            var retry = Options.Create(new RetryOptions { MaxAttempts = 0, DelaySeconds = 0 });
+            var hash = Options.Create(new HashOptions { Enabled = false, Algorithm = "SHA256" });
+            var cleanup = Options.Create(new CleanupOptions());
+
+            var writtenPaths = new List<string>();
+            var mock = new Mock<IFileTransferClient>();
+            mock.Setup(c => c.ListFilesAsync("/remote", It.IsAny<CancellationToken>(), true))
+                .ReturnsAsync(new[] { maliciousRemotePath });
+            // ガードが効かなければ、渡されたローカルパスへ実際に書き込まれてしまう
+            mock.Setup(c => c.DownloadAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .Callback<string, string, CancellationToken>((_, local, _) =>
+                {
+                    lock (writtenPaths) { writtenPaths.Add(local); }
+                    Directory.CreateDirectory(Path.GetDirectoryName(local)!);
+                    File.WriteAllText(local, "escaped");
+                })
+                .Returns(Task.CompletedTask);
+            mock.Setup(c => c.Dispose());
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            using var provider = services.BuildServiceProvider();
+            using var lifetime = new DummyLifetime();
+            var exitCode = new ApplicationExitCode();
+            var worker = new TestWorker(
+                watch, transfer, retry, hash, cleanup, provider,
+                provider.GetRequiredService<ILogger<Worker>>(), lifetime,
+                new NoDisposeClient(mock.Object), exitCode);
+
+            await worker.RunAsync(CancellationToken.None);
+
+            // ダウンロードは開始すらされない
+            Assert.Empty(writtenPaths);
+            // 拒否は失敗として扱われる
+            Assert.NotEqual(0, exitCode.Code);
+            // Watch.Path の外に何も作られていない
+            var watchFull = Path.GetFullPath(watchDirectory);
+            Assert.All(
+                Directory.GetFiles(root, "*", SearchOption.AllDirectories),
+                f => Assert.StartsWith(watchFull, Path.GetFullPath(f), StringComparison.OrdinalIgnoreCase));
+        }
+        finally
+        {
+            Directory.Delete(root, true);
         }
     }
 

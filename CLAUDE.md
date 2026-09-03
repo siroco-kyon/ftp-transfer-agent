@@ -23,8 +23,14 @@ dotnet format --no-restore --verify-no-changes
 
 ### Testing
 ```bash
-# Install Python test dependencies first (required for FTP server simulation)
-python3 -m pip install pyftpdlib
+# Install Python test dependencies first (required for the real FTP/SFTP test servers)
+#   pyftpdlib: FTP server (also used for fault injection)
+#   paramiko:  SFTP server (runs without Docker; also exercises the posix-rename fallback)
+python3 -m pip install pyftpdlib paramiko
+
+# Docker is additionally required for the OpenSSH-based SFTP integration tests
+# (SftpClientDockerIntegrationTests / WorkerSftpDockerEndToEndTests).
+# Without Docker those tests are skipped; CI fails if any real-server test is skipped.
 
 # Run all tests
 dotnet test FtpTransferAgent.Tests/FtpTransferAgent.Tests.csproj --no-build --configuration Release --verbosity normal
@@ -133,5 +139,5 @@ The application uses `appsettings.json` with these main sections:
   - Polly 8.6.0 - Retry and resilience patterns
   - Microsoft.Extensions.Hosting 9.0.6 - Background service hosting
   - Microsoft.Extensions.Options.DataAnnotations 9.0.6 - Configuration validation
-- **Test Dependencies**: pyftpdlib (Python FTP server for integration tests)
-- **CI/CD**: GitHub Actions with Ubuntu runner, includes format verification and Python FTP server setup
+- **Test Dependencies**: pyftpdlib (FTP server), paramiko (SFTP server), Docker (OpenSSH SFTP server for `[DockerFact]` tests)
+- **CI/CD**: GitHub Actions with Ubuntu runner. Includes format verification, Python FTP/SFTP server setup, and a guard that fails the build if any real-server integration test was skipped
