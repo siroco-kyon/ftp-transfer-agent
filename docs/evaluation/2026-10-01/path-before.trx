@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="aa62f56e-2039-445e-b716-9060eb139ca7" name="test-user@WINDOWS-TEST-PC 2026-10-01 20:56:06" runUser="WINDOWS-TEST-PC\test-user" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-10-01T20:56:06.8547794+09:00" queuing="2026-10-01T20:56:06.8547798+09:00" start="2026-10-01T20:56:02.3648459+09:00" finish="2026-10-01T20:56:06.8606952+09:00" />
+  <TestSettings name="default" id="5748500d-caa7-4b0b-8a9b-18af413fd0b2">
+    <Deployment runDeploymentRoot="test-user_WINDOWS-TEST-PC_2026-10-01_20_56_06" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="c6aacb2e-259f-43d5-8b39-d1b7fe2f8b75" testId="f980379a-d5d9-cf90-e3a4-70a30910a28f" testName="FtpTransferAgent.Tests.ProcessLockTests.DefaultLock_TrailingSeparatorCannotBypassHeldLock" computerName="WINDOWS-TEST-PC" duration="00:00:00.1288377" startTime="2026-10-01T20:56:06.6041951+09:00" endTime="2026-10-01T20:56:06.7562823+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c6aacb2e-259f-43d5-8b39-d1b7fe2f8b75">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Throws() Failure: No exception was thrown&#xD;
+Expected: typeof(System.InvalidOperationException)</Message>
+          <StackTrace>   at FtpTransferAgent.Tests.ProcessLockTests.DefaultLock_TrailingSeparatorCannotBypassHeldLock() in D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\ProcessLockTests.cs:line 30&#xD;
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+    <UnitTestResult executionId="3f37311a-e493-4d0e-8917-94d1d13810e4" testId="5f8442da-e76f-c85e-d866-1eff24591a46" testName="FtpTransferAgent.Tests.DeliveryStateStoreTests.DefaultDirectories_AreIndependentOfTrailingSeparator" computerName="WINDOWS-TEST-PC" duration="00:00:00.1270328" startTime="2026-10-01T20:56:06.6041700+09:00" endTime="2026-10-01T20:56:06.7562837+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Failed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3f37311a-e493-4d0e-8917-94d1d13810e4">
+      <Output>
+        <ErrorInfo>
+          <Message>Assert.Equal() Failure: Strings differ&#xD;
+                                                   ↓ (pos 61)&#xD;
+Expected: ···"l\\FtpTransferAgent\\delivery-state\\eb2986640f1d1ad4"&#xD;
+Actual:   ···"l\\FtpTransferAgent\\delivery-state\\3f079ce0c6d95474"&#xD;
+                                                   ↑ (pos 61)</Message>
+          <StackTrace>   at FtpTransferAgent.Tests.DeliveryStateStoreTests.DefaultDirectories_AreIndependentOfTrailingSeparator() in D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\DeliveryStateStoreTests.cs:line 42&#xD;
+   at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)&#xD;
+   at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)</StackTrace>
+        </ErrorInfo>
+      </Output>
+    </UnitTestResult>
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="FtpTransferAgent.Tests.ProcessLockTests.DefaultLock_TrailingSeparatorCannotBypassHeldLock" storage="d:\github\ftp-transfer-agent\ftptransferagent.tests\bin\release\net10.0\ftptransferagent.tests.dll" id="f980379a-d5d9-cf90-e3a4-70a30910a28f">
+      <Execution id="c6aacb2e-259f-43d5-8b39-d1b7fe2f8b75" />
+      <TestMethod codeBase="D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="FtpTransferAgent.Tests.ProcessLockTests" name="DefaultLock_TrailingSeparatorCannotBypassHeldLock" />
+    </UnitTest>
+    <UnitTest name="FtpTransferAgent.Tests.DeliveryStateStoreTests.DefaultDirectories_AreIndependentOfTrailingSeparator" storage="d:\github\ftp-transfer-agent\ftptransferagent.tests\bin\release\net10.0\ftptransferagent.tests.dll" id="5f8442da-e76f-c85e-d866-1eff24591a46">
+      <Execution id="3f37311a-e493-4d0e-8917-94d1d13810e4" />
+      <TestMethod codeBase="D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="FtpTransferAgent.Tests.DeliveryStateStoreTests" name="DefaultDirectories_AreIndependentOfTrailingSeparator" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="f980379a-d5d9-cf90-e3a4-70a30910a28f" executionId="c6aacb2e-259f-43d5-8b39-d1b7fe2f8b75" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="5f8442da-e76f-c85e-d866-1eff24591a46" executionId="3f37311a-e493-4d0e-8917-94d1d13810e4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="一覧に存在しない結果" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="読み込まれたすべての結果" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Failed">
+    <Counters total="2" executed="2" passed="0" failed="2" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.5+1b188a7b0a (64-bit .NET 10.0.11)&#xD;
+[xUnit.net 00:00:01.55]   Discovering: FtpTransferAgent.Tests&#xD;
+[xUnit.net 00:00:02.14]   Discovered:  FtpTransferAgent.Tests&#xD;
+[xUnit.net 00:00:02.52]   Starting:    FtpTransferAgent.Tests&#xD;
+[xUnit.net 00:00:02.58]       Assert.Throws() Failure: No exception was thrown&#xD;
+[xUnit.net 00:00:02.58]       Expected: typeof(System.InvalidOperationException)&#xD;
+[xUnit.net 00:00:02.58]       Stack Trace:&#xD;
+[xUnit.net 00:00:02.58]         D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\ProcessLockTests.cs(30,0): at FtpTransferAgent.Tests.ProcessLockTests.DefaultLock_TrailingSeparatorCannotBypassHeldLock()&#xD;
+[xUnit.net 00:00:02.58]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)&#xD;
+[xUnit.net 00:00:02.58]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)&#xD;
+[xUnit.net 00:00:02.59]       Assert.Equal() Failure: Strings differ&#xD;
+[xUnit.net 00:00:02.59]                                                          ↓ (pos 61)&#xD;
+[xUnit.net 00:00:02.59]       Expected: ···"l\\FtpTransferAgent\\delivery-state\\eb2986640f1d1ad4"&#xD;
+[xUnit.net 00:00:02.59]       Actual:   ···"l\\FtpTransferAgent\\delivery-state\\3f079ce0c6d95474"&#xD;
+[xUnit.net 00:00:02.59]                                                          ↑ (pos 61)&#xD;
+[xUnit.net 00:00:02.59]       Stack Trace:&#xD;
+[xUnit.net 00:00:02.59]         D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\DeliveryStateStoreTests.cs(42,0): at FtpTransferAgent.Tests.DeliveryStateStoreTests.DefaultDirectories_AreIndependentOfTrailingSeparator()&#xD;
+[xUnit.net 00:00:02.59]            at System.Reflection.MethodBaseInvoker.InterpretedInvoke_Method(Object obj, IntPtr* args)&#xD;
+[xUnit.net 00:00:02.59]            at System.Reflection.MethodBaseInvoker.InvokeWithNoArgs(Object obj, BindingFlags invokeAttr)&#xD;
+[xUnit.net 00:00:02.60]   Finished:    FtpTransferAgent.Tests (ID = 'c325f4d9e3045cbfca5624b3b7a8576df4c54ff7c82b44a2e5d477e4ca3ac0e3')&#xD;
+</StdOut>
+    </Output>
+    <RunInfos>
+      <RunInfo computerName="WINDOWS-TEST-PC" outcome="Error" timestamp="2026-10-01T20:56:06.7626264+09:00">
+        <Text>[xUnit.net 00:00:02.58]     FtpTransferAgent.Tests.ProcessLockTests.DefaultLock_TrailingSeparatorCannotBypassHeldLock [FAIL]</Text>
+      </RunInfo>
+      <RunInfo computerName="WINDOWS-TEST-PC" outcome="Error" timestamp="2026-10-01T20:56:06.7687036+09:00">
+        <Text>[xUnit.net 00:00:02.59]     FtpTransferAgent.Tests.DeliveryStateStoreTests.DefaultDirectories_AreIndependentOfTrailingSeparator [FAIL]</Text>
+      </RunInfo>
+    </RunInfos>
+  </ResultSummary>
+</TestRun>

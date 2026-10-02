@@ -24,6 +24,8 @@ jobs:
         run: docker pull atmoz/sftp:alpine
       - name: Restore
         run: dotnet restore
+      - name: Verify evaluation report and evidence
+        run: python3 docs/evaluation/2026-10-01/verify_evidence.py
       - name: Format
         run: dotnet format --no-restore --verify-no-changes
       - name: Build

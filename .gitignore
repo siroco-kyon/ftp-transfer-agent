@@ -14,5 +14,8 @@ slides/*.html
 # ローカル FTP/SFTP サーバーの資材と大量のテストデータが生成される
 .bench/
 
+# 評価の再実行結果・一時データ・PC固有の管理記録
+.audit-results/
+
 # テスト実行時に生成される一時ディレクトリ
 .ftptransferagent-tmp/

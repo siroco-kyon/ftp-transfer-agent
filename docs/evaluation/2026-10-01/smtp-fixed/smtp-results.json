@@ -1,0 +1,370 @@
+[
+  {
+    "case": "disabled",
+    "exit": 1,
+    "seconds": 0.373,
+    "received_before_process_exit": 0,
+    "source_files_preserved": 20,
+    "passed": true,
+    "messages": []
+  },
+  {
+    "case": "limited",
+    "exit": 1,
+    "seconds": 0.583,
+    "received_before_process_exit": 5,
+    "source_files_preserved": 20,
+    "passed": true,
+    "messages": [
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      }
+    ]
+  },
+  {
+    "case": "unlimited",
+    "exit": 1,
+    "seconds": 1.034,
+    "received_before_process_exit": 61,
+    "source_files_preserved": 20,
+    "passed": true,
+    "messages": [
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Services.TransferQueue] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      },
+      {
+        "subject": "[FtpTransferAgent.Worker] Error",
+        "to": "receiver@example.test",
+        "from": "sender@example.test"
+      }
+    ]
+  },
+  {
+    "case": "relay-rejects",
+    "exit": 1,
+    "seconds": 0.381,
+    "received_before_process_exit": 0,
+    "source_files_preserved": 20,
+    "passed": true,
+    "messages": []
+  }
+]

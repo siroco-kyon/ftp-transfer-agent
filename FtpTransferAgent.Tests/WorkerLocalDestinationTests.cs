@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -192,11 +192,12 @@ public class WorkerLocalDestinationTests : IDisposable
 
         try
         {
-            Directory.CreateSymbolicLink(link, outside);
+            TestDirectoryLink.Create(link, outside);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
         {
             // シンボリックリンクを作成できない環境。黙って成功扱いにせずスキップとして可視化する
+            if (OperatingSystem.IsWindows()) throw;
             Assert.Skip($"Cannot create a directory symbolic link in this environment: {ex.Message}");
             return;
         }
@@ -276,6 +277,8 @@ public class WorkerLocalDestinationTests : IDisposable
 
     public void Dispose()
     {
+        var link = Path.Combine(_watchDir, "linked");
+        if (Directory.Exists(link)) Directory.Delete(link);
         try { Directory.Delete(_root, true); } catch { /* best effort */ }
     }
 }

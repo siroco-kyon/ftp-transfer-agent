@@ -1,0 +1,138 @@
+Configuration warnings:
+WARNING: Very short retry delay may cause server to reject connections
+WARNING: HostKeyFingerprint is not set. The SFTP server's host key will be accepted without verification, so a man-in-the-middle cannot be detected. Obtain the fingerprint with 'ssh-keyscan <host> | ssh-keygen -lf -' and set it (e.g. "SHA256:...").
+INFO: Hash verification is disabled. File integrity will not be verified after transfer.
+INFO: Acquired process lock at C:\Users\test-user\AppData\Local\Temp\agent-speed-vv_diraa\small-c16-hashFalse-existsTrue-r1\agent.lock
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.TransferQueue[0]
+      Retry 1/1 for C:\Users\test-user\AppData\Local\Temp\agent-speed-vv_diraa\small-c16-hashFalse-existsTrue-r1\watch\file-0004.bin: The connection to the remote server was closed before a valid SSH identification string was received.
+      Renci.SshNet.Common.SshConnectionException: The connection to the remote server was closed before a valid SSH identification string was received.
+         at Renci.SshNet.Connection.ProtocolVersionExchange.SocketReadLineAsync(Socket socket, List`1 buffer, CancellationToken cancellationToken)
+         at Renci.SshNet.Connection.ProtocolVersionExchange.StartAsync(String clientVersion, Socket socket, CancellationToken cancellationToken)
+         at Renci.SshNet.Session.ConnectAsync(CancellationToken cancellationToken)
+         at Renci.SshNet.BaseClient.CreateAndConnectSessionAsync(CancellationToken cancellationToken)
+         at Renci.SshNet.BaseClient.ConnectAsync(CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.SftpClientWrapper.EnsureConnectedAsync(CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\SftpClientWrapper.cs:line 134
+         at FtpTransferAgent.Services.SftpClientWrapper.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\SftpClientWrapper.cs:line 241
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2508
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.TransferQueue[0]
+      Retry 1/1 for C:\Users\test-user\AppData\Local\Temp\agent-speed-vv_diraa\small-c16-hashFalse-existsTrue-r1\watch\file-0015.bin: The connection to the remote server was closed before a valid SSH identification string was received.
+      Renci.SshNet.Common.SshConnectionException: The connection to the remote server was closed before a valid SSH identification string was received.
+         at Renci.SshNet.Connection.ProtocolVersionExchange.SocketReadLineAsync(Socket socket, List`1 buffer, CancellationToken cancellationToken)
+         at Renci.SshNet.Connection.ProtocolVersionExchange.StartAsync(String clientVersion, Socket socket, CancellationToken cancellationToken)
+         at Renci.SshNet.Session.ConnectAsync(CancellationToken cancellationToken)
+         at Renci.SshNet.BaseClient.CreateAndConnectSessionAsync(CancellationToken cancellationToken)
+         at Renci.SshNet.BaseClient.ConnectAsync(CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.SftpClientWrapper.EnsureConnectedAsync(CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\SftpClientWrapper.cs:line 134
+         at FtpTransferAgent.Services.SftpClientWrapper.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\SftpClientWrapper.cs:line 241
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2508
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.TransferQueue[0]
+      Retry 1/1 for C:\Users\test-user\AppData\Local\Temp\agent-speed-vv_diraa\small-c16-hashFalse-existsTrue-r1\watch\file-0014.bin: The connection to the remote server was closed before a valid SSH identification string was received.
+      Renci.SshNet.Common.SshConnectionException: The connection to the remote server was closed before a valid SSH identification string was received.
+         at Renci.SshNet.Connection.ProtocolVersionExchange.SocketReadLineAsync(Socket socket, List`1 buffer, CancellationToken cancellationToken)
+         at Renci.SshNet.Connection.ProtocolVersionExchange.StartAsync(String clientVersion, Socket socket, CancellationToken cancellationToken)
+         at Renci.SshNet.Session.ConnectAsync(CancellationToken cancellationToken)
+         at Renci.SshNet.BaseClient.CreateAndConnectSessionAsync(CancellationToken cancellationToken)
+         at Renci.SshNet.BaseClient.ConnectAsync(CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.SftpClientWrapper.EnsureConnectedAsync(CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\SftpClientWrapper.cs:line 134
+         at FtpTransferAgent.Services.SftpClientWrapper.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\SftpClientWrapper.cs:line 241
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2508
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+2026-10-01 21:15:19 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 8 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-speed-vv_diraa\small-c16-hashFalse-existsTrue-r1\watch\file-0015.bin|sftp://127.0.0.1:60264/upload/small-c16-hashFalse-existsTrue-r1|204444f738994be7b07b227807b41048 after all retries (Retryable)
+      Renci.SshNet.Common.SshConnectionException: The connection to the remote server was closed before a valid SSH identification string was received.
+         at Renci.SshNet.Connection.ProtocolVersionExchange.SocketReadLineAsync(Socket socket, List`1 buffer, CancellationToken cancellationToken)
+         at Renci.SshNet.Connection.ProtocolVersionExchange.StartAsync(String clientVersion, Socket socket, CancellationToken cancellationToken)
+         at Renci.SshNet.Session.ConnectAsync(CancellationToken cancellationToken)
+         at Renci.SshNet.BaseClient.CreateAndConnectSessionAsync(CancellationToken cancellationToken)
+         at Renci.SshNet.BaseClient.ConnectAsync(CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.SftpClientWrapper.EnsureConnectedAsync(CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\SftpClientWrapper.cs:line 134
+         at FtpTransferAgent.Services.SftpClientWrapper.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\SftpClientWrapper.cs:line 241
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2508
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:15:19 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-speed-vv_diraa\small-c16-hashFalse-existsTrue-r1\watch\file-0015.bin: 0/1 destinations succeeded. Failed: sftp://127.0.0.1:60264/upload/small-c16-hashFalse-existsTrue-r1. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.TransferQueue[0]
+      Retry 1/1 for C:\Users\test-user\AppData\Local\Temp\agent-speed-vv_diraa\small-c16-hashFalse-existsTrue-r1\watch\file-0016.bin: The connection to the remote server was closed before a valid SSH identification string was received.
+      Renci.SshNet.Common.SshConnectionException: The connection to the remote server was closed before a valid SSH identification string was received.
+         at Renci.SshNet.Connection.ProtocolVersionExchange.SocketReadLineAsync(Socket socket, List`1 buffer, CancellationToken cancellationToken)
+         at Renci.SshNet.Connection.ProtocolVersionExchange.StartAsync(String clientVersion, Socket socket, CancellationToken cancellationToken)
+         at Renci.SshNet.Session.ConnectAsync(CancellationToken cancellationToken)
+         at Renci.SshNet.BaseClient.CreateAndConnectSessionAsync(CancellationToken cancellationToken)
+         at Renci.SshNet.BaseClient.ConnectAsync(CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.SftpClientWrapper.EnsureConnectedAsync(CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\SftpClientWrapper.cs:line 134
+         at FtpTransferAgent.Services.SftpClientWrapper.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\SftpClientWrapper.cs:line 241
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2508
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:GV0zUVZhpWVxv9U4fM2K1KsbVlL5L8+5lRHW6Cc6skQ (MD5: 63cdf92e99bf2cb1aaf5c8714253f850)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:GV0zUVZhpWVxv9U4fM2K1KsbVlL5L8+5lRHW6Cc6skQ (MD5: 63cdf92e99bf2cb1aaf5c8714253f850)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:GV0zUVZhpWVxv9U4fM2K1KsbVlL5L8+5lRHW6Cc6skQ (MD5: 63cdf92e99bf2cb1aaf5c8714253f850)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:GV0zUVZhpWVxv9U4fM2K1KsbVlL5L8+5lRHW6Cc6skQ (MD5: 63cdf92e99bf2cb1aaf5c8714253f850)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:GV0zUVZhpWVxv9U4fM2K1KsbVlL5L8+5lRHW6Cc6skQ (MD5: 63cdf92e99bf2cb1aaf5c8714253f850)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:GV0zUVZhpWVxv9U4fM2K1KsbVlL5L8+5lRHW6Cc6skQ (MD5: 63cdf92e99bf2cb1aaf5c8714253f850)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:GV0zUVZhpWVxv9U4fM2K1KsbVlL5L8+5lRHW6Cc6skQ (MD5: 63cdf92e99bf2cb1aaf5c8714253f850)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:GV0zUVZhpWVxv9U4fM2K1KsbVlL5L8+5lRHW6Cc6skQ (MD5: 63cdf92e99bf2cb1aaf5c8714253f850)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:GV0zUVZhpWVxv9U4fM2K1KsbVlL5L8+5lRHW6Cc6skQ (MD5: 63cdf92e99bf2cb1aaf5c8714253f850)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:GV0zUVZhpWVxv9U4fM2K1KsbVlL5L8+5lRHW6Cc6skQ (MD5: 63cdf92e99bf2cb1aaf5c8714253f850)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:GV0zUVZhpWVxv9U4fM2K1KsbVlL5L8+5lRHW6Cc6skQ (MD5: 63cdf92e99bf2cb1aaf5c8714253f850)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:GV0zUVZhpWVxv9U4fM2K1KsbVlL5L8+5lRHW6Cc6skQ (MD5: 63cdf92e99bf2cb1aaf5c8714253f850)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:GV0zUVZhpWVxv9U4fM2K1KsbVlL5L8+5lRHW6Cc6skQ (MD5: 63cdf92e99bf2cb1aaf5c8714253f850)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:GV0zUVZhpWVxv9U4fM2K1KsbVlL5L8+5lRHW6Cc6skQ (MD5: 63cdf92e99bf2cb1aaf5c8714253f850)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:GV0zUVZhpWVxv9U4fM2K1KsbVlL5L8+5lRHW6Cc6skQ (MD5: 63cdf92e99bf2cb1aaf5c8714253f850)
+2026-10-01 21:15:19 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:GV0zUVZhpWVxv9U4fM2K1KsbVlL5L8+5lRHW6Cc6skQ (MD5: 63cdf92e99bf2cb1aaf5c8714253f850)
+2026-10-01 21:15:20 fail: FtpTransferAgent.Worker[0]
+      Transfer completed with failures. The process exit code will be set to 1.

@@ -1,0 +1,13 @@
+{
+  "runtime": "win-x64",
+  "self_contained": true,
+  "single_file": true,
+  "exit": 0,
+  "dotnet_not_in_path": true,
+  "dotnet_root_points_to_missing_directory": true,
+  "files_verified": 2,
+  "end_files_verified": 2,
+  "remaining_source_files": 0,
+  "exe_sha256": "ed9631b1be919fbd823ffb5b1fcd49d7127e15ffdc081b39ada7c9cf48b3e8c6",
+  "passed": true
+}

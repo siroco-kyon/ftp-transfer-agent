@@ -1,0 +1,91 @@
+{"case": "disabled", "exit": 1, "seconds": 0.388, "received_before_process_exit": 0, "source_files_preserved": 20, "passed": true}
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 52903)
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 52900)
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 52904)
+----------------------------------------
+----------------------------------------
+Exception occurred during processing of request from ('127.0.0.1', 52902)
+Exception occurred during processing of request from ('127.0.0.1', 52901)
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+Traceback (most recent call last):
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 755, in __init__
+    self.handle()
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 691, in process_request_thread
+    self.finish_request(request, client_address)
+  File "D:\Github\ftp-transfer-agent\.audit-results\2026-10-01-regression\smtp_probe.py", line 24, in handle
+    while line := self.rfile.readline():
+                  ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socket.py", line 706, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 755, in __init__
+    self.handle()
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 755, in __init__
+    self.handle()
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 361, in finish_request
+    self.RequestHandlerClass(request, client_address, self)
+ConnectionResetError: [WinError 10054] �����̐ڑ��̓����[�g �z�X�g�ɋ����I�ɐؒf����܂����B
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 755, in __init__
+    self.handle()
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socketserver.py", line 755, in __init__
+    self.handle()
+  File "D:\Github\ftp-transfer-agent\.audit-results\2026-10-01-regression\smtp_probe.py", line 24, in handle
+    while line := self.rfile.readline():
+                  ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\ftp-transfer-agent\.audit-results\2026-10-01-regression\smtp_probe.py", line 24, in handle
+    while line := self.rfile.readline():
+                  ^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\ftp-transfer-agent\.audit-results\2026-10-01-regression\smtp_probe.py", line 24, in handle
+    while line := self.rfile.readline():
+                  ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socket.py", line 706, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "D:\Github\ftp-transfer-agent\.audit-results\2026-10-01-regression\smtp_probe.py", line 24, in handle
+    while line := self.rfile.readline():
+                  ^^^^^^^^^^^^^^^^^^^^^
+----------------------------------------
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socket.py", line 706, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socket.py", line 706, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\test-user\AppData\Local\Programs\Python\Python311\Lib\socket.py", line 706, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+ConnectionResetError: [WinError 10054] �����̐ڑ��̓����[�g �z�X�g�ɋ����I�ɐؒf����܂����B
+ConnectionResetError: [WinError 10054] �����̐ڑ��̓����[�g �z�X�g�ɋ����I�ɐؒf����܂����B
+ConnectionResetError: [WinError 10054] �����̐ڑ��̓����[�g �z�X�g�ɋ����I�ɐؒf����܂����B
+ConnectionResetError: [WinError 10054] �����̐ڑ��̓����[�g �z�X�g�ɋ����I�ɐؒf����܂����B
+----------------------------------------
+----------------------------------------
+----------------------------------------
+----------------------------------------
+Traceback (most recent call last):
+  File "D:\Github\ftp-transfer-agent\.audit-results\2026-10-01-regression\smtp_probe.py", line 89, in <module>
+    assert len(received) == limit, (label, len(received))
+           ^^^^^^^^^^^^^^^^^^^^^^
+AssertionError: ('limited', 0)

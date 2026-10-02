@@ -1,6 +1,7 @@
 using System.IO;
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using FtpTransferAgent.Configuration;
@@ -16,6 +17,9 @@ namespace FtpTransferAgent.Services;
 /// </summary>
 public class SftpClientWrapper : IFileTransferClient, IDisposable
 {
+    // 接続確立だけを宛先ごとに4件までにする。認証前の接続集中によるSSHサーバーの拒否を抑え、
+    // 認証済みの接続では設定した並列数で転送する。別のホストの接続開始は互いに待たせない。
+    private static readonly ConcurrentDictionary<(string Host, int Port), SemaphoreSlim> HandshakeGates = new();
     private readonly SftpClient _client;
     private readonly ILogger<SftpClientWrapper> _logger;
     // 設定値全体を保持。ホスト鍵検証で利用するため。
@@ -131,8 +135,20 @@ public class SftpClientWrapper : IFileTransferClient, IDisposable
     {
         if (!_client.IsConnected)
         {
-            await _client.ConnectAsync(ct).ConfigureAwait(false);
-            LogConnectionEstablished();
+            var gate = HandshakeGates.GetOrAdd((_options.Host.ToLowerInvariant(), _options.Port), _ => new SemaphoreSlim(4, 4));
+            await gate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                if (!_client.IsConnected)
+                {
+                    await _client.ConnectAsync(ct).ConfigureAwait(false);
+                    LogConnectionEstablished();
+                }
+            }
+            finally
+            {
+                gate.Release();
+            }
         }
     }
 

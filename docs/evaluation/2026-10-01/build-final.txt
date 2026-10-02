@@ -1,0 +1,8 @@
+  FtpTransferAgent -> D:\Github\ftp-transfer-agent\FtpTransferAgent\bin\Release\net10.0\FtpTransferAgent.dll
+  FtpTransferAgent.Tests -> D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll
+
+ビルドに成功しました。
+    0 個の警告
+    0 エラー
+
+経過時間 00:00:01.29

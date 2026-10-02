@@ -1,0 +1,70 @@
+[
+  {
+    "case": "upload-once",
+    "exit": 0,
+    "counts": {
+      "uploads": 2
+    },
+    "local": null,
+    "remote": "CORRECT-payload-12345",
+    "remote_end": true,
+    "remote_temps": 0
+  },
+  {
+    "case": "upload-always",
+    "exit": 1,
+    "counts": {
+      "uploads": 2
+    },
+    "local": "CORRECT-payload-12345",
+    "remote": "CORRUPT-payload-12345",
+    "remote_end": false,
+    "remote_temps": 0
+  },
+  {
+    "case": "download-once",
+    "exit": 0,
+    "counts": {
+      "reads": 4
+    },
+    "local": "CORRECT-payload-12345",
+    "remote": null,
+    "remote_end": false,
+    "remote_temps": 0
+  },
+  {
+    "case": "download-always",
+    "exit": 1,
+    "counts": {
+      "reads": 4
+    },
+    "local": "OLD local copy",
+    "remote": "CORRECT-payload-12345",
+    "remote_end": false,
+    "remote_temps": 0
+  },
+  {
+    "case": "rename-once",
+    "exit": 0,
+    "counts": {
+      "uploads": 2,
+      "rename-after-delete": 2
+    },
+    "local": null,
+    "remote": "CORRECT-payload-12345",
+    "remote_end": true,
+    "remote_temps": 0
+  },
+  {
+    "case": "rename-always",
+    "exit": 1,
+    "counts": {
+      "uploads": 2,
+      "rename-after-delete": 2
+    },
+    "local": "CORRECT-payload-12345",
+    "remote": null,
+    "remote_end": false,
+    "remote_temps": 1
+  }
+]

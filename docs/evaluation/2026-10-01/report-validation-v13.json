@@ -1,0 +1,14 @@
+{
+  "structure_valid": true,
+  "unique_ids": 38,
+  "manual_rows": 221,
+  "local_and_anchor_links_valid": 62,
+  "windows_only": true,
+  "automated_passed": 443,
+  "new_sftp_runs": 12,
+  "new_sftp_verified_files": 12000,
+  "speed_test_data_cleanup_verified": true,
+  "report_sha256": "bc802a23a4c92423ad47ea9aa4781bc6d228c4b600c4273f4b46b91c76d00a62",
+  "visual_browser_check": "not performed in this revision; browser access to local file was previously denied",
+  "shared_evidence_verified": true
+}

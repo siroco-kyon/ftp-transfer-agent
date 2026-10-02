@@ -1,0 +1,40 @@
+{
+  "client_os": "Windows-10-10.0.26200-SP0",
+  "server_os": "Windows-10-10.0.26200-SP0",
+  "server": "Paramiko 5.0.0 on Windows; loopback only",
+  "started_at": "2026-10-01T23:07:17.996838+09:00",
+  "files_per_run": 1000,
+  "bytes_per_file": 4194304,
+  "total_bytes_per_run": 4194304000,
+  "concurrency": [
+    1,
+    4,
+    8,
+    16
+  ],
+  "repeats": 3,
+  "product_sha256_enabled": true,
+  "verify_uploaded_file_exists": true,
+  "retry_count_limit": 1,
+  "delay_seconds": 0,
+  "client_and_server_storage": "D drive, unique temporary directories",
+  "measurement": "process start to exit, includes product verification and input cleanup; independent destination verification excluded",
+  "artificial_delay": false,
+  "host_key_verification": true,
+  "binary_sha256": "257b2c36e886189c1209be0145765be72241aa6e2dec262af273030b71bdb673",
+  "resumed_at": "2026-10-01T23:33:55.120857+09:00",
+  "resume_note": "Initial runner interrupted after completed 1/4 measurements. Remaining measurements retain the Windows software, volume, settings and binary.",
+  "finished_at": "2026-10-01T23:45:37.611554+09:00",
+  "hardware": {
+    "system": {
+      "TotalPhysicalMemory": 34258423808
+    },
+    "cpu": {
+      "Name": "Intel(R) Core(TM) i7-10700 CPU @ 2.90GHz",
+      "NumberOfCores": 8,
+      "NumberOfLogicalProcessors": 16
+    }
+  },
+  "measured_at_finish": "2026-10-01T23:46:49.348261+09:00",
+  "observed_retry_count": 0
+}

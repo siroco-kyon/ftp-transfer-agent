@@ -1,0 +1,122 @@
+[
+  {
+    "workload": "small",
+    "files": 400,
+    "bytes_per_file": 8192,
+    "concurrency": 1,
+    "hash_enabled": false,
+    "verify_uploaded_file_exists": true,
+    "seconds": [
+      3.279,
+      3.193,
+      3.105
+    ],
+    "median_seconds": 3.193,
+    "all_file_hashes_match": true
+  },
+  {
+    "workload": "small",
+    "files": 400,
+    "bytes_per_file": 8192,
+    "concurrency": 1,
+    "hash_enabled": false,
+    "verify_uploaded_file_exists": false,
+    "seconds": [
+      2.695,
+      2.672,
+      2.704
+    ],
+    "median_seconds": 2.695,
+    "all_file_hashes_match": true
+  },
+  {
+    "workload": "small",
+    "files": 400,
+    "bytes_per_file": 8192,
+    "concurrency": 4,
+    "hash_enabled": false,
+    "verify_uploaded_file_exists": true,
+    "seconds": [
+      1.49,
+      1.497,
+      1.486
+    ],
+    "median_seconds": 1.49,
+    "all_file_hashes_match": true
+  },
+  {
+    "workload": "small",
+    "files": 400,
+    "bytes_per_file": 8192,
+    "concurrency": 4,
+    "hash_enabled": false,
+    "verify_uploaded_file_exists": false,
+    "seconds": [
+      1.369,
+      1.361,
+      1.382
+    ],
+    "median_seconds": 1.369,
+    "all_file_hashes_match": true
+  },
+  {
+    "workload": "small",
+    "files": 400,
+    "bytes_per_file": 8192,
+    "concurrency": 16,
+    "hash_enabled": false,
+    "verify_uploaded_file_exists": true,
+    "seconds": [
+      1.723,
+      1.695,
+      1.687
+    ],
+    "median_seconds": 1.695,
+    "all_file_hashes_match": true
+  },
+  {
+    "workload": "small",
+    "files": 400,
+    "bytes_per_file": 8192,
+    "concurrency": 16,
+    "hash_enabled": false,
+    "verify_uploaded_file_exists": false,
+    "seconds": [
+      1.671,
+      1.71,
+      1.674
+    ],
+    "median_seconds": 1.674,
+    "all_file_hashes_match": true
+  },
+  {
+    "workload": "medium",
+    "files": 200,
+    "bytes_per_file": 524288,
+    "concurrency": 4,
+    "hash_enabled": false,
+    "verify_uploaded_file_exists": true,
+    "seconds": [
+      1.631,
+      1.606,
+      1.619
+    ],
+    "median_seconds": 1.619,
+    "all_file_hashes_match": true
+  },
+  {
+    "workload": "large",
+    "files": 1,
+    "bytes_per_file": 268435456,
+    "concurrency": 1,
+    "hash_enabled": true,
+    "verify_uploaded_file_exists": true,
+    "seconds": [
+      5.027,
+      4.866,
+      5.065
+    ],
+    "median_seconds": 5.027,
+    "all_file_hashes_match": true
+  }
+]

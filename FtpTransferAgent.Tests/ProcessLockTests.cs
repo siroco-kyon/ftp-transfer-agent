@@ -23,6 +23,13 @@ public class ProcessLockTests : IDisposable
 
     private string NewLockPath() => Path.Combine(_dir, Path.GetRandomFileName() + ".lock");
 
+    [Fact]
+    public void DefaultLock_TrailingSeparatorCannotBypassHeldLock()
+    {
+        using var first = ProcessLock.Acquire(null, _dir);
+        Assert.Throws<InvalidOperationException>(() => ProcessLock.Acquire(null, _dir + Path.DirectorySeparatorChar));
+    }
+
     // ProcessLock は FileShare.Read でファイルを保持しているため、書き込み保護された状態のまま読み出すには
     // FileShare.ReadWrite を指定する必要がある。
     private static string ReadShared(string path)

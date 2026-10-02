@@ -49,7 +49,7 @@ builder.Logging.AddSimpleConsole(o => o.TimestampFormat = "yyyy-MM-dd HH:mm:ss "
 if (!string.IsNullOrEmpty(logging.RollingFilePath))
 {
     // ログをファイルにも出力する
-    builder.Logging.AddProvider(new RollingFileLoggerProvider(logging));
+    builder.Services.AddSingleton<ILoggerProvider>(_ => new RollingFileLoggerProvider(logging));
 
     // 起動時に古いログを掃除（Retention.Enabled=true 時のみ）
     if (logging.Retention?.Enabled == true)
@@ -67,7 +67,9 @@ if (!string.IsNullOrEmpty(logging.RollingFilePath))
 }
 if (smtp.Enabled)
 {
-    builder.Logging.AddProvider(new ErrorEmailLoggerProvider(smtp));
+    // DIで生成するとホスト終了時にDisposeが呼ばれ、未完了のメール送信を待機できる。
+    // AddProviderへ生成済みインスタンスを渡すと、DIはその破棄を管理しない。
+    builder.Services.AddSingleton<ILoggerProvider>(_ => new ErrorEmailLoggerProvider(smtp));
 }
 
 // 設定バリデーターを登録
@@ -80,7 +82,7 @@ builder.Services.AddHostedService<Worker>();
 // ホストを構築して実行
 try
 {
-    var host = builder.Build();
+    using var host = builder.Build();
 
     // 設定の包括的バリデーションを実行
     var validator = host.Services.GetRequiredService<ConfigurationValidator>();

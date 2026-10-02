@@ -1,0 +1,3 @@
+Configuration warnings:
+WARNING: Very short retry delay may cause server to reject connections
+INFO: Acquired process lock at D:\Github\ftp-transfer-agent\.audit-results\2026-10-01-regression\native-sftp-ubzt52da\bulk-c8-hashTrue-existsTrue-r1\agent.lock

@@ -1,0 +1,63 @@
+[
+  {
+    "case": "download-normal",
+    "exit": 0,
+    "download_exists": true,
+    "destination_exists": false,
+    "background_failure": false,
+    "validation_failure": false
+  },
+  {
+    "case": "download-trailing-separator",
+    "exit": 0,
+    "download_exists": true,
+    "destination_exists": false,
+    "background_failure": false,
+    "validation_failure": false
+  },
+  {
+    "case": "download-normal-preserve",
+    "exit": 0,
+    "download_exists": true,
+    "destination_exists": false,
+    "background_failure": false,
+    "validation_failure": false
+  },
+  {
+    "case": "download-trailing-preserve",
+    "exit": 0,
+    "download_exists": true,
+    "destination_exists": false,
+    "background_failure": false,
+    "validation_failure": false
+  },
+  {
+    "case": "state-initialization-failure",
+    "exit": 1,
+    "download_exists": true,
+    "destination_exists": false,
+    "background_failure": false,
+    "validation_failure": false
+  },
+  {
+    "case": "fanout-failure",
+    "exit": 1,
+    "source_exists": false,
+    "dest_a_exists": true,
+    "dest_b_exists": false
+  },
+  {
+    "case": "fanout-changed-spelling",
+    "exit": 0,
+    "source_exists": true,
+    "dest_a_exists": true,
+    "dest_b_exists": true
+  },
+  {
+    "case": "fanout-original-spelling",
+    "exit": 0,
+    "source_exists": true,
+    "dest_a_exists": true,
+    "dest_b_exists": true
+  }
+]

@@ -36,6 +36,15 @@ public class DeliveryStateStoreTests : IDisposable
     }
 
     [Fact]
+    public void DefaultDirectories_AreIndependentOfTrailingSeparator()
+    {
+        var trailing = _watchDir + Path.DirectorySeparatorChar;
+        Assert.Equal(DeliveryStateStore.ResolveStateDirectory(null, _watchDir), DeliveryStateStore.ResolveStateDirectory(null, trailing));
+        Assert.Equal(DeliveryStateStore.ResolveRetryDirectory(null, _watchDir), DeliveryStateStore.ResolveRetryDirectory(null, trailing));
+        Assert.Equal(DeliveryStateStore.ResolveUploadSnapshotDirectory(_watchDir), DeliveryStateStore.ResolveUploadSnapshotDirectory(trailing));
+    }
+
+    [Fact]
     public async Task RecordDelivered_ThenGetDelivered_ReturnsDestination()
     {
         var store = CreateStore();

@@ -1,0 +1,7 @@
+Configuration warnings:
+WARNING: Very short retry delay may cause server to reject connections
+WARNING: HostKeyFingerprint is not set. The SFTP server's host key will be accepted without verification, so a man-in-the-middle cannot be detected. Obtain the fingerprint with 'ssh-keyscan <host> | ssh-keygen -lf -' and set it (e.g. "SHA256:...").
+INFO: Hash verification is disabled. File integrity will not be verified after transfer.
+INFO: Acquired process lock at C:\Users\test-user\AppData\Local\Temp\agent-speed-10uy9whj\small-c1-hashFalse-existsTrue-r0\agent.lock
+2026-10-01 21:19:38 warn: FtpTransferAgent.Services.SftpClientWrapper[0]
+      HostKeyFingerprint is not configured. Trusting server key without verification: SHA256:erwXOWGkjse4U6ydGPb8gCqYnU+SKcchuD1mqaxacsk (MD5: 9a330c4e17952503336cf2b6aff52543)
