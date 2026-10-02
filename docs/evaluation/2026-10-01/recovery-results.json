@@ -1,0 +1,122 @@
+[
+  {
+    "case": "deep-fanout-False-outage",
+    "exit": 1,
+    "source": null,
+    "retry": "old generation",
+    "dest_a": "old generation",
+    "dest_b": null,
+    "passed": true
+  },
+  {
+    "case": "deep-fanout-False-recovery",
+    "exit": 0,
+    "source": "NEW generation that must eventually be delivered",
+    "retry": null,
+    "dest_a": "old generation",
+    "dest_b": "old generation",
+    "passed": true
+  },
+  {
+    "case": "deep-fanout-False-next-run",
+    "exit": 0,
+    "source": "NEW generation that must eventually be delivered",
+    "retry": null,
+    "dest_a": "NEW generation that must eventually be delivered",
+    "dest_b": "NEW generation that must eventually be delivered",
+    "passed": true
+  },
+  {
+    "case": "deep-fanout-False-third-run",
+    "exit": 0,
+    "source": "NEW generation that must eventually be delivered",
+    "retry": null,
+    "dest_a": "NEW generation that must eventually be delivered",
+    "dest_b": "NEW generation that must eventually be delivered",
+    "passed": true
+  },
+  {
+    "case": "deep-fanout-True-outage",
+    "exit": 1,
+    "source": null,
+    "retry": "old generation",
+    "dest_a": "old generation",
+    "dest_b": null,
+    "passed": true
+  },
+  {
+    "case": "deep-fanout-True-recovery",
+    "exit": 0,
+    "source": "NEW generation that must eventually be delivered",
+    "retry": null,
+    "dest_a": "old generation",
+    "dest_b": "old generation",
+    "passed": true
+  },
+  {
+    "case": "deep-fanout-True-next-run",
+    "exit": 0,
+    "source": null,
+    "retry": null,
+    "dest_a": "NEW generation that must eventually be delivered",
+    "dest_b": "NEW generation that must eventually be delivered",
+    "passed": true
+  },
+  {
+    "case": "deep-fanout-True-third-run",
+    "exit": 0,
+    "source": null,
+    "retry": null,
+    "dest_a": "NEW generation that must eventually be delivered",
+    "dest_b": "NEW generation that must eventually be delivered",
+    "passed": true
+  },
+  {
+    "case": "deep-end-False-delete-failure",
+    "exit": 1,
+    "local_data": "download payload",
+    "remote_data": "download payload",
+    "remote_end": null,
+    "passed": true
+  },
+  {
+    "case": "deep-end-False-recovered",
+    "exit": 0,
+    "local_data": "download payload",
+    "remote_data": null,
+    "remote_end": null,
+    "passed": true
+  },
+  {
+    "case": "deep-end-False-next-run",
+    "exit": 0,
+    "local_data": "download payload",
+    "remote_data": null,
+    "remote_end": null,
+    "passed": true
+  },
+  {
+    "case": "deep-end-True-delete-failure",
+    "exit": 1,
+    "local_data": "download payload",
+    "remote_data": "download payload",
+    "remote_end": null,
+    "passed": true
+  },
+  {
+    "case": "deep-end-True-recovered",
+    "exit": 0,
+    "local_data": "download payload",
+    "remote_data": null,
+    "remote_end": null,
+    "passed": true
+  },
+  {
+    "case": "deep-end-True-next-run",
+    "exit": 0,
+    "local_data": "download payload",
+    "remote_data": null,
+    "remote_end": null,
+    "passed": true
+  }
+]

@@ -506,12 +506,19 @@ public class WorkerFanoutSafetyTests
         }
     }
 
-    [Fact]
-    public async Task ExecuteAsync_Fanout_CleansUpOrphanedUploadSnapshotsFromPreviousRun()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExecuteAsync_Fanout_CleansUpOrphanedUploadSnapshotsFromPreviousRun(bool legacyTrailingSeparator)
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
         var snapshotRoot = DeliveryStateStore.ResolveUploadSnapshotDirectory(dir);
+        if (legacyTrailingSeparator)
+        {
+            var legacyHash = LocalPathIdentity.CompatibleHashes(dir).Single(hash => hash != LocalPathIdentity.WatchHash(dir));
+            snapshotRoot = Path.Combine(Path.GetDirectoryName(snapshotRoot)!, legacyHash);
+        }
 
         try
         {

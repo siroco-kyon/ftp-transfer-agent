@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.IO;
+using System.Collections.Generic;
 
 namespace FtpTransferAgent.Services;
 
@@ -13,6 +14,7 @@ public sealed class ProcessLock : IDisposable
     private readonly string _lockFilePath;
     private FileStream? _stream;
     private bool _disposed;
+    private readonly List<ProcessLock> _compatibleLocks = new();
 
     public string LockFilePath => _lockFilePath;
 
@@ -35,6 +37,32 @@ public sealed class ProcessLock : IDisposable
     public static ProcessLock Acquire(string? lockFilePath, string? watchPath = null)
     {
         var path = ResolveLockFilePath(lockFilePath, watchPath);
+        if (!string.IsNullOrWhiteSpace(lockFilePath) || string.IsNullOrWhiteSpace(watchPath))
+        {
+            return AcquireOne(path);
+        }
+
+        var acquired = new List<ProcessLock>();
+        try
+        {
+            var root = Path.GetDirectoryName(Path.GetDirectoryName(path)!)!;
+            foreach (var hash in LocalPathIdentity.CompatibleHashes(watchPath))
+            {
+                acquired.Add(AcquireOne(Path.Combine(root, hash, "ftp-transfer-agent.lock")));
+            }
+            var primary = acquired.Find(value => value.LockFilePath == path)!;
+            primary._compatibleLocks.AddRange(acquired.FindAll(value => value != primary));
+            return primary;
+        }
+        catch
+        {
+            foreach (var item in acquired) item.Dispose();
+            throw;
+        }
+    }
+
+    private static ProcessLock AcquireOne(string path)
+    {
         var dir = Path.GetDirectoryName(path);
         if (!string.IsNullOrEmpty(dir))
         {
@@ -122,9 +150,7 @@ public sealed class ProcessLock : IDisposable
     // 既定解決 (DeliveryStateStore) と同じ手口で、構成ごとに衝突しないサブフォルダ名を作る。
     private static string WatchSubdirectory(string watchPath)
     {
-        var full = Path.GetFullPath(watchPath).ToLowerInvariant();
-        var hash = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(full));
-        return Convert.ToHexString(hash).ToLowerInvariant()[..16];
+        return LocalPathIdentity.WatchHash(watchPath);
     }
 
     private static string GetCurrentProcessName()
@@ -201,6 +227,7 @@ public sealed class ProcessLock : IDisposable
     {
         if (_disposed) return;
         _disposed = true;
+        foreach (var item in _compatibleLocks) item.Dispose();
 
         try
         {

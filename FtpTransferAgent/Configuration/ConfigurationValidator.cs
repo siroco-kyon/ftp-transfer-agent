@@ -1,4 +1,4 @@
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Security;
 using FtpTransferAgent.Services;
 using Microsoft.Extensions.Logging;
@@ -197,10 +197,10 @@ public class ConfigurationValidator
     }
 
     private static string NormalizeDirectoryPath(string path) =>
-        path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        LocalPathIdentity.Normalize(path);
 
     private static bool IsAncestorDirectory(string ancestor, string child) =>
-        child.StartsWith(ancestor + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+        child.StartsWith(LocalPathIdentity.Prefix(ancestor), StringComparison.OrdinalIgnoreCase)
         || child.StartsWith(ancestor + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 
     private void ValidateAdditionalDestinations(WatchOptions watch, TransferOptions transfer, ConfigurationValidationResult result)

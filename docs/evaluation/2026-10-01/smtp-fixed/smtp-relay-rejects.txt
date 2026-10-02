@@ -1,0 +1,765 @@
+INFO: Mode 'local' writes through the OS file system (including SMB/UNC shares). No CIFS/SMB1 is implemented; ensure SMB1 is disabled and enable SMB encryption on the server if on-the-wire confidentiality is required.
+INFO: Acquired process lock at C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\agent.lock
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 0 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\10.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|116ac508be7e4c4c84ccebcaca932d8b - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 1 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\11.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|5e7dab109cda4bb0bc2bcb1bde2ec6b8 - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 2 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\0.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|43d8f647d4f940ab82be677836c19da7 - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 3 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\1.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|7c56e822a6e84c308ad5a69645037bf4 - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\1.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\10.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\0.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\11.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 3 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\12.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|aed9a96a3dda4dbeafbfa880d918c888 - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 1 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\14.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|7b3e7dc2cf3f4094ac4539c8effbb0ec - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 2 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\13.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|0e823e6828f44ce0b5fe11f2770c5a41 - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 0 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\15.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|7c6deec9e33643c59e20c8f07eb286cb - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\13.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\15.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\12.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\14.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 3 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\18.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|819f0f8bc6a84b84b98754d9acc3c114 - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 2 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\17.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|4d79c452f4bf4a799bfe9876b3dc399f - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\17.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\18.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 0 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\16.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|67eac9383edf44a2959ee4983cff115d - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\16.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 1 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\19.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|23118125bd734ec4beaefa08b8036bb2 - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\19.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 2 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\2.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|3ac2047ea14741d9a203f1d4cdb48ef1 - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 3 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\3.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|6457af35e39f42d3ba32ad107086f15a - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\2.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\3.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 0 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\4.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|20beb35353ac427790a7f0b12393c8b7 - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\4.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 1 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\5.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|34dc14a710484d0f9734ed00e4afd0de - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\5.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 2 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\6.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|50cab42abf5a42bc8f3f8fceb1ec5a3c - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\6.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 3 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\7.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|62c208eb25224a64a8af2965de6b2f46 - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\7.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 0 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\8.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|642b90c7add846e9b262a02287b2105c - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\8.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Services.TransferQueue[0]
+      Worker 1 failed to process Upload:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\9.txt|local://:21C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination|02efce1a6d854f11bd346e4b712a3e4d - Non-retryable error
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Partial failure for C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\watch\9.txt: 0/1 destinations succeeded. Failed: local:C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination. Local file retained for next run. Retry policy is all-or-nothing, so already-successful destinations will also be retried.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Transfer completed with failures. The process exit code will be set to 1.
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+2026-10-01 21:25:11 fail: FtpTransferAgent.Worker[0]
+      Critical error occurred during transfer: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+      System.IO.IOException: Cannot create 'C:\Users\test-user\AppData\Local\Temp\agent-smtp-xuanl2cz\relay-rejects\blocked-destination' because a file or directory with the same name already exists.
+         at System.IO.FileSystem.CreateDirectory(String fullPath, Byte[] securityDescriptor)
+         at System.IO.Directory.CreateDirectory(String path)
+         at FtpTransferAgent.Services.LocalFileTransferClient.EnsureParentDirectory(String filePath) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 158
+         at FtpTransferAgent.Services.LocalFileTransferClient.UploadAsync(String localPath, String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\LocalFileTransferClient.cs:line 51
+         at FtpTransferAgent.Worker.UploadPathWithHashAsync(IFileTransferClient client, String localPath, String remotePath, String destLabel, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2490
+         at FtpTransferAgent.Worker.ProcessUploadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2550
+         at FtpTransferAgent.Worker.<>c__DisplayClass89_2.<<ExecuteAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 1783
+      --- End of stack trace from previous location ---
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_3.<<StartAsync>b__2>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 119
+      --- End of stack trace from previous location ---
+         at Polly.AsyncPolicy.<>c__DisplayClass44_0.<<ImplementationAsync>b__0>d.MoveNext()
+      --- End of stack trace from previous location ---
+         at Polly.Retry.AsyncRetryEngine.ImplementationAsync[TResult](Func`3 action, Context context, ExceptionPredicates shouldRetryExceptionPredicates, ResultPredicates`1 shouldRetryResultPredicates, Func`5 onRetryAsync, CancellationToken cancellationToken, Int32 permittedRetryCount, IEnumerable`1 sleepDurationsEnumerable, Func`4 sleepDurationProvider, Boolean continueOnCapturedContext)
+         at Polly.AsyncPolicy.ExecuteInternalAsync(Func`3 action, Context context, Boolean continueOnCapturedContext, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.TransferQueue.<>c__DisplayClass15_0.<<StartAsync>g__Worker|0>d.MoveNext() in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\TransferQueue.cs:line 116
+WARNING: Error email limit (5) reached. Further error emails are suppressed for this run.

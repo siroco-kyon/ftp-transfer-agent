@@ -1,0 +1,126 @@
+[
+  {
+    "workload": "bulk",
+    "files": 1000,
+    "bytes_per_file": 4194304,
+    "total_bytes": 4194304000,
+    "concurrency": 1,
+    "hash_enabled": true,
+    "verify_uploaded_file_exists": true,
+    "seconds": [
+      96.944,
+      96.589,
+      92.908
+    ],
+    "median_seconds": 96.589,
+    "all_file_hashes_match": true,
+    "exit_codes": [
+      0,
+      0,
+      0
+    ],
+    "source_remaining_files": [
+      0,
+      0,
+      0
+    ],
+    "observed_retry_counts": [
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "workload": "bulk",
+    "files": 1000,
+    "bytes_per_file": 4194304,
+    "total_bytes": 4194304000,
+    "concurrency": 4,
+    "hash_enabled": true,
+    "verify_uploaded_file_exists": true,
+    "seconds": [
+      62.504,
+      61.438,
+      69.322
+    ],
+    "median_seconds": 62.504,
+    "all_file_hashes_match": true,
+    "exit_codes": [
+      0,
+      0,
+      0
+    ],
+    "source_remaining_files": [
+      0,
+      0,
+      0
+    ],
+    "observed_retry_counts": [
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "workload": "bulk",
+    "files": 1000,
+    "bytes_per_file": 4194304,
+    "total_bytes": 4194304000,
+    "concurrency": 8,
+    "hash_enabled": true,
+    "verify_uploaded_file_exists": true,
+    "seconds": [
+      66.899,
+      62.833,
+      74.749
+    ],
+    "median_seconds": 66.899,
+    "all_file_hashes_match": true,
+    "exit_codes": [
+      0,
+      0,
+      0
+    ],
+    "source_remaining_files": [
+      0,
+      0,
+      0
+    ],
+    "observed_retry_counts": [
+      0,
+      0,
+      0
+    ]
+  },
+  {
+    "workload": "bulk",
+    "files": 1000,
+    "bytes_per_file": 4194304,
+    "total_bytes": 4194304000,
+    "concurrency": 16,
+    "hash_enabled": true,
+    "verify_uploaded_file_exists": true,
+    "seconds": [
+      73.64,
+      72.901,
+      73.341
+    ],
+    "median_seconds": 73.341,
+    "all_file_hashes_match": true,
+    "exit_codes": [
+      0,
+      0,
+      0
+    ],
+    "source_remaining_files": [
+      0,
+      0,
+      0
+    ],
+    "observed_retry_counts": [
+      0,
+      0,
+      0
+    ]
+  }
+]

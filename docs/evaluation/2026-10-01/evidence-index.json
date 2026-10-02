@@ -1,0 +1,481 @@
+{
+  "verified_on": "2026-10-01",
+  "base_commit": "d0faf5653bf15c906aa866cd002062b77495d0f1",
+  "source_files": [
+    {
+      "path": "FtpTransferAgent.Tests/DeliveryStateStoreTests.cs",
+      "sha256": "1db277d8468b2fe50f1a726449700d46cee754569d3f4586bf947b34ff485890",
+      "sha256_lf": "5663a8e25dd6d18bcb3a9669e0dd75cdf89072ca8c9b43dd0bb1730415a46d58"
+    },
+    {
+      "path": "FtpTransferAgent.Tests/PerDestinationDeliveryTrackingTests.cs",
+      "sha256": "04ff98d747a0eec7359780f4f4f72ce0c2026dc7dfc006b5f9820546c7573cb2",
+      "sha256_lf": "7a5171643b77c746852e91083cea1080fd9ebf7103fd0f751a0ca1b7e6a7f2e8"
+    },
+    {
+      "path": "FtpTransferAgent.Tests/PersistentRecoveryTests.cs",
+      "sha256": "aa45e11de8ad9f59d272c2652dd488a00838cec59361cb491067c10d61ee7e16",
+      "sha256_lf": "aa45e11de8ad9f59d272c2652dd488a00838cec59361cb491067c10d61ee7e16"
+    },
+    {
+      "path": "FtpTransferAgent.Tests/ProcessLockTests.cs",
+      "sha256": "327da9a58c2ea0512f61fc74913aabe09b00e318d935a2acd967655157e3300b",
+      "sha256_lf": "c6b6b449f15bf93dcb557d1ef4aed74abfe6ab01b1445064a34063b63627304e"
+    },
+    {
+      "path": "FtpTransferAgent.Tests/ProgramEmailIntegrationTests.cs",
+      "sha256": "c9189cdf3476406ad731b046f4af94acc94fdd25abcaa343ac4e5fcb204d73b5",
+      "sha256_lf": "c9189cdf3476406ad731b046f4af94acc94fdd25abcaa343ac4e5fcb204d73b5"
+    },
+    {
+      "path": "FtpTransferAgent.Tests/SftpClientDockerIntegrationTests.cs",
+      "sha256": "5f3a2bba90954a1b0ccf7545209cb5bfca103488fe3437eb21f299f170de58bc",
+      "sha256_lf": "5f3a2bba90954a1b0ccf7545209cb5bfca103488fe3437eb21f299f170de58bc"
+    },
+    {
+      "path": "FtpTransferAgent.Tests/TestDirectoryLink.cs",
+      "sha256": "cda27170319b10aca7fb29692be57d46686161088a1b64c4085f01f8262c9c52",
+      "sha256_lf": "cda27170319b10aca7fb29692be57d46686161088a1b64c4085f01f8262c9c52"
+    },
+    {
+      "path": "FtpTransferAgent.Tests/WorkerDownloadTests.cs",
+      "sha256": "66bd6b8a6e46c8a6dec730eb846a70f9e893d9aa1f2934dbb97975309e2eb5c0",
+      "sha256_lf": "d67c504434f3a93d7c3b624a3478d965fad51304ea17ee37e898ed1af5302854"
+    },
+    {
+      "path": "FtpTransferAgent.Tests/WorkerFanoutSafetyTests.cs",
+      "sha256": "81045417c256e64332e23c483b5b1a9904d2fe1ac5b21ac6f35a421669240fdb",
+      "sha256_lf": "b75f4d45e50e67239efced85d94b63bc2def125cae75d21286a20ebcc69e284e"
+    },
+    {
+      "path": "FtpTransferAgent.Tests/WorkerLocalDestinationTests.cs",
+      "sha256": "3e9598f0f080a132c21a98d9e946f60bdb5b92b0331ad75f21001de29454ec1b",
+      "sha256_lf": "23601c0a48add5ab99dba46f67784a115e498ec9d3dbbdd3c0dd7b16ad9bbd0f"
+    },
+    {
+      "path": "FtpTransferAgent/Configuration/ConfigurationValidator.cs",
+      "sha256": "7c92c9ff423e0f226d2459a613400d2c51dfd5127045932ce3af4b855f5268af",
+      "sha256_lf": "066fb7b2763831a24dcf211fe7c558b215ad60af8bcd5cac482dec2a331b8a96"
+    },
+    {
+      "path": "FtpTransferAgent/FtpTransferAgent.csproj",
+      "sha256": "59f8e825bb548b9c1bf3192412d4d31034a9cdbb9c375feb5f44e4667c4e84a7",
+      "sha256_lf": "dde93b443dc7b68cc3b92f211cb71efe47a319bc6ec29c6adb3444d1e0c861c7"
+    },
+    {
+      "path": "FtpTransferAgent/Program.cs",
+      "sha256": "7098b6e8d18145c4486dbe35c394484bd8d437d74530ed8cb4cda7d3d320bc86",
+      "sha256_lf": "7098b6e8d18145c4486dbe35c394484bd8d437d74530ed8cb4cda7d3d320bc86"
+    },
+    {
+      "path": "FtpTransferAgent/Services/CompletedDeliveryArchive.cs",
+      "sha256": "daca487726039daab7b97a0fb783e2bf22e7aee67337f6f85a7099553b6e2ca5",
+      "sha256_lf": "daca487726039daab7b97a0fb783e2bf22e7aee67337f6f85a7099553b6e2ca5"
+    },
+    {
+      "path": "FtpTransferAgent/Services/DeliveryStateStore.cs",
+      "sha256": "75e84409e33c9f3f7c98f973dc1ac5313a7805d197b2380b699d45eb30ef1d37",
+      "sha256_lf": "ca0b6c1849f2c8666573750d61f77cc2246e0806e989a0caddfa094d998ca653"
+    },
+    {
+      "path": "FtpTransferAgent/Services/DownloadCleanupStore.cs",
+      "sha256": "41c89f98b60c7f926fb64b848d2b662c7995faa287ecfc7277a1698d4f699a0e",
+      "sha256_lf": "41c89f98b60c7f926fb64b848d2b662c7995faa287ecfc7277a1698d4f699a0e"
+    },
+    {
+      "path": "FtpTransferAgent/Services/LocalPathIdentity.cs",
+      "sha256": "83e9688896a6a1361b956942c8016ddca6f26a55b9ecea2af506d868ea98ae6c",
+      "sha256_lf": "83e9688896a6a1361b956942c8016ddca6f26a55b9ecea2af506d868ea98ae6c"
+    },
+    {
+      "path": "FtpTransferAgent/Services/ProcessLock.cs",
+      "sha256": "e89bfc65b4e2ba28760ad98fe233c56152add08349b463257c87207e6a7694cb",
+      "sha256_lf": "21a2315c7fa17d6d0983bd49d3c32c8a05c3c3ecc2b4b476f3db391d955c7a70"
+    },
+    {
+      "path": "FtpTransferAgent/Services/SftpClientWrapper.cs",
+      "sha256": "cfb7422dee31e0c895eb8dcc8fbd43fafa3a886023387c04f88aadd059552517",
+      "sha256_lf": "cfb7422dee31e0c895eb8dcc8fbd43fafa3a886023387c04f88aadd059552517"
+    },
+    {
+      "path": "FtpTransferAgent/Worker.cs",
+      "sha256": "2a27200591ef0bf42ee1f1cbba36fe855354f2622593bd5a0c2598f12810e7b5",
+      "sha256_lf": "5c8b9ae44ba8dcc33386c7911aac682873ca1a8a38d72bdf4a79f726ac85c116"
+    },
+    {
+      "path": "docs/html/evaluation-report.html",
+      "sha256": "bc802a23a4c92423ad47ea9aa4781bc6d228c4b600c4273f4b46b91c76d00a62",
+      "sha256_lf": "bc802a23a4c92423ad47ea9aa4781bc6d228c4b600c4273f4b46b91c76d00a62"
+    },
+    {
+      "path": "docs/per-destination-delivery-tracking.md",
+      "sha256": "45cd1f689a48d30c1496e52cfb889edcd7c1b2f2a70693033e67c27a6150edfb",
+      "sha256_lf": "eab694d4d05c738907c7a3141d2f1bf2786b8dfcb7930e4b701b462ad2966058"
+    },
+    {
+      "path": "docs/retry-vs-watch-overwrite.md",
+      "sha256": "54cd685d0ae280a89ef07cad822439b121b0239bd026ecd9ac58940a8db25a5a",
+      "sha256_lf": "e4b2c27aab381ca2601fac84213a01c78a3a95a6a536e25aeb73942add11f37b"
+    }
+  ],
+  "manual_csv_sha256": "b1b68b2e99e11fe32386396fa15e0134fae4356915887efc71d20b6f68085685",
+  "passed": 443,
+  "failed": 0,
+  "skipped": 0,
+  "manual_items": 221,
+  "performance_runs": 36,
+  "report_version": "1.3",
+  "original_sftp_runs": 24,
+  "large_sftp_runs": 12,
+  "large_sftp_verified_files": 12000,
+  "large_sftp_observed_retries": 0,
+  "large_sftp_binary_sha256": "257b2c36e886189c1209be0145765be72241aa6e2dec262af273030b71bdb673",
+  "additional_evidence": [
+    {
+      "path": "docs/evaluation/2026-10-01/build-final.txt",
+      "sha256_lf": "1cfb28ca9614519fb925466fdd0b1c2ed3bee6d57aa1a916afb2cfb3a4652e03"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/fault-results.json",
+      "sha256_lf": "3acb811b685d76a57abbbca26c72297186edc42474efba9946a04e1c1b3ed828"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/fault_matrix.py",
+      "sha256_lf": "a7c6c0313b16a3b250a98c871dbc626bb82bc30cc418250817dce5fe13da3adc"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/interrupted-probe-cleanup.json",
+      "sha256_lf": "29c049d134ae32ec5cee9cec9e72d8864dcba6d003b306938a29ddf9ba4fafa4"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/manual-appendix-before-v13.sha256",
+      "sha256_lf": "8c73c10d77fde3317f51a7b9353e52a9af3a38fef50d221f07df92db2d0484b1"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/manual-results.json",
+      "sha256_lf": "0c101a17b44659211044bb27154e8590dbe064de602fdb12cd04ebd9f30f6a25"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/path-after.trx",
+      "sha256_lf": "17d5631938aa6fc11a4bbd74d794a120ed4a9b19a6f90b4e42d1ddf844091958"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/path-before.trx",
+      "sha256_lf": "2e5cb594c081f9d49fae2ffe9f1922abb141bd992865b73992643fc9db1265ce"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/probe-results.json",
+      "sha256_lf": "e0d1561cdd413d50aae11737097fabbfe8c4900d0bc7ea32103330adee6f72bb"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/probe.py",
+      "sha256_lf": "beb8b6919e0910eb5d3c69a32387563d87d5f7c9136ae4badd1d03745565d016"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/publish-smoke-results.json",
+      "sha256_lf": "12ec3139e1ddfe6d57b2954b35a8cd42e4a05bd7b3372482705383effa455a8b"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/README.md",
+      "sha256_lf": "536dfdb83a984a27c69171cf69277264b6ebd8cb16ba3f592319e990679b7aab"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/recovery-results.json",
+      "sha256_lf": "da82291ef3105fda812fa79d30f52c7d7fdedabf8a2bdf01867ea51c5efbb35c"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/recovery_probe.py",
+      "sha256_lf": "48b25f8a27681cec8bfaf8ff8673acde7393e3f9a23ee6bdfd121a88f2ee61a1"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/report-validation-v13.json",
+      "sha256_lf": "b18c4984ee68d76977dd3f4b66ef4e9baca56b072c93db79cd35790c60b52045"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/small-c16-hashFalse-existsTrue-r1.txt",
+      "sha256_lf": "831b90316ab59834df927188074f92ff118eef1e376a5f9d62cd327944704fb2"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/smtp-console.txt",
+      "sha256_lf": "5f9a71287fdb884459be2e4da761df5f86829201b4ccaedce0702e79d6ef1c8e"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/smtp_probe.py",
+      "sha256_lf": "4fec7cbd57527697b4436db687f30247e22faa3ee2c5ecccc63b4a6e41fbbb52"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/stress-results.json",
+      "sha256_lf": "b5c311b704cffd9a3ed42d041beabca89e62984dab5654214c5c2bfe4869efd3"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/stress_probe.py",
+      "sha256_lf": "8b2753996b3b768141603674e0c43a0f5f084e21c8abbdf698c4e09ba0aade6a"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/verify_evidence.py",
+      "sha256_lf": "bcb8e4b5a224cba67c1ddfdf37771f7999f1a7fc9ebcd1006a40e9a0f4ae6750"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/windows-release.trx",
+      "sha256_lf": "53b47bdfb7bd7f61ad3775d275266003b546da0b125384dc3e47b49e20a3a2cb"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/windows-release.txt",
+      "sha256_lf": "1dade1113d49b91b03b9b3b30d40229c89d560e20d107a5993fec24049a00df0"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/windows_native_sftp_speed_probe.py",
+      "sha256_lf": "eccb54cde2c5b690e12b782989a98c3ce42bb620ffcb728128936b32575582f0"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/windows_speed_probe.py",
+      "sha256_lf": "a0f422e2472fc9f2728e87e72094411dd8e908258e08007d0898b87345683677"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/smtp-fixed/smtp-disabled.txt",
+      "sha256_lf": "aaf2ce9257c4883e28906cff243d9353e7754dc9217e72a05d57cc39dfb69caf"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/smtp-fixed/smtp-limited.txt",
+      "sha256_lf": "8dd2e8041ddcd17fe77a47dba2f91df491bc5d51d4fcb4acf52218d49a80b90e"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/smtp-fixed/smtp-relay-rejects.txt",
+      "sha256_lf": "5dc7e80a2187facf91bbf787b3e4069b462628f5375cbd95cf2ba7af4b9ea724"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/smtp-fixed/smtp-results.json",
+      "sha256_lf": "a1c587291b7072111995f8d1331440788e7eb5fca2e086de23a3590deef0a08e"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/smtp-fixed/smtp-unlimited.txt",
+      "sha256_lf": "744d01f9b7b05b4dc3b7e1c45fac090cc2e381d3a9b2782bbc8f4f3943ad594b"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/large-c1-hashTrue-existsTrue-r0.txt",
+      "sha256_lf": "b33926ad5c3c9262c1259e10c6dc2a78956dbcd4b0ce5d21078b0ba6e45138ca"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/large-c1-hashTrue-existsTrue-r1.txt",
+      "sha256_lf": "a0edb73a58c366db43ba24bf823b7de7e622cfeb2cd5e32d80ecb3075faab734"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/large-c1-hashTrue-existsTrue-r2.txt",
+      "sha256_lf": "0e71cbf5c38ded3aa17387b975f952cce05053669f21769d6e16f8d2664dedb2"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/medium-c4-hashFalse-existsTrue-r0.txt",
+      "sha256_lf": "8bf65905e8b3c85508e76acf19bcc3b99d70efb8abf9785dcd1ff5284d57be5f"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/medium-c4-hashFalse-existsTrue-r1.txt",
+      "sha256_lf": "3bff4b57f1fe6a8b565f8cea1255a32faa7e07d7e01b1b5e67adc746c0078bfc"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/medium-c4-hashFalse-existsTrue-r2.txt",
+      "sha256_lf": "1f40769817830e6f92d315ff1e1ef1d330b488cd4b0740d7873de77fe3054335"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/sftp-server.txt",
+      "sha256_lf": "220ca5c114ddcec1c3a5c2c94293fa03756a93c93c3c51e7517ba780b5dabf2d"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c1-hashFalse-existsFalse-r0.txt",
+      "sha256_lf": "dab1b3ef12874a44015f5986f5e4984bf6e54d71e17bc7f55822d71f9e6cb8c3"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c1-hashFalse-existsFalse-r1.txt",
+      "sha256_lf": "2a597f494631027b51d775bfb2b4dc48cf1213071bd2d2d5af7549e3683a27f9"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c1-hashFalse-existsFalse-r2.txt",
+      "sha256_lf": "823294d780f3da8b1b1dbf262120d23c84ed0437040ccb0d1f6acaaa13cd5c2f"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c1-hashFalse-existsTrue-r0.txt",
+      "sha256_lf": "cacad3d2e819c2fe190db2a4a882ea978aa498d4daddfcc18d66e50be75760bd"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c1-hashFalse-existsTrue-r1.txt",
+      "sha256_lf": "8b02a1e65b8f30c5f6646282be3f6e8a08e0a59a2b2db4f6d6868db44ffce290"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c1-hashFalse-existsTrue-r2.txt",
+      "sha256_lf": "178d912cec7dd1f5b9d494e023f28447a2b2398960aff0603409ea9abfd2672a"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c16-hashFalse-existsFalse-r0.txt",
+      "sha256_lf": "6ba8e830826548a28bf9b71fc4259fb077b2fd7e78cd14a72ff4f99aaace8fcc"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c16-hashFalse-existsFalse-r1.txt",
+      "sha256_lf": "a94139a97f70d82604dc3f437ba86195397a022312ef263d08098a7a823f76d2"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c16-hashFalse-existsFalse-r2.txt",
+      "sha256_lf": "31c7549453ba8873392a4c0f6a9cf659b8fb32d17dfc925f1c41e8dad5c879ba"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c16-hashFalse-existsTrue-r0.txt",
+      "sha256_lf": "bed4d12b63ee9d9e5b09c8f43d793c22202b08dce7a1b6f3e84aca04cb6c81f7"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c16-hashFalse-existsTrue-r1.txt",
+      "sha256_lf": "d61e1565e5a2ce03bbc51e7c02cbff258c7229c3397a31eafa15d919c8f69358"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c16-hashFalse-existsTrue-r2.txt",
+      "sha256_lf": "ee77feaf449d8195ed891c67afb1107a403e58a0c9bf92f3090f4b217d8c3ba9"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c4-hashFalse-existsFalse-r0.txt",
+      "sha256_lf": "0304882e1ea9de7462b317d904716b82a33007b01817c1506441cbbb8b28612b"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c4-hashFalse-existsFalse-r1.txt",
+      "sha256_lf": "1f95fd17b6d84a97a4d73f985cf0ba892aa0b7fc0c1b4455a2302f9338087d78"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c4-hashFalse-existsFalse-r2.txt",
+      "sha256_lf": "e8a734b3f70949a4c1b158c1b1ca2daaeaab6b5fc46f74daed91e85e255920c2"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c4-hashFalse-existsTrue-r0.txt",
+      "sha256_lf": "b699978d72e51a8b862a731a4d385d926f0cc6fd853d83a250f4c94b77829e22"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c4-hashFalse-existsTrue-r1.txt",
+      "sha256_lf": "eeb6a685d6da15def217227bb7874613c256380c7e5d57ae5c88f1e4860592bf"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/small-c4-hashFalse-existsTrue-r2.txt",
+      "sha256_lf": "ceba3d24e2e0ece8691268c2c814ea209b8690811170aa1cdaeb608f55bbc067"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/sshd-effective-config.txt",
+      "sha256_lf": "4ad5a615d11cd5838f6d08fd67dabf285093d1caebbfcae0c97d2c4506bfcdc2"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-final/windows-speed-results.json",
+      "sha256_lf": "79a390173af50a9cc3d3dff22879749e2e966c3e5f3172ced7226d5bebe797ac"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c1-hashTrue-existsTrue-r0-sha256.txt",
+      "sha256_lf": "cf76d4b375dc4992c3faf63671b785233a496a210919a17fd8a2525bbd3ac995"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c1-hashTrue-existsTrue-r0.txt",
+      "sha256_lf": "b5466fb2dff4345db2cf13c402f589ce880de418bf9b46fbdb16a6020c2c6dd7"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c1-hashTrue-existsTrue-r1-sha256.txt",
+      "sha256_lf": "055530cab65170fdf3e97b714b01b63830acd2da708c8bf600490dbb49ef3938"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c1-hashTrue-existsTrue-r1.txt",
+      "sha256_lf": "1c82da23e804ea01aacde8310869ff7eef7d37f2e67fec74e08546a301c14688"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c1-hashTrue-existsTrue-r2-sha256.txt",
+      "sha256_lf": "31608d4d1dafc75321d5dfeed63f85f29ad8767773a29a64235a35b8dc479b20"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c1-hashTrue-existsTrue-r2.txt",
+      "sha256_lf": "5ab242bc220ccc6a648c96473bded4c6292e32bd02102a881473f1cb44c6bc50"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c16-hashTrue-existsTrue-r0-sha256.txt",
+      "sha256_lf": "808328a3f9fb57d22e7482dde061bc11f593851ce70f857ace1a3a849641b492"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c16-hashTrue-existsTrue-r0.txt",
+      "sha256_lf": "2a561c7b3b0f2ad6b7fc27ad8fcef57602a78fc5626036e26123d5b4b2033d3a"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c16-hashTrue-existsTrue-r1-sha256.txt",
+      "sha256_lf": "4801fa091aadecd549eb999b09b2992330b3d8e7ebdd4214f0ac96ec333f650d"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c16-hashTrue-existsTrue-r1.txt",
+      "sha256_lf": "1a4841df7c09aa19e33fea50ab44f1eb9ffa3c95aee86cd8eef2e01210b2581b"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c16-hashTrue-existsTrue-r2-sha256.txt",
+      "sha256_lf": "b56564000cb9ab46fc509268569cbdfda2a41a95ac1f34591ad9128460a441ef"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c16-hashTrue-existsTrue-r2.txt",
+      "sha256_lf": "784f43bf7fc852da4c4fabd6a98696d9eb72cd47aed895683c457136b4a86e69"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c4-hashTrue-existsTrue-r0-sha256.txt",
+      "sha256_lf": "7d332254141e7cc5b473cc02b589c99e4b19e23e84453b8a7604fe5d224d1e70"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c4-hashTrue-existsTrue-r0.txt",
+      "sha256_lf": "6814663b5d86e5784e255ee1be5f8e42153fe823e5476f46c009d88c74ba76a4"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c4-hashTrue-existsTrue-r1-sha256.txt",
+      "sha256_lf": "68755ea5513451bec9d9c332ffeead47fd07c8ae50093034c72798862ac65064"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c4-hashTrue-existsTrue-r1.txt",
+      "sha256_lf": "3987546c5bf649aafbb4dbd7f0b45969f4675dca3d81ddb3169cd2d55c1fcb60"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c4-hashTrue-existsTrue-r2-sha256.txt",
+      "sha256_lf": "f5b2bdf86c05f361d718de32dd746194d24f86a626d1d544302bb0996e6c231d"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c4-hashTrue-existsTrue-r2.txt",
+      "sha256_lf": "5f89fe60fd4c0c02947d6f68cedf614ae0e2fcb797353cae303fbdf8be642849"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c8-hashTrue-existsTrue-r0-sha256.txt",
+      "sha256_lf": "95d0f54bbfa327d2714c7748e74d8dc1488bccf721b568273c1a7ea2060eb583"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c8-hashTrue-existsTrue-r0.txt",
+      "sha256_lf": "40656ef72f6568282511078887412e9b07ecce3a39820a3b0952190741a9160f"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c8-hashTrue-existsTrue-r1-sha256.txt",
+      "sha256_lf": "ac62af2766e1b7fb8ab4cbdf6f5da84a0121708309dd32d5ab2ce8159b85b42b"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c8-hashTrue-existsTrue-r1.txt",
+      "sha256_lf": "616f5ee967e99d17865a5c9f8a3da5a01b08ddf4a33d7f29e0257931780fc5d1"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c8-hashTrue-existsTrue-r2-sha256.txt",
+      "sha256_lf": "a462f774b53298601058fc8b3bc32adf0e659832185493061cc8336c1d4ae5c6"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/bulk-c8-hashTrue-existsTrue-r2.txt",
+      "sha256_lf": "fdc47bcfe61c94057cc087c30a944498df5aa3a420742138c9c1d698c37a9d26"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/cleanup.json",
+      "sha256_lf": "da31b705d3be13f94d0af03345f4356482305068dadb94400e871ba2d2c12493"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/expected-sha256.json",
+      "sha256_lf": "c47ebc4bc1fd7d72680c0e7c9ef807211dc6fd5621517bdcadf2c30e832af15a"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/hardware.json",
+      "sha256_lf": "8d46588b9c43f2f4bdfb028632673c82612a5ce038c598187d90c247546d4e8b"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/measurement-conditions.json",
+      "sha256_lf": "87988b5c986a923258184f150ec641c50a374de7a1c19d870bd0c9a5ccd62220"
+    },
+    {
+      "path": "docs/evaluation/2026-10-01/speed-native/windows-speed-results.json",
+      "sha256_lf": "4db3b967f2a47190b168d24ab67a03e62f9dfdf26b97dacbdca7ceadaf2acd3b"
+    }
+  ],
+  "source_hash_format": "Original measured Windows bytes; sha256_lf normalizes CRLF for Git checkouts.",
+  "publication_note": "Logs renamed to .txt; user and machine identifiers replaced; scripts write into ignored rerun directory."
+}

@@ -1,4 +1,4 @@
-using System.IO;
+﻿using System.IO;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Services;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,13 +14,15 @@ namespace FtpTransferAgent.Tests;
 /// </summary>
 public class WorkerDownloadTests
 {
-    [Fact]
-    public async Task ExecuteAsync_DownloadsFileAndDeletesRemote()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExecuteAsync_DownloadsFileAndDeletesRemote(bool trailingSeparator)
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
         var remoteContent = "data";
-        var watch = Options.Create(new WatchOptions { Path = dir });
+        var watch = Options.Create(new WatchOptions { Path = dir + (trailingSeparator ? Path.DirectorySeparatorChar.ToString() : "") });
         var transfer = Options.Create(new TransferOptions
         {
             Mode = "ftp",
@@ -35,8 +37,8 @@ public class WorkerDownloadTests
         var hashOpt = Options.Create(new HashOptions { Algorithm = "SHA256" });
         var cleanup = Options.Create(new CleanupOptions { DeleteRemoteAfterDownload = true });
 
-        var remoteFile = "/remote/sample.txt";
-        var localPath = Path.Combine(dir, "sample.txt");
+        var remoteFile = "/remote/..sample.txt";
+        var localPath = Path.Combine(dir, "..sample.txt");
 
         // メモリストリームを早期Disposeしないように修正
         string remoteHash;
@@ -155,12 +157,13 @@ public class WorkerDownloadTests
         {
             try
             {
-                Directory.CreateSymbolicLink(link, outsideDirectory);
+                TestDirectoryLink.Create(link, outsideDirectory);
             }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
             {
                 // シンボリックリンクを作成できない環境 (Windows で開発者モード/管理者権限が無い等)。
                 // 黙って成功扱いにせず、スキップとして可視化する
+                if (OperatingSystem.IsWindows()) throw;
                 Assert.Skip($"Cannot create a directory symbolic link in this environment: {ex.Message}");
                 return;
             }
@@ -205,6 +208,7 @@ public class WorkerDownloadTests
         }
         finally
         {
+            if (Directory.Exists(link)) Directory.Delete(link);
             if (Directory.Exists(root))
             {
                 Directory.Delete(root, true);
@@ -400,6 +404,11 @@ public class WorkerDownloadTests
         // DeleteRemoteEndFiles 有効時、Worker は END ダウンロード前に存在確認を行う
         mock.Setup(c => c.ExistsAsync(remoteEndFile, It.IsAny<CancellationToken>()))
             .ReturnsAsync(true);
+        mock.Setup(c => c.ExistsAsync(remoteFile, It.IsAny<CancellationToken>())).ReturnsAsync(true);
+        mock.Setup(c => c.GetRemoteHashAsync(remoteEndFile, "SHA256", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("ready"))));
+        mock.Setup(c => c.GetRemoteHashAsync(remoteFile, "SHA256", It.IsAny<CancellationToken>(), false))
+            .ReturnsAsync(Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes("data"))));
         // 非ハッシュのダウンロードは一時パスに書かれ、Worker が最終パスへ移動する。
         mock.Setup(c => c.DownloadAsync(remoteFile, It.IsAny<string>(), It.IsAny<CancellationToken>()))
             .Callback<string, string, CancellationToken>((_, lp, _) =>
@@ -430,15 +439,17 @@ public class WorkerDownloadTests
         Directory.Delete(dir, true);
     }
 
-    [Fact]
-    public async Task ExecuteAsync_DownloadsSubdirectoryFilesWithPreserveFolderStructure()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ExecuteAsync_DownloadsSubdirectoryFilesWithPreserveFolderStructure(bool trailingSeparator)
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
 
         var watch = Options.Create(new WatchOptions
         {
-            Path = dir,
+            Path = dir + (trailingSeparator ? Path.DirectorySeparatorChar.ToString() : ""),
             IncludeSubfolders = true
         });
         var transfer = Options.Create(new TransferOptions

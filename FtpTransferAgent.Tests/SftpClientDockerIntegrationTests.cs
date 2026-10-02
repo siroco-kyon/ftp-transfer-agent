@@ -254,6 +254,40 @@ public class SftpClientDockerIntegrationTests
     }
 
     [DockerFact]
+    public async Task SixteenConnectionsStartedTogether_CompleteRepeatedlyWithoutConnectionRetries()
+    {
+        Assert.True(_fixture.IsAvailable, _fixture.UnavailableReason);
+        var directory = CreateTempDir();
+        try
+        {
+            var source = Path.Combine(directory, "source.bin");
+            await File.WriteAllBytesAsync(source, System.Security.Cryptography.RandomNumberGenerator.GetBytes(8192));
+            var expectedHash = await HashUtil.ComputeHashAsync(source, "SHA256", CancellationToken.None);
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            for (var round = 0; round < 3; round++)
+            {
+                var start = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var remoteBase = $"/upload/burst-{Guid.NewGuid():N}";
+                var tasks = Enumerable.Range(0, 16).Select(async index =>
+                {
+                    using var wrapper = new SftpClientWrapper(CreateOptions(), _logger.Object);
+                    await start.Task;
+                    var remote = $"{remoteBase}/{index}.bin";
+                    await wrapper.UploadAsync(source, remote, timeout.Token);
+                    Assert.Equal(expectedHash, await wrapper.GetRemoteHashAsync(remote, "SHA256", timeout.Token));
+                    await wrapper.DeleteAsync(remote, timeout.Token);
+                }).ToArray();
+                start.SetResult();
+                await Task.WhenAll(tasks);
+            }
+        }
+        finally
+        {
+            TryDeleteDirectory(directory);
+        }
+    }
+
+    [DockerFact]
     public async Task UploadDownloadHashAndDelete_ShouldWorkAgainstDockerSftpServer()
     {
         Assert.True(_fixture.IsAvailable, _fixture.UnavailableReason ?? "Docker fixture is not ready.");

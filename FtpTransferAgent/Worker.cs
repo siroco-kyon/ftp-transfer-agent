@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.IO;
 using System.Runtime.ExceptionServices;
 using System.Security.Cryptography;
@@ -32,6 +32,7 @@ public class Worker : BackgroundService
     // 宛先別配信トラッキング有効時のマーカーストア (put 方向のみ)。無効時は null。
     private DeliveryStateStore? _deliveryStore;
     private string? _retryDirectoryFullPath;
+    private DownloadCleanupStore? _downloadCleanupStore;
 
     // アップロードスナップショットの一時ルート (watch 構成ごとに分離)。トラッキング初期化時に設定。
     private string? _uploadSnapshotRootFullPath;
@@ -304,18 +305,14 @@ public class Worker : BackgroundService
             : Path.GetRelativePath(_retryDirectoryFullPath, file).Replace('\\', '/');
 
     private static string NormalizeDirectoryPath(string path) =>
-        Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        LocalPathIdentity.Normalize(path);
 
     private static string DirectoryPrefix(string path) =>
-        NormalizeDirectoryPath(path) + Path.DirectorySeparatorChar;
+        LocalPathIdentity.Prefix(path);
 
     private static bool IsUnderDirectory(string path, string root)
     {
-        var fullPath = NormalizeDirectoryPath(path);
-        var fullRoot = NormalizeDirectoryPath(root);
-        return string.Equals(fullPath, fullRoot, StringComparison.OrdinalIgnoreCase)
-            || fullPath.StartsWith(fullRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            || fullPath.StartsWith(fullRoot + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        return LocalPathIdentity.Contains(root, path);
     }
 
     private static bool IsUnderDirectoryPrefix(string path, string? directoryPrefix) =>
@@ -1390,7 +1387,7 @@ public class Worker : BackgroundService
                 // ローカルを残す構成 (DeleteAfterVerify=false)。
                 // 過去の部分失敗でリトライディレクトリへ退避していた場合は watch.Path へ戻し、
                 // 隠しフォルダにファイルが取り残されないようにする (元ファイルは利用者の場所に残す)。
-                RestoreFromRetryDirectoryIfNeeded(sourcePath, tracking.RelativePath, relatedEndFiles, relatedEndFileRelativePaths);
+                if (RestoreFromRetryDirectoryIfNeeded(sourcePath, tracking.RelativePath, relatedEndFiles, relatedEndFileRelativePaths)) return;
 
                 // 全宛先分のマーカーを揃えておき、次回バッチで送信をスキップさせる。
                 // 過去の部分失敗で先に配信済みになった宛先のマーカーも含め、全宛先を同じ
@@ -1625,7 +1622,7 @@ public class Worker : BackgroundService
     // retry 側に残った半端なファイルが以降の列挙フィルタで候補から外れ、復元も再試行
     // されないまま取り残されるため。ベストエフォートで、失敗してもマーカーは記録される
     // ため再送は起きない (ペアごと retry 側に残り、次回の配信済みスキップ時に復元を再試行する)。
-    private void RestoreFromRetryDirectoryIfNeeded(
+    private bool RestoreFromRetryDirectoryIfNeeded(
         string sourcePath,
         string relativePath,
         IReadOnlyList<string> relatedEndFiles,
@@ -1633,7 +1630,7 @@ public class Worker : BackgroundService
     {
         if (_retryDirectoryFullPath is null || !IsUnderDirectory(sourcePath, _retryDirectoryFullPath))
         {
-            return;
+            return false;
         }
 
         var plannedMoves = new List<(string Source, string Target, string Kind)>();
@@ -1666,9 +1663,10 @@ public class Worker : BackgroundService
 
                 if (File.Exists(target))
                 {
-                    _logger.LogWarning("Cannot restore {Kind} {File} to watch directory because target already exists: {Target}. All related files remain in the retry directory; restore will be retried on a later run.",
-                        request.Kind, request.Source, target);
-                    return;
+                    var archive = new CompletedDeliveryArchive(_deliveryStore!.StateDirectory, _retryDirectoryFullPath);
+                    archive.Archive(relativePath, requests.Select(value => value.Source).ToArray(), _deliveryStore.RemoveAllOrThrow);
+                    _logger.LogInformation("Archived completed retry generation {File}; the new watch generation can be delivered on the next run.", relativePath);
+                    return true;
                 }
 
                 plannedMoves.Add((request.Source, target, request.Kind));
@@ -1677,7 +1675,8 @@ public class Worker : BackgroundService
         catch (Exception ex) when (IsRetryFileSystemException(ex) || ex is InvalidOperationException)
         {
             _logger.LogWarning(ex, "Cannot plan restore from retry directory; files remain there: {Error}", ex.Message);
-            return;
+            _exitCode?.MarkFailure();
+            return false;
         }
 
         var completedMoves = new List<(string Source, string Target, string Kind)>();
@@ -1715,7 +1714,9 @@ public class Worker : BackgroundService
         {
             _logger.LogWarning(ex, "Failed to restore file(s) from retry directory; they remain there and restore will be retried on a later run: {Error}", ex.Message);
             RollBackRetryMoves(completedMoves);
+            _exitCode?.MarkFailure();
         }
+        return false;
     }
 
     // Main background processing loop.
@@ -1735,17 +1736,21 @@ public class Worker : BackgroundService
         string? stateDirFullPath = null;
         if (trackingEnabled)
         {
+            DeliveryStateStore.MigrateDefaultDirectories(_transfer.StateDirectory, _transfer.RetryDirectory, _watch.Path);
             stateDirFullPath = DeliveryStateStore.ResolveStateDirectory(_transfer.StateDirectory, _watch.Path);
             _retryDirectoryFullPath = DeliveryStateStore.ResolveRetryDirectory(_transfer.RetryDirectory, _watch.Path);
             var storeLogger = _services.GetRequiredService<ILogger<DeliveryStateStore>>();
             _deliveryStore = new DeliveryStateStore(stateDirFullPath, _watch.Path, _transfer.DeliverySignatureMode, _hash.Algorithm, storeLogger, _retryDirectoryFullPath);
             _deliveryStore.Initialize();
+            if (_retryDirectoryFullPath is not null)
+                new CompletedDeliveryArchive(stateDirFullPath, _retryDirectoryFullPath).Recover(_deliveryStore.RemoveAllOrThrow);
 
             // スナップショットの一時ルートを構成ごとに確定し、前回の異常終了 (強制終了/電源断) で
             // 残った残骸を起動時に掃除する。EnableUploadSnapshot が無効でも、過去に有効だった実行の
             // 残骸を片付けられるよう常に掃除する。
             _uploadSnapshotRootFullPath = DeliveryStateStore.ResolveUploadSnapshotDirectory(_watch.Path);
-            CleanupOrphanedUploadSnapshots(_uploadSnapshotRootFullPath);
+            foreach (var hash in LocalPathIdentity.CompatibleHashes(_watch.Path))
+                CleanupOrphanedUploadSnapshots(Path.Combine(Path.GetDirectoryName(_uploadSnapshotRootFullPath)!, hash));
 
             _logger.LogInformation("Per-destination delivery tracking enabled (signature mode: {Mode}, upload snapshot: {Snapshot}). State directory: {Dir}. Retry directory: {RetryDir}",
                 _transfer.DeliverySignatureMode, _transfer.EnableUploadSnapshot ? "on" : "off", _deliveryStore.StateDirectory, _retryDirectoryFullPath ?? "(disabled)");
@@ -2111,10 +2116,33 @@ public class Worker : BackgroundService
                 // 二重起動防止ロックにより同一 watch の別インスタンスは並走しないため、ここで消すのは
                 // 必ず死んだ前回実行の残骸であり、進行中の転送を壊さない。
                 CleanupOrphanedDownloadTempFiles();
+                _downloadCleanupStore = new DownloadCleanupStore(_watch.Path, _transfer);
+                if (_downloadCleanupStore.Pending.Any() && (!_cleanup.DeleteRemoteAfterDownload || !_cleanup.DeleteRemoteEndFiles))
+                    throw new InvalidOperationException("Pending remote cleanup exists; restore the deletion settings to resume it safely.");
                 try
                 {
                     // リモート一覧取得用に専用のクライアントを生成する
                     using var listClient = CreateClient();
+                    var pendingCleanup = _downloadCleanupStore.Pending.ToArray();
+                    var pendingPaths = pendingCleanup.Select(record => record.Path).ToHashSet(StringComparer.Ordinal);
+                    foreach (var record in pendingCleanup)
+                    {
+                        // 壊れた記録から設定外のリモートファイルを削除しない。
+                        var remoteBase = NormalizeRemotePath(_transfer.RemotePath).TrimEnd('/') + "/";
+                        var dataPath = NormalizeRemotePath(record.Path);
+                        if (!dataPath.StartsWith(remoteBase, StringComparison.Ordinal)
+                            || dataPath.Split('/').Any(segment => segment == ".."))
+                            throw new IOException($"Cleanup record is outside the configured remote directory: {record.Path}");
+                        _ = ResolveLocalDownloadPath(record.Path);
+                        foreach (var end in record.EndFiles)
+                        {
+                            if (!string.Equals(GetDataFileForEndFileRemote(NormalizeRemotePath(end.Path)), dataPath, StringComparison.OrdinalIgnoreCase))
+                                throw new IOException($"Cleanup record contains an unrelated END file: {end.Path}");
+                            _ = ResolveLocalDownloadPath(end.Path);
+                        }
+                        await primaryQueue.Channel.Writer.WriteAsync(new TransferItem(record.Path, TransferAction.Download,
+                            RelatedEndFilePaths: record.EndFiles.Select(end => end.Path).ToArray()), stoppingToken);
+                    }
                     // リモートファイル一覧を取得
                     var files = await listClient.ListFilesAsync(_transfer.RemotePath, stoppingToken, _watch.IncludeSubfolders).ConfigureAwait(false);
 
@@ -2143,6 +2171,7 @@ public class Worker : BackgroundService
                     foreach (var normPath in sortedNormPaths)
                     {
                         var originalPath = normalizedMap[normPath];
+                        if (pendingPaths.Contains(originalPath)) continue;
 
                         // ENDファイルかどうかを正規化パスで判定。
                         // put 側と同様、TransferEndFiles の値によらず END 一覧へ収集する。
@@ -2556,7 +2585,7 @@ public class Worker : BackgroundService
     /// <summary>
     /// ダウンロード処理（確実なハッシュ検証付き）
     /// </summary>
-    private async Task<long> ProcessDownloadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token)
+    private async Task<long> ProcessDownloadAsync(IFileTransferClient client, TransferItem item, Guid id, CancellationToken token, bool performCleanup = true)
     {
         var localPath = ResolveLocalDownloadPath(item.Path);
 
@@ -2578,7 +2607,9 @@ public class Worker : BackgroundService
         ClaimDownloadPath(localPath, item.Path);
 
         _logger.LogInformation("[{Id}] Starting download {Remote} to {Local}", id, item.Path, localPath);
-        return await DownloadToLocalPathAsync(client, item, id, localPath, token).ConfigureAwait(false);
+        if (performCleanup && _downloadCleanupStore?.TryGet(item.Path, out var pending) == true)
+            return await ResumeDownloadCleanupAsync(client, pending!, id, token).ConfigureAwait(false);
+        return await DownloadToLocalPathAsync(client, item, id, localPath, token, performCleanup).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -2610,10 +2641,9 @@ public class Worker : BackgroundService
 
             var safePath = Path.Combine(_watch.Path, relativePath);
             var fullPath = Path.GetFullPath(safePath);
-            var watchFullPath = Path.GetFullPath(_watch.Path);
+            var watchFullPath = NormalizeDirectoryPath(_watch.Path);
 
-            if (!fullPath.StartsWith(watchFullPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(fullPath, watchFullPath, StringComparison.OrdinalIgnoreCase))
+            if (!IsUnderDirectory(fullPath, watchFullPath))
             {
                 throw new ArgumentException($"Unsafe file path detected: {relativePath}");
             }
@@ -2642,18 +2672,17 @@ public class Worker : BackgroundService
 
             var safePath = Path.Combine(_watch.Path, fileName);
             var fullPath = Path.GetFullPath(safePath);
-            var watchFullPath = Path.GetFullPath(_watch.Path);
+            var watchFullPath = NormalizeDirectoryPath(_watch.Path);
 
             // より厳密なパス検証
-            if (!fullPath.StartsWith(watchFullPath + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(fullPath, watchFullPath, StringComparison.OrdinalIgnoreCase))
+            if (!IsUnderDirectory(fullPath, watchFullPath))
             {
                 throw new ArgumentException($"Path traversal attempt detected: {fileName}");
             }
 
             // 最終的な安全性確認
             var relativePath = Path.GetRelativePath(watchFullPath, fullPath);
-            if (relativePath.StartsWith("..") || Path.IsPathRooted(relativePath))
+            if (relativePath.Split('/', '\\').Any(segment => segment == "..") || Path.IsPathRooted(relativePath))
             {
                 throw new ArgumentException($"Invalid relative path detected: {fileName}");
             }
@@ -2667,9 +2696,12 @@ public class Worker : BackgroundService
     /// <summary>
     /// 解決済みのローカルパスへ実際にダウンロードし、設定に応じて検証・後処理を行う。
     /// </summary>
-    private async Task<long> DownloadToLocalPathAsync(IFileTransferClient client, TransferItem item, Guid id, string localPath, CancellationToken token)
+    private async Task<long> DownloadToLocalPathAsync(IFileTransferClient client, TransferItem item, Guid id, string localPath, CancellationToken token, bool performCleanup)
     {
         long fileSize;
+        var durableCleanup = performCleanup && !IsEndFileRemote(item.Path) && item.RelatedEndFilePaths is { Count: > 0 }
+            && _cleanup.DeleteRemoteEndFiles && _cleanup.DeleteRemoteAfterDownload;
+        string? cleanupHash = null;
         if (_hash.Enabled)
         {
             // 事前にリモートファイルのハッシュを計算
@@ -2699,6 +2731,7 @@ public class Worker : BackgroundService
                     throw new HashMismatchException(error);
                 }
 
+                if (durableCleanup) cleanupHash = await HashUtil.ComputeHashAsync(verifiedDownloadPath, "SHA256", token).ConfigureAwait(false);
                 MoveDownloadIntoPlace(verifiedDownloadPath, localPath);
                 _logger.LogInformation("[{Id}] Download completed for {Remote} ({Size})", id, item.Path, FormatBytes(fileSize));
             }
@@ -2721,6 +2754,7 @@ public class Worker : BackgroundService
             {
                 await client.DownloadAsync(item.Path, downloadTempPath, token).ConfigureAwait(false);
                 fileSize = new FileInfo(downloadTempPath).Length;
+                if (durableCleanup) cleanupHash = await HashUtil.ComputeHashAsync(downloadTempPath, "SHA256", token).ConfigureAwait(false);
                 MoveDownloadIntoPlace(downloadTempPath, localPath);
             }
             catch
@@ -2729,6 +2763,22 @@ public class Worker : BackgroundService
                 throw;
             }
             _logger.LogInformation("[{Id}] Download completed for {Remote} ({Size}, hash verification disabled)", id, item.Path, FormatBytes(fileSize));
+        }
+
+        if (!performCleanup) return fileSize;
+        if (durableCleanup)
+        {
+            var ends = new List<DownloadCleanupStore.EndFile>();
+            foreach (var path in item.RelatedEndFilePaths!)
+            {
+                if (!await client.ExistsAsync(path, token).ConfigureAwait(false)) continue;
+                var fingerprint = await client.GetRemoteHashAsync(path, "SHA256", token).ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(fingerprint)) throw new IOException($"Cannot identify END file before cleanup: {path}");
+                ends.Add(new DownloadCleanupStore.EndFile(path, fingerprint));
+            }
+            var record = new DownloadCleanupStore.Record(item.Path, cleanupHash!, ends.ToArray(), _watch.TransferEndFiles);
+            _downloadCleanupStore!.Save(record);
+            return fileSize + await ResumeDownloadCleanupAsync(client, record, id, token).ConfigureAwait(false);
         }
 
         // ENDファイルまたは通常ファイルの削除判定
@@ -2782,6 +2832,58 @@ public class Worker : BackgroundService
         }
 
         return bytesTransferred;
+    }
+
+    private async Task<long> ResumeDownloadCleanupAsync(IFileTransferClient client, DownloadCleanupStore.Record record, Guid id, CancellationToken token)
+    {
+        var dataExists = await client.ExistsAsync(record.Path, token).ConfigureAwait(false);
+        if (dataExists)
+        {
+            var hash = await client.GetRemoteHashAsync(record.Path, "SHA256", token).ConfigureAwait(false);
+            if (!string.Equals(hash, record.Hash, StringComparison.OrdinalIgnoreCase))
+            {
+                _logger.LogInformation("Remote file {Remote} changed after download; old cleanup was cancelled. The new generation will be processed on the next run.", record.Path);
+                _downloadCleanupStore!.Remove(record.Path);
+                return 0;
+            }
+        }
+
+        long bytes = 0;
+        foreach (var end in record.EndFiles)
+        {
+            if (end.Deleted) continue;
+            if (!await client.ExistsAsync(end.Path, token).ConfigureAwait(false))
+            {
+                end.Deleted = true;
+                _downloadCleanupStore!.Save(record);
+                continue;
+            }
+            var hash = await client.GetRemoteHashAsync(end.Path, "SHA256", token).ConfigureAwait(false);
+            if (!string.Equals(hash, end.Hash, StringComparison.OrdinalIgnoreCase))
+                throw new IOException($"Remote END file changed after download; cleanup was stopped: {end.Path}");
+            if (record.TransferEndFiles && !end.Downloaded)
+            {
+                bytes += await ProcessDownloadAsync(client, new TransferItem(end.Path, TransferAction.Download), id, token, performCleanup: false).ConfigureAwait(false);
+                end.Downloaded = true;
+                _downloadCleanupStore!.Save(record);
+            }
+            await client.DeleteAsync(end.Path, token).ConfigureAwait(false);
+            end.Deleted = true;
+            _downloadCleanupStore!.Save(record);
+        }
+        if (dataExists)
+        {
+            // END処理中にデータが差し替わった場合も、旧記録で新世代を削除しない。
+            var hash = await client.GetRemoteHashAsync(record.Path, "SHA256", token).ConfigureAwait(false);
+            if (!string.Equals(hash, record.Hash, StringComparison.OrdinalIgnoreCase))
+                throw new IOException($"Remote data changed during cleanup: {record.Path}");
+            await client.DeleteAsync(record.Path, token).ConfigureAwait(false);
+        }
+        record.DataDeleted = true;
+        _downloadCleanupStore!.Save(record);
+        _downloadCleanupStore.Remove(record.Path);
+        _logger.LogInformation("[{Id}] Completed durable remote cleanup for {Remote}", id, record.Path);
+        return bytes;
     }
 
     /// <summary>

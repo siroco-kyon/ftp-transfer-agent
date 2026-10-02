@@ -355,9 +355,69 @@ public sealed class DeliveryStateStore
     // サブフォルダ名を作るために使う (状態/リトライ/スナップショットの分離に共通)。
     private static string WatchHash(string watchPath)
     {
-        var watchFull = Path.GetFullPath(watchPath);
-        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(watchFull.ToLowerInvariant()));
-        return Convert.ToHexString(hash).ToLowerInvariant()[..16];
+        return LocalPathIdentity.WatchHash(watchPath);
+    }
+
+    /// <summary>旧版の既定保存先を統合する。競合したファイルは上書きせず、起動を失敗させる。</summary>
+    public static void MigrateDefaultDirectories(string? stateConfigured, string? retryConfigured, string watchPath)
+    {
+        if (string.IsNullOrWhiteSpace(stateConfigured)) Migrate("delivery-state", watchPath);
+        if (retryConfigured is null) Migrate("delivery-retry", watchPath);
+    }
+
+    private static void Migrate(string leaf, string watchPath)
+    {
+        var target = ResolveDefaultDataDirectory(leaf, watchPath);
+        var parent = Path.GetDirectoryName(target)!;
+        foreach (var hash in LocalPathIdentity.CompatibleHashes(watchPath))
+        {
+            var source = Path.Combine(parent, hash);
+            if (source == target || !Directory.Exists(source)) continue;
+            // 一つでも競合があれば、移動を開始する前に停止する。
+            var files = GetMigrationFiles(source).ToArray();
+            foreach (var file in files)
+            {
+                var destination = Path.Combine(target, Path.GetRelativePath(source, file));
+                if (File.Exists(destination) || Directory.Exists(destination))
+                    throw new IOException($"Legacy delivery directory conflicts with {destination}; both copies were preserved.");
+            }
+            foreach (var file in files)
+            {
+                var destination = Path.Combine(target, Path.GetRelativePath(source, file));
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                File.Move(file, destination);
+            }
+            foreach (var directory in Directory.GetDirectories(source, "*", SearchOption.AllDirectories).OrderByDescending(value => value.Length))
+                Directory.Delete(directory);
+            Directory.Delete(source);
+        }
+    }
+
+    /// <summary>世代切り替えでは旧記録の削除失敗を隠さず、保管処理を再開可能な状態に保つ。</summary>
+    public void RemoveAllOrThrow(string relativePath)
+    {
+        foreach (var entry in _markers.Values.Where(entry => entry.RelativePath == relativePath).ToArray())
+        {
+            File.Delete(entry.MarkerFilePath);
+            _markers.TryRemove(Key(entry.RelativePath, entry.DestinationName), out _);
+        }
+    }
+
+    private static IEnumerable<string> GetMigrationFiles(string directory)
+    {
+        if ((File.GetAttributes(directory) & FileAttributes.ReparsePoint) != 0)
+            throw new IOException($"Cannot migrate a reparse point: {directory}");
+        foreach (var entry in Directory.EnumerateFileSystemEntries(directory))
+        {
+            var attributes = File.GetAttributes(entry);
+            if ((attributes & FileAttributes.ReparsePoint) != 0)
+                throw new IOException($"Cannot migrate a reparse point: {entry}");
+            if ((attributes & FileAttributes.Directory) != 0)
+            {
+                foreach (var file in GetMigrationFiles(entry)) yield return file;
+            }
+            else yield return entry;
+        }
     }
 
     /// <summary>

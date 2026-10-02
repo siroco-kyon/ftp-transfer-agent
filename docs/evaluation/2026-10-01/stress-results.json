@@ -1,0 +1,13 @@
+{
+  "files": 1100,
+  "destinations": 2,
+  "workers_per_destination": 16,
+  "exit": 0,
+  "seconds": 31.05,
+  "injected_hash_failures": 10,
+  "ftp_stores": 2210,
+  "mismatches": [],
+  "remaining_source_files": 0,
+  "remaining_markers": 0,
+  "ftp_temp_files": 0
+}
