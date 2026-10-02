@@ -11,10 +11,12 @@ public class CleanupOptions
     /// false にすると元ファイルを残す (複数宛先トラッキング時は配信マーカーで再送をスキップする)。
     /// </summary>
     public bool DeleteAfterVerify { get; set; } = true;
+    /// <summary>get成功後に元データの削除を試す。削除失敗は警告ログに残し、自動再試行しない。</summary>
     public bool DeleteRemoteAfterDownload { get; set; }
 
     /// <summary>
     /// ENDファイル転送成功後に転送先のENDファイルを削除するか
+    /// getでは削除失敗を警告ログに残す。ENDが残る場合は関連データも残す。
     /// </summary>
     public bool DeleteRemoteEndFiles { get; set; } = false;
 

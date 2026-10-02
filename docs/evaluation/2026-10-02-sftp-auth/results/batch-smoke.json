@@ -1,0 +1,32 @@
+[
+  {
+    "limit": 4,
+    "authentication": "password",
+    "transfer_concurrency": 16,
+    "files": 32,
+    "exit_code": 0,
+    "source_remaining": 0,
+    "established_sessions": 16,
+    "retry_log_count": 0
+  },
+  {
+    "limit": 8,
+    "authentication": "password",
+    "transfer_concurrency": 16,
+    "files": 32,
+    "exit_code": 0,
+    "source_remaining": 0,
+    "established_sessions": 16,
+    "retry_log_count": 0
+  },
+  {
+    "limit": 8,
+    "authentication": "key",
+    "transfer_concurrency": 16,
+    "files": 32,
+    "exit_code": 0,
+    "source_remaining": 0,
+    "established_sessions": 16,
+    "retry_log_count": 0
+  }
+]

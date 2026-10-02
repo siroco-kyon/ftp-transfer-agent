@@ -379,10 +379,11 @@ dotnet publish -c Release -r osx-x64 --self-contained /p:PublishSingleFile=true
 <table>
 <tr><th>項目</th><th>型</th><th>必須</th><th>既定値</th><th>説明</th></tr>
 <tr><td><code>DeleteAfterVerify</code></td><td>bool</td><td>-</td><td><strong>true</strong></td><td><strong><code>put</code> 専用</strong>。成功後にローカルファイルを削除（アウトボックス運用）。ファンアウト時は<strong>全宛先成功時のみ</strong>。<code>false</code> で元ファイルを保持（複数宛先トラッキング時は配信マーカーで再送をスキップ）。<strong><code>get</code> では無視される</strong>（ダウンロードでローカルファイルが削除されることはない）。既定が <code>true</code> のため、<code>get</code> 構成では起動時に警告を出す</td></tr>
-<tr><td><code>DeleteRemoteAfterDownload</code></td><td>bool</td><td>-</td><td>false</td><td><code>get</code> 成功後にリモートファイルを削除</td></tr>
+<tr><td><code>DeleteRemoteAfterDownload</code></td><td>bool</td><td>-</td><td>false</td><td><code>get</code> 成功後に削除を試す。削除失敗は警告ログに記録し、取得成功として扱う。自動削除再開は行わない</td></tr>
 <tr><td><code>DeleteRemoteEndFiles</code></td><td>bool</td><td>-</td><td>false</td><td>END ファイル転送/取得の成功後にリモート END ファイルを削除</td></tr>
 <tr><td><code>DeleteLocalSkippedEndFiles</code></td><td>bool</td><td>-</td><td>false</td><td><code>put</code> で <code>TransferEndFiles=false</code> のとき、転送成功したデータに対応する未転送 END ファイルをローカルから削除</td></tr>
 </table>
+<p>getでの削除失敗は警告ログで確認してください。削除の自動再試行・再開と復旧用の追加ハッシュ照合は行いません。END削除に失敗した場合は関連データも残します。取得中のデータとENDは、送り元で同名のまま上書きしない運用とします。<a href="evaluation-report.html#download-cleanup">評価検証の結果</a>に詳細を記載しています。</p>
 
 <h3>4.2.7 Smtp（メール通知設定）</h3>
 <p><code>LogLevel.Error</code> 以上のログが発生した際にメール送信します。必須項目チェックは <code>Enabled: true</code> の場合のみ行われます。</p>

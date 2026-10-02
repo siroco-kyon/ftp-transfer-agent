@@ -1,0 +1,28 @@
+[
+  {
+    "held_unauthenticated": 0,
+    "limit": 4,
+    "trials": 20,
+    "connection_attempts": 320,
+    "failures": 0,
+    "successful_trials": 20,
+    "successful_hash_checks": 320,
+    "all_authenticated_median_ms": 1090.2477,
+    "all_authenticated_p95_ms": 1165.3551,
+    "failure_stages": [],
+    "error_types": []
+  },
+  {
+    "held_unauthenticated": 0,
+    "limit": 8,
+    "trials": 20,
+    "connection_attempts": 320,
+    "failures": 0,
+    "successful_trials": 20,
+    "successful_hash_checks": 320,
+    "all_authenticated_median_ms": 618.22955,
+    "all_authenticated_p95_ms": 658.4744,
+    "failure_stages": [],
+    "error_types": []
+  }
+]

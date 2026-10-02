@@ -1,0 +1,14 @@
+{
+  "measuredAtUtc": "2026-10-02T03:28:23.8275122+00:00",
+  "operatingSystem": "Microsoft Windows NT 10.0.26200.0",
+  "dotnet": "10.0.11",
+  "sshNet": "2026.0.0.1",
+  "fingerprint": "SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd\u002B8avQFV78s",
+  "authentication": "password",
+  "connectionsPerTrial": 16,
+  "payloadBytes": 1024,
+  "retryAttempts": 0,
+  "randomSeed": 20261002,
+  "timer": "AllAuthenticatedMilliseconds: simultaneous release to last SFTP session-established log; includes gate wait and SFTP initialization; excludes tiny file transfer/hash/delete",
+  "reuseCheck": "Exists, upload, hash, delete use the same wrapper/connection"
+}

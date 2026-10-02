@@ -1,0 +1,32 @@
+[
+  {
+    "path": "FtpTransferAgent/Services/SftpConnectionLimiter.cs",
+    "sha256_lf": "188e47ab5ed6af0c362208afe157cf3db175151b709ce5357d6e6f2d109b32e2",
+    "snapshot": "measured-sources/FtpTransferAgent/Services/SftpConnectionLimiter.cs"
+  },
+  {
+    "path": "FtpTransferAgent/Services/SftpClientWrapper.cs",
+    "sha256_lf": "198e1c52b656daac2b71b5c1b9c2ff9d2ab188239e12ac964bad8b8ca214e8b0",
+    "snapshot": "measured-sources/FtpTransferAgent/Services/SftpClientWrapper.cs"
+  },
+  {
+    "path": "FtpTransferAgent/Configuration/TransferOptions.cs",
+    "sha256_lf": "d8f87868a88d59891999caf14b7b69ed4e883e8f2360d2818513229866105c64",
+    "snapshot": "measured-sources/FtpTransferAgent/Configuration/TransferOptions.cs"
+  },
+  {
+    "path": "FtpTransferAgent/Program.cs",
+    "sha256_lf": "13c68471a8d92f70619815169c63e335fb4c54cf578541afc59b01a02666a72d",
+    "snapshot": "measured-sources/FtpTransferAgent/Program.cs"
+  },
+  {
+    "path": "docs/evaluation/2026-10-02-sftp-auth/Probe/Program.cs",
+    "sha256_lf": "3f5a21f72160141c04da4e94f3ac08bd6d9dd1cb901b2265c12591f93618f423",
+    "snapshot": "measured-sources/docs/evaluation/2026-10-02-sftp-auth/Probe/Program.cs"
+  },
+  {
+    "path": "docs/evaluation/2026-10-02-sftp-auth/run_probe.py",
+    "sha256_lf": "5f5bb514157a6bc73969877f1780f99956e1a02220de5912fcc81f1c793186f9",
+    "snapshot": "measured-sources/docs/evaluation/2026-10-02-sftp-auth/run_probe.py"
+  }
+]

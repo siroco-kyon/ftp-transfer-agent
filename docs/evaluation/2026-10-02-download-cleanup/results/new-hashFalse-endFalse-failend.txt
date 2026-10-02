@@ -1,0 +1,42 @@
+Configuration warnings:
+WARNING: Very short retry delay may cause server to reject connections
+WARNING: Cleanup.DeleteAfterVerify is enabled but Direction is 'get'. Local files are never deleted when downloading; use Cleanup.DeleteRemoteAfterDownload to remove the source files on the server.
+WARNING: Cleanup.DeleteRemoteEndFiles is enabled but Watch.TransferEndFiles is disabled. When downloading, END files that are not transferred are still removed from the server only if they belong to a downloaded data file; review this combination so END files do not accumulate on the server.
+WARNING: Transfer.StateDirectory is set but Direction is 'get'. Delivery-tracking state applies only to uploads (put) and will be ignored.
+INFO: Hash verification is disabled. File integrity will not be verified after transfer.
+INFO: Acquired process lock at D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-download-cleanup-sftp\data\new-hashFalse-endFalse-failend\batch.lock
+2026-10-02 14:37:24 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: Password only (host=127.0.0.1, port=52381, user=audit)
+2026-10-02 14:37:24 info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+2026-10-02 14:37:24 info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+2026-10-02 14:37:24 info: Microsoft.Hosting.Lifetime[0]
+      Content root path: D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-download-cleanup-sftp\data\new-hashFalse-endFalse-failend
+2026-10-02 14:37:24 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:x+bMXwXkvnfhU6yPQXzmHYE0R0cHT9wQut8B6UyPfik
+2026-10-02 14:37:24 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=52381, User=audit, ServerVersion=SSH-2.0-paramiko_5.0.0, KeyExchange=curve25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 14:37:24 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: Password only (host=127.0.0.1, port=52381, user=audit)
+2026-10-02 14:37:24 info: FtpTransferAgent.Worker[0]
+      [60091ccc-ce34-4015-a7a9-8b87417d6197] Starting download /payload.bin to D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-download-cleanup-sftp\data\new-hashFalse-endFalse-failend\watch\payload.bin
+2026-10-02 14:37:24 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:x+bMXwXkvnfhU6yPQXzmHYE0R0cHT9wQut8B6UyPfik
+2026-10-02 14:37:24 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=52381, User=audit, ServerVersion=SSH-2.0-paramiko_5.0.0, KeyExchange=curve25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 14:37:24 info: FtpTransferAgent.Worker[0]
+      [60091ccc-ce34-4015-a7a9-8b87417d6197] Download completed for /payload.bin (32.00 KB, hash verification disabled)
+2026-10-02 14:37:24 warn: FtpTransferAgent.Worker[0]
+      [60091ccc-ce34-4015-a7a9-8b87417d6197] Could not delete remote file /payload.bin.END after successful download. The file may remain on the server; deletion will not be retried or resumed automatically.
+      Renci.SshNet.Common.SftpPermissionDeniedException: Permission denied
+         at Renci.SshNet.SubsystemSession.<WaitOnHandleAsync>g__DoWaitAsync|39_0[T](TaskCompletionSource`1 tcs, Int32 millisecondsTimeout, CancellationToken cancellationToken)
+         at Renci.SshNet.SftpClient.DeleteFileAsync(String path, CancellationToken cancellationToken)
+         at FtpTransferAgent.Services.SftpClientWrapper.DeleteAsync(String remotePath, CancellationToken ct) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Services\SftpClientWrapper.cs:line 504
+         at FtpTransferAgent.Worker.TryDeleteDownloadedRemoteAsync(IFileTransferClient client, String path, Guid id, CancellationToken token, Action`1 onCleanupFailure) in D:\Github\ftp-transfer-agent\FtpTransferAgent\Worker.cs:line 2789
+2026-10-02 14:37:24 warn: FtpTransferAgent.Worker[0]
+      [60091ccc-ce34-4015-a7a9-8b87417d6197] Remote data /payload.bin was retained because its END file could not be deleted.
+2026-10-02 14:37:24 info: FtpTransferAgent.Worker[0]
+      Transfer completed. Total: 1, Success: 1, Failed: 0, Critical Errors: 0, Success Rate: 100.0%, Volume: 32.00 KB
+2026-10-02 14:37:24 info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...

@@ -1,5 +1,6 @@
 {
   "verified_on": "2026-10-01",
+  "measured_source_commit": "a24d37086fd861c2f3a24b87c5a27c68b22fd93d",
   "base_commit": "d0faf5653bf15c906aa866cd002062b77495d0f1",
   "source_files": [
     {
@@ -213,7 +214,8 @@
     },
     {
       "path": "docs/evaluation/2026-10-01/verify_evidence.py",
-      "sha256_lf": "bcb8e4b5a224cba67c1ddfdf37771f7999f1a7fc9ebcd1006a40e9a0f4ae6750"
+      "sha256_lf": "7fcd651d01941d17b6852e134fe2afb552e4a823116003a0c277224eafdbfd49",
+      "sha256": "7fcd651d01941d17b6852e134fe2afb552e4a823116003a0c277224eafdbfd49"
     },
     {
       "path": "docs/evaluation/2026-10-01/windows-release.trx",

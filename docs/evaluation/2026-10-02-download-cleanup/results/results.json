@@ -1,0 +1,346 @@
+[
+  {
+    "case": "new-hashFalse-endFalse-failnone",
+    "exit_code": 0,
+    "read_bytes": {
+      "/payload.bin": 32768
+    },
+    "reads": {
+      "/payload.bin": 3
+    },
+    "deletes": {
+      "/payload.bin.END": 1,
+      "/payload.bin": 1
+    },
+    "local_matches": true,
+    "remote_data_exists": false,
+    "remote_end_exists": false,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": false
+  },
+  {
+    "case": "previous-hashFalse",
+    "exit_code": 0,
+    "read_bytes": {
+      "/payload.bin": 98304,
+      "/payload.bin.END": 10
+    },
+    "reads": {
+      "/payload.bin": 9,
+      "/payload.bin.END": 4
+    },
+    "deletes": {
+      "/payload.bin.END": 1,
+      "/payload.bin": 1
+    },
+    "local_matches": true,
+    "remote_data_exists": false,
+    "remote_end_exists": false,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": false
+  },
+  {
+    "case": "new-hashFalse-endFalse-faildata",
+    "exit_code": 0,
+    "read_bytes": {
+      "/payload.bin": 32768
+    },
+    "reads": {
+      "/payload.bin": 3
+    },
+    "deletes": {
+      "/payload.bin.END": 1,
+      "/payload.bin": 1
+    },
+    "local_matches": true,
+    "remote_data_exists": true,
+    "remote_end_exists": false,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": true
+  },
+  {
+    "case": "new-hashFalse-endFalse-faildata-next",
+    "exit_code": 0,
+    "read_bytes": {},
+    "reads": {},
+    "deletes": {},
+    "local_matches": false,
+    "remote_data_exists": true,
+    "remote_end_exists": false,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": false
+  },
+  {
+    "case": "new-hashFalse-endFalse-failend",
+    "exit_code": 0,
+    "read_bytes": {
+      "/payload.bin": 32768
+    },
+    "reads": {
+      "/payload.bin": 3
+    },
+    "deletes": {
+      "/payload.bin.END": 1
+    },
+    "local_matches": true,
+    "remote_data_exists": true,
+    "remote_end_exists": true,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": true
+  },
+  {
+    "case": "new-hashFalse-endTrue-failnone",
+    "exit_code": 0,
+    "read_bytes": {
+      "/payload.bin": 32768,
+      "/payload.bin.END": 5
+    },
+    "reads": {
+      "/payload.bin": 3,
+      "/payload.bin.END": 2
+    },
+    "deletes": {
+      "/payload.bin.END": 1,
+      "/payload.bin": 1
+    },
+    "local_matches": true,
+    "remote_data_exists": false,
+    "remote_end_exists": false,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": false
+  },
+  {
+    "case": "new-hashFalse-endTrue-faildata",
+    "exit_code": 0,
+    "read_bytes": {
+      "/payload.bin": 32768,
+      "/payload.bin.END": 5
+    },
+    "reads": {
+      "/payload.bin": 3,
+      "/payload.bin.END": 2
+    },
+    "deletes": {
+      "/payload.bin.END": 1,
+      "/payload.bin": 1
+    },
+    "local_matches": true,
+    "remote_data_exists": true,
+    "remote_end_exists": false,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": true
+  },
+  {
+    "case": "new-hashFalse-endTrue-faildata-next",
+    "exit_code": 0,
+    "read_bytes": {},
+    "reads": {},
+    "deletes": {},
+    "local_matches": false,
+    "remote_data_exists": true,
+    "remote_end_exists": false,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": false
+  },
+  {
+    "case": "new-hashFalse-endTrue-failend",
+    "exit_code": 0,
+    "read_bytes": {
+      "/payload.bin": 32768,
+      "/payload.bin.END": 5
+    },
+    "reads": {
+      "/payload.bin": 3,
+      "/payload.bin.END": 2
+    },
+    "deletes": {
+      "/payload.bin.END": 1
+    },
+    "local_matches": true,
+    "remote_data_exists": true,
+    "remote_end_exists": true,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": true
+  },
+  {
+    "case": "new-hashTrue-endFalse-failnone",
+    "exit_code": 0,
+    "read_bytes": {
+      "/payload.bin": 65536
+    },
+    "reads": {
+      "/payload.bin": 6
+    },
+    "deletes": {
+      "/payload.bin.END": 1,
+      "/payload.bin": 1
+    },
+    "local_matches": true,
+    "remote_data_exists": false,
+    "remote_end_exists": false,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": false
+  },
+  {
+    "case": "previous-hashTrue",
+    "exit_code": 0,
+    "read_bytes": {
+      "/payload.bin": 131072,
+      "/payload.bin.END": 10
+    },
+    "reads": {
+      "/payload.bin": 12,
+      "/payload.bin.END": 4
+    },
+    "deletes": {
+      "/payload.bin.END": 1,
+      "/payload.bin": 1
+    },
+    "local_matches": true,
+    "remote_data_exists": false,
+    "remote_end_exists": false,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": false
+  },
+  {
+    "case": "new-hashTrue-endFalse-faildata",
+    "exit_code": 0,
+    "read_bytes": {
+      "/payload.bin": 65536
+    },
+    "reads": {
+      "/payload.bin": 6
+    },
+    "deletes": {
+      "/payload.bin.END": 1,
+      "/payload.bin": 1
+    },
+    "local_matches": true,
+    "remote_data_exists": true,
+    "remote_end_exists": false,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": true
+  },
+  {
+    "case": "new-hashTrue-endFalse-faildata-next",
+    "exit_code": 0,
+    "read_bytes": {},
+    "reads": {},
+    "deletes": {},
+    "local_matches": false,
+    "remote_data_exists": true,
+    "remote_end_exists": false,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": false
+  },
+  {
+    "case": "new-hashTrue-endFalse-failend",
+    "exit_code": 0,
+    "read_bytes": {
+      "/payload.bin": 65536
+    },
+    "reads": {
+      "/payload.bin": 6
+    },
+    "deletes": {
+      "/payload.bin.END": 1
+    },
+    "local_matches": true,
+    "remote_data_exists": true,
+    "remote_end_exists": true,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": true
+  },
+  {
+    "case": "new-hashTrue-endTrue-failnone",
+    "exit_code": 0,
+    "read_bytes": {
+      "/payload.bin": 65536,
+      "/payload.bin.END": 10
+    },
+    "reads": {
+      "/payload.bin": 6,
+      "/payload.bin.END": 4
+    },
+    "deletes": {
+      "/payload.bin.END": 1,
+      "/payload.bin": 1
+    },
+    "local_matches": true,
+    "remote_data_exists": false,
+    "remote_end_exists": false,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": false
+  },
+  {
+    "case": "new-hashTrue-endTrue-faildata",
+    "exit_code": 0,
+    "read_bytes": {
+      "/payload.bin": 65536,
+      "/payload.bin.END": 10
+    },
+    "reads": {
+      "/payload.bin": 6,
+      "/payload.bin.END": 4
+    },
+    "deletes": {
+      "/payload.bin.END": 1,
+      "/payload.bin": 1
+    },
+    "local_matches": true,
+    "remote_data_exists": true,
+    "remote_end_exists": false,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": true
+  },
+  {
+    "case": "new-hashTrue-endTrue-faildata-next",
+    "exit_code": 0,
+    "read_bytes": {},
+    "reads": {},
+    "deletes": {},
+    "local_matches": false,
+    "remote_data_exists": true,
+    "remote_end_exists": false,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": false
+  },
+  {
+    "case": "new-hashTrue-endTrue-failend",
+    "exit_code": 0,
+    "read_bytes": {
+      "/payload.bin": 65536,
+      "/payload.bin.END": 10
+    },
+    "reads": {
+      "/payload.bin": 6,
+      "/payload.bin.END": 4
+    },
+    "deletes": {
+      "/payload.bin.END": 1
+    },
+    "local_matches": true,
+    "remote_data_exists": true,
+    "remote_end_exists": true,
+    "state_json_count": 0,
+    "retry_logs": 0,
+    "cleanup_warning": true
+  }
+]

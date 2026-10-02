@@ -89,7 +89,7 @@ public class WorkerDownloadTests
     }
 
     [Fact]
-    public async Task ExecuteAsync_WhenRemoteDeletionFails_MarksFailureAndKeepsDownloadedFile()
+    public async Task ExecuteAsync_WhenRemoteDeletionFails_CompletesAndKeepsDownloadedFile()
     {
         var dir = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
         Directory.CreateDirectory(dir);
@@ -133,7 +133,7 @@ public class WorkerDownloadTests
 
             await worker.RunAsync(CancellationToken.None);
 
-            Assert.Equal(1, exitCode.Code);
+            Assert.Equal(0, exitCode.Code);
             Assert.Equal("downloaded", await File.ReadAllTextAsync(Path.Combine(dir, "sample.txt")));
             mock.Verify(c => c.DeleteAsync(remoteFile, It.IsAny<CancellationToken>()), Times.Once);
         }

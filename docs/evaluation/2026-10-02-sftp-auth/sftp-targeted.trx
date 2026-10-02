@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="c2fd185d-2166-4477-9cef-4e330bf4f1a9" name="WINDOWS-USER@WINDOWS-PC 2026-10-02 12:23:06" runUser="WINDOWS-PC\WINDOWS-USER" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-10-02T12:23:06.5178038+09:00" queuing="2026-10-02T12:23:06.5178041+09:00" start="2026-10-02T12:23:04.5555840+09:00" finish="2026-10-02T12:23:16.4750623+09:00" />
+  <TestSettings name="default" id="441d57ab-7999-4162-a29a-309df1debfb4">
+    <Deployment runDeploymentRoot="WINDOWS-USER_WINDOWS-PC_2026-10-02_12_23_06" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="2b4d1dec-33fa-402e-8b1c-c82f4ced4227" testId="6b378faf-a7cb-6f07-d29c-0e88ed1adaba" testName="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests.Connection_ShouldSucceed_WhenHostKeyFingerprintMatches" computerName="WINDOWS-PC" duration="00:00:00.5079196" startTime="2026-10-02T12:23:12.5443217+09:00" endTime="2026-10-02T12:23:13.0523094+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2b4d1dec-33fa-402e-8b1c-c82f4ced4227" />
+    <UnitTestResult executionId="33cb7e18-7509-4e65-bdf0-37aa3c5e1419" testId="f1a9fbe8-6e11-f07b-b877-c201310d1556" testName="FtpTransferAgent.Tests.SftpConnectionLimiterTests.OutOfRangeConfiguration_IsRejectedAtStartup(value: 0)" computerName="WINDOWS-PC" duration="00:00:00.0036623" startTime="2026-10-02T12:23:06.2443237+09:00" endTime="2026-10-02T12:23:06.2480086+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="33cb7e18-7509-4e65-bdf0-37aa3c5e1419" />
+    <UnitTestResult executionId="336580d8-da99-4d07-bc12-64cc20017ab4" testId="578bba05-b673-774b-9322-652ec17973b4" testName="FtpTransferAgent.Tests.SftpConnectionLimiterTests.SameEndpoint_WaitsAtLimit_AndResumesWhenLeaseIsReleased(limit: 8)" computerName="WINDOWS-PC" duration="00:00:00.0005366" startTime="2026-10-02T12:23:06.1944165+09:00" endTime="2026-10-02T12:23:06.1950027+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="336580d8-da99-4d07-bc12-64cc20017ab4" />
+    <UnitTestResult executionId="5579befe-3642-4781-bdcb-13597c9ba8f5" testId="25732578-94af-bcd5-cc4d-5c9b8943e6d8" testName="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests.Connection_ShouldFail_WhenSha256HostKeyFingerprintDoesNotMatch" computerName="WINDOWS-PC" duration="00:00:00.3033904" startTime="2026-10-02T12:23:13.0527655+09:00" endTime="2026-10-02T12:23:13.3562140+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="5579befe-3642-4781-bdcb-13597c9ba8f5" />
+    <UnitTestResult executionId="7184eac4-0dc9-4123-b84b-4a773653a5d6" testId="57446c2d-7999-179c-8985-14faa4e061a7" testName="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests.DependencyInjectedClients_ShareConfiguredGateAcrossDestinations" computerName="WINDOWS-PC" duration="00:00:00.5131603" startTime="2026-10-02T12:23:11.5117467+09:00" endTime="2026-10-02T12:23:12.0249858+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="7184eac4-0dc9-4123-b84b-4a773653a5d6" />
+    <UnitTestResult executionId="a34ee788-0438-4d5a-817a-34338c9cbfb6" testId="863b14c3-7a0f-3346-8075-fb0868eee4a7" testName="FtpTransferAgent.Tests.SftpConnectionLimiterTests.OutOfRangeConfiguration_IsRejectedAtStartup(value: 17)" computerName="WINDOWS-PC" duration="00:00:00.0466174" startTime="2026-10-02T12:23:06.1974160+09:00" endTime="2026-10-02T12:23:06.2440692+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="a34ee788-0438-4d5a-817a-34338c9cbfb6" />
+    <UnitTestResult executionId="f4791669-feb8-4001-8c1c-2d7520a20e08" testId="72b217e7-5796-1384-2666-b625c6bbaead" testName="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests.Connection_ShouldSucceed_WhenSha256HostKeyFingerprintMatches" computerName="WINDOWS-PC" duration="00:00:00.5177591" startTime="2026-10-02T12:23:12.0258910+09:00" endTime="2026-10-02T12:23:12.5437227+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f4791669-feb8-4001-8c1c-2d7520a20e08" />
+    <UnitTestResult executionId="2055c985-8512-47bc-b09d-8aa576fb556a" testId="bf47a2d4-a140-7fce-efee-13e8042ef9a9" testName="FtpTransferAgent.Tests.SftpConnectionLimiterTests.CommandLine_CanOverrideJsonValue" computerName="WINDOWS-PC" duration="00:00:00.0199541" startTime="2026-10-02T12:23:06.2521305+09:00" endTime="2026-10-02T12:23:06.2721160+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2055c985-8512-47bc-b09d-8aa576fb556a" />
+    <UnitTestResult executionId="98813a07-e992-4a3e-9322-84cfda5e34a3" testId="18293dae-534f-a651-3abc-66fdba386d32" testName="FtpTransferAgent.Tests.SftpConnectionLimiterTests.CanceledWaitAndFailedConnection_DoNotConsumeSlots" computerName="WINDOWS-PC" duration="00:00:00.0035882" startTime="2026-10-02T12:23:06.2483294+09:00" endTime="2026-10-02T12:23:06.2519348+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="98813a07-e992-4a3e-9322-84cfda5e34a3" />
+    <UnitTestResult executionId="1624ebfe-0cbd-469c-b232-e856e3021e1f" testId="6d2eced4-a6da-f57d-316f-71c512a74983" testName="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests.Connection_ShouldFail_WhenHostKeyFingerprintDoesNotMatch" computerName="WINDOWS-PC" duration="00:00:00.2733910" startTime="2026-10-02T12:23:15.3242948+09:00" endTime="2026-10-02T12:23:15.5977361+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="1624ebfe-0cbd-469c-b232-e856e3021e1f" />
+    <UnitTestResult executionId="c2e6a9a0-1e19-4c39-b48e-f42cad33b9b3" testId="90a662de-3785-e516-ab52-6a3680ff251b" testName="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests.UploadDownloadHashAndDelete_ShouldWorkAgainstDockerSftpServer" computerName="WINDOWS-PC" duration="00:00:00.3189026" startTime="2026-10-02T12:23:15.5982820+09:00" endTime="2026-10-02T12:23:15.9172649+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="c2e6a9a0-1e19-4c39-b48e-f42cad33b9b3" />
+    <UnitTestResult executionId="9b273487-450f-4409-a56a-5899f832eca4" testId="6d76da11-9798-2cf8-7d32-8b37f1eb156b" testName="FtpTransferAgent.Tests.SftpConnectionLimiterTests.SameEndpoint_WaitsAtLimit_AndResumesWhenLeaseIsReleased(limit: 4)" computerName="WINDOWS-PC" duration="00:00:00.0269471" startTime="2026-10-02T12:23:06.1506878+09:00" endTime="2026-10-02T12:23:06.1879663+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="9b273487-450f-4409-a56a-5899f832eca4" />
+    <UnitTestResult executionId="d8f54920-95b5-491e-9f4b-8b21a949578c" testId="3660d40a-0f1c-85af-fa0f-c0e4cbfb69fb" testName="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests.EightConcurrentHandshakes_WithSixteenTransfers_CompleteRepeatedlyWithoutRetries" computerName="WINDOWS-PC" duration="00:00:01.9663810" startTime="2026-10-02T12:23:13.3569661+09:00" endTime="2026-10-02T12:23:15.3234187+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="d8f54920-95b5-491e-9f4b-8b21a949578c" />
+    <UnitTestResult executionId="31c21f6d-9fb8-45de-bcfa-995643a4ac12" testId="1a372cd6-2bcc-ab30-0456-9c53730c340f" testName="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests.SixteenConnectionsStartedTogether_CompleteRepeatedlyWithoutConnectionRetries" computerName="WINDOWS-PC" duration="00:00:03.6165862" startTime="2026-10-02T12:23:07.8934910+09:00" endTime="2026-10-02T12:23:11.5101534+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="31c21f6d-9fb8-45de-bcfa-995643a4ac12" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests.SixteenConnectionsStartedTogether_CompleteRepeatedlyWithoutConnectionRetries" storage="d:\github\ftp-transfer-agent\ftptransferagent.tests\bin\release\net10.0\ftptransferagent.tests.dll" id="1a372cd6-2bcc-ab30-0456-9c53730c340f">
+      <Execution id="31c21f6d-9fb8-45de-bcfa-995643a4ac12" />
+      <TestMethod codeBase="D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests" name="SixteenConnectionsStartedTogether_CompleteRepeatedlyWithoutConnectionRetries" />
+    </UnitTest>
+    <UnitTest name="FtpTransferAgent.Tests.SftpConnectionLimiterTests.OutOfRangeConfiguration_IsRejectedAtStartup(value: 0)" storage="d:\github\ftp-transfer-agent\ftptransferagent.tests\bin\release\net10.0\ftptransferagent.tests.dll" id="f1a9fbe8-6e11-f07b-b877-c201310d1556">
+      <Execution id="33cb7e18-7509-4e65-bdf0-37aa3c5e1419" />
+      <TestMethod codeBase="D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="FtpTransferAgent.Tests.SftpConnectionLimiterTests" name="OutOfRangeConfiguration_IsRejectedAtStartup" />
+    </UnitTest>
+    <UnitTest name="FtpTransferAgent.Tests.SftpConnectionLimiterTests.CanceledWaitAndFailedConnection_DoNotConsumeSlots" storage="d:\github\ftp-transfer-agent\ftptransferagent.tests\bin\release\net10.0\ftptransferagent.tests.dll" id="18293dae-534f-a651-3abc-66fdba386d32">
+      <Execution id="98813a07-e992-4a3e-9322-84cfda5e34a3" />
+      <TestMethod codeBase="D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="FtpTransferAgent.Tests.SftpConnectionLimiterTests" name="CanceledWaitAndFailedConnection_DoNotConsumeSlots" />
+    </UnitTest>
+    <UnitTest name="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests.Connection_ShouldFail_WhenSha256HostKeyFingerprintDoesNotMatch" storage="d:\github\ftp-transfer-agent\ftptransferagent.tests\bin\release\net10.0\ftptransferagent.tests.dll" id="25732578-94af-bcd5-cc4d-5c9b8943e6d8">
+      <Execution id="5579befe-3642-4781-bdcb-13597c9ba8f5" />
+      <TestMethod codeBase="D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests" name="Connection_ShouldFail_WhenSha256HostKeyFingerprintDoesNotMatch" />
+    </UnitTest>
+    <UnitTest name="FtpTransferAgent.Tests.SftpConnectionLimiterTests.SameEndpoint_WaitsAtLimit_AndResumesWhenLeaseIsReleased(limit: 8)" storage="d:\github\ftp-transfer-agent\ftptransferagent.tests\bin\release\net10.0\ftptransferagent.tests.dll" id="578bba05-b673-774b-9322-652ec17973b4">
+      <Execution id="336580d8-da99-4d07-bc12-64cc20017ab4" />
+      <TestMethod codeBase="D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="FtpTransferAgent.Tests.SftpConnectionLimiterTests" name="SameEndpoint_WaitsAtLimit_AndResumesWhenLeaseIsReleased" />
+    </UnitTest>
+    <UnitTest name="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests.Connection_ShouldFail_WhenHostKeyFingerprintDoesNotMatch" storage="d:\github\ftp-transfer-agent\ftptransferagent.tests\bin\release\net10.0\ftptransferagent.tests.dll" id="6d2eced4-a6da-f57d-316f-71c512a74983">
+      <Execution id="1624ebfe-0cbd-469c-b232-e856e3021e1f" />
+      <TestMethod codeBase="D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests" name="Connection_ShouldFail_WhenHostKeyFingerprintDoesNotMatch" />
+    </UnitTest>
+    <UnitTest name="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests.Connection_ShouldSucceed_WhenSha256HostKeyFingerprintMatches" storage="d:\github\ftp-transfer-agent\ftptransferagent.tests\bin\release\net10.0\ftptransferagent.tests.dll" id="72b217e7-5796-1384-2666-b625c6bbaead">
+      <Execution id="f4791669-feb8-4001-8c1c-2d7520a20e08" />
+      <TestMethod codeBase="D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests" name="Connection_ShouldSucceed_WhenSha256HostKeyFingerprintMatches" />
+    </UnitTest>
+    <UnitTest name="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests.Connection_ShouldSucceed_WhenHostKeyFingerprintMatches" storage="d:\github\ftp-transfer-agent\ftptransferagent.tests\bin\release\net10.0\ftptransferagent.tests.dll" id="6b378faf-a7cb-6f07-d29c-0e88ed1adaba">
+      <Execution id="2b4d1dec-33fa-402e-8b1c-c82f4ced4227" />
+      <TestMethod codeBase="D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests" name="Connection_ShouldSucceed_WhenHostKeyFingerprintMatches" />
+    </UnitTest>
+    <UnitTest name="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests.EightConcurrentHandshakes_WithSixteenTransfers_CompleteRepeatedlyWithoutRetries" storage="d:\github\ftp-transfer-agent\ftptransferagent.tests\bin\release\net10.0\ftptransferagent.tests.dll" id="3660d40a-0f1c-85af-fa0f-c0e4cbfb69fb">
+      <Execution id="d8f54920-95b5-491e-9f4b-8b21a949578c" />
+      <TestMethod codeBase="D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests" name="EightConcurrentHandshakes_WithSixteenTransfers_CompleteRepeatedlyWithoutRetries" />
+    </UnitTest>
+    <UnitTest name="FtpTransferAgent.Tests.SftpConnectionLimiterTests.CommandLine_CanOverrideJsonValue" storage="d:\github\ftp-transfer-agent\ftptransferagent.tests\bin\release\net10.0\ftptransferagent.tests.dll" id="bf47a2d4-a140-7fce-efee-13e8042ef9a9">
+      <Execution id="2055c985-8512-47bc-b09d-8aa576fb556a" />
+      <TestMethod codeBase="D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="FtpTransferAgent.Tests.SftpConnectionLimiterTests" name="CommandLine_CanOverrideJsonValue" />
+    </UnitTest>
+    <UnitTest name="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests.UploadDownloadHashAndDelete_ShouldWorkAgainstDockerSftpServer" storage="d:\github\ftp-transfer-agent\ftptransferagent.tests\bin\release\net10.0\ftptransferagent.tests.dll" id="90a662de-3785-e516-ab52-6a3680ff251b">
+      <Execution id="c2e6a9a0-1e19-4c39-b48e-f42cad33b9b3" />
+      <TestMethod codeBase="D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests" name="UploadDownloadHashAndDelete_ShouldWorkAgainstDockerSftpServer" />
+    </UnitTest>
+    <UnitTest name="FtpTransferAgent.Tests.SftpConnectionLimiterTests.SameEndpoint_WaitsAtLimit_AndResumesWhenLeaseIsReleased(limit: 4)" storage="d:\github\ftp-transfer-agent\ftptransferagent.tests\bin\release\net10.0\ftptransferagent.tests.dll" id="6d76da11-9798-2cf8-7d32-8b37f1eb156b">
+      <Execution id="9b273487-450f-4409-a56a-5899f832eca4" />
+      <TestMethod codeBase="D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="FtpTransferAgent.Tests.SftpConnectionLimiterTests" name="SameEndpoint_WaitsAtLimit_AndResumesWhenLeaseIsReleased" />
+    </UnitTest>
+    <UnitTest name="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests.DependencyInjectedClients_ShareConfiguredGateAcrossDestinations" storage="d:\github\ftp-transfer-agent\ftptransferagent.tests\bin\release\net10.0\ftptransferagent.tests.dll" id="57446c2d-7999-179c-8985-14faa4e061a7">
+      <Execution id="7184eac4-0dc9-4123-b84b-4a773653a5d6" />
+      <TestMethod codeBase="D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="FtpTransferAgent.Tests.SftpClientDockerIntegrationTests" name="DependencyInjectedClients_ShareConfiguredGateAcrossDestinations" />
+    </UnitTest>
+    <UnitTest name="FtpTransferAgent.Tests.SftpConnectionLimiterTests.OutOfRangeConfiguration_IsRejectedAtStartup(value: 17)" storage="d:\github\ftp-transfer-agent\ftptransferagent.tests\bin\release\net10.0\ftptransferagent.tests.dll" id="863b14c3-7a0f-3346-8075-fb0868eee4a7">
+      <Execution id="a34ee788-0438-4d5a-817a-34338c9cbfb6" />
+      <TestMethod codeBase="D:\Github\ftp-transfer-agent\FtpTransferAgent.Tests\bin\Release\net10.0\FtpTransferAgent.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="FtpTransferAgent.Tests.SftpConnectionLimiterTests" name="OutOfRangeConfiguration_IsRejectedAtStartup" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="6b378faf-a7cb-6f07-d29c-0e88ed1adaba" executionId="2b4d1dec-33fa-402e-8b1c-c82f4ced4227" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="f1a9fbe8-6e11-f07b-b877-c201310d1556" executionId="33cb7e18-7509-4e65-bdf0-37aa3c5e1419" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="578bba05-b673-774b-9322-652ec17973b4" executionId="336580d8-da99-4d07-bc12-64cc20017ab4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="25732578-94af-bcd5-cc4d-5c9b8943e6d8" executionId="5579befe-3642-4781-bdcb-13597c9ba8f5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="57446c2d-7999-179c-8985-14faa4e061a7" executionId="7184eac4-0dc9-4123-b84b-4a773653a5d6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="863b14c3-7a0f-3346-8075-fb0868eee4a7" executionId="a34ee788-0438-4d5a-817a-34338c9cbfb6" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="72b217e7-5796-1384-2666-b625c6bbaead" executionId="f4791669-feb8-4001-8c1c-2d7520a20e08" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="bf47a2d4-a140-7fce-efee-13e8042ef9a9" executionId="2055c985-8512-47bc-b09d-8aa576fb556a" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="18293dae-534f-a651-3abc-66fdba386d32" executionId="98813a07-e992-4a3e-9322-84cfda5e34a3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6d2eced4-a6da-f57d-316f-71c512a74983" executionId="1624ebfe-0cbd-469c-b232-e856e3021e1f" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="90a662de-3785-e516-ab52-6a3680ff251b" executionId="c2e6a9a0-1e19-4c39-b48e-f42cad33b9b3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="6d76da11-9798-2cf8-7d32-8b37f1eb156b" executionId="9b273487-450f-4409-a56a-5899f832eca4" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="3660d40a-0f1c-85af-fa0f-c0e4cbfb69fb" executionId="d8f54920-95b5-491e-9f4b-8b21a949578c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="1a372cd6-2bcc-ab30-0456-9c53730c340f" executionId="31c21f6d-9fb8-45de-bcfa-995643a4ac12" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="一覧に存在しない結果" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="読み込まれたすべての結果" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="14" executed="14" passed="14" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.5+1b188a7b0a (64-bit .NET 10.0.11)&#xD;
+[xUnit.net 00:00:00.26]   Discovering: FtpTransferAgent.Tests&#xD;
+[xUnit.net 00:00:00.86]   Discovered:  FtpTransferAgent.Tests&#xD;
+[xUnit.net 00:00:01.21]   Starting:    FtpTransferAgent.Tests&#xD;
+[xUnit.net 00:00:11.40]   Finished:    FtpTransferAgent.Tests (ID = 'c325f4d9e3045cbfca5624b3b7a8576df4c54ff7c82b44a2e5d477e4ca3ac0e3')&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>

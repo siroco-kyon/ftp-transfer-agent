@@ -1,0 +1,30 @@
+{
+  "removed": [
+    {
+      "path": ".audit-results\\2026-10-02-sftp-auth",
+      "files": 1,
+      "bytes": 183,
+      "exists_after": false
+    },
+    {
+      "path": ".audit-results\\2026-10-02-sftp-auth-final",
+      "files": 7,
+      "bytes": 1236715,
+      "exists_after": false
+    },
+    {
+      "path": "docs\\evaluation\\2026-10-02-sftp-auth\\Probe\\bin",
+      "files": 48,
+      "bytes": 9687914,
+      "exists_after": false
+    },
+    {
+      "path": "docs\\evaluation\\2026-10-02-sftp-auth\\Probe\\obj",
+      "files": 29,
+      "bytes": 481190,
+      "exists_after": false
+    }
+  ],
+  "completed_probe_cache_removed": true,
+  "partial_runs_removed": true
+}
