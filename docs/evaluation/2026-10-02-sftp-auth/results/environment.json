@@ -1,0 +1,13 @@
+{
+  "client_os": "Windows-10-10.0.26200-SP0",
+  "server_image": "atmoz/sftp:alpine",
+  "image_id": "sha256:6d41b9200f8115ce925bbd295376cb3c6b72634a267f41946e5aee4efe482186",
+  "image_digest": "[\"atmoz/sftp@sha256:6d41b9200f8115ce925bbd295376cb3c6b72634a267f41946e5aee4efe482186\"]",
+  "docker_version": "27.4.0",
+  "sshd_version": "OpenSSH_10.3p1, OpenSSL 3.5.9 29 Sep 2026",
+  "container": "ftp-transfer-agent-auth-230d595bf1ab47eda6283cd84c2e1cac",
+  "port": 61838,
+  "server_settings_changed": false,
+  "measured_source_commit": "a24d37086fd861c2f3a24b87c5a27c68b22fd93d",
+  "source_state": "working tree with configurable limiter, see source-hashes.json"
+}

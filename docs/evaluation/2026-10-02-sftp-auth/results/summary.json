@@ -1,0 +1,178 @@
+[
+  {
+    "held_unauthenticated": 0,
+    "limit": 1,
+    "trials": 20,
+    "connection_attempts": 320,
+    "failures": 0,
+    "successful_trials": 20,
+    "successful_hash_checks": 320,
+    "all_authenticated_median_ms": 3859.1246,
+    "all_authenticated_p95_ms": 4667.5305,
+    "failure_stages": [],
+    "error_types": []
+  },
+  {
+    "held_unauthenticated": 0,
+    "limit": 2,
+    "trials": 20,
+    "connection_attempts": 320,
+    "failures": 0,
+    "successful_trials": 20,
+    "successful_hash_checks": 320,
+    "all_authenticated_median_ms": 2101.73845,
+    "all_authenticated_p95_ms": 2177.0195,
+    "failure_stages": [],
+    "error_types": []
+  },
+  {
+    "held_unauthenticated": 0,
+    "limit": 4,
+    "trials": 20,
+    "connection_attempts": 320,
+    "failures": 0,
+    "successful_trials": 20,
+    "successful_hash_checks": 320,
+    "all_authenticated_median_ms": 1100.8821,
+    "all_authenticated_p95_ms": 1134.5077,
+    "failure_stages": [],
+    "error_types": []
+  },
+  {
+    "held_unauthenticated": 0,
+    "limit": 6,
+    "trials": 20,
+    "connection_attempts": 320,
+    "failures": 0,
+    "successful_trials": 20,
+    "successful_hash_checks": 320,
+    "all_authenticated_median_ms": 835.6552,
+    "all_authenticated_p95_ms": 886.6123,
+    "failure_stages": [],
+    "error_types": []
+  },
+  {
+    "held_unauthenticated": 0,
+    "limit": 8,
+    "trials": 20,
+    "connection_attempts": 320,
+    "failures": 0,
+    "successful_trials": 20,
+    "successful_hash_checks": 320,
+    "all_authenticated_median_ms": 623.0322,
+    "all_authenticated_p95_ms": 658.4831,
+    "failure_stages": [],
+    "error_types": []
+  },
+  {
+    "held_unauthenticated": 0,
+    "limit": 12,
+    "trials": 20,
+    "connection_attempts": 320,
+    "failures": 12,
+    "successful_trials": 13,
+    "successful_hash_checks": 308,
+    "all_authenticated_median_ms": 594.0078,
+    "all_authenticated_p95_ms": 633.8842,
+    "failure_stages": [
+      "connect"
+    ],
+    "error_types": [
+      "Renci.SshNet.Common.SshConnectionException"
+    ]
+  },
+  {
+    "held_unauthenticated": 0,
+    "limit": 16,
+    "trials": 20,
+    "connection_attempts": 320,
+    "failures": 36,
+    "successful_trials": 5,
+    "successful_hash_checks": 284,
+    "all_authenticated_median_ms": 416.2288,
+    "all_authenticated_p95_ms": 437.2448,
+    "failure_stages": [
+      "connect"
+    ],
+    "error_types": [
+      "Renci.SshNet.Common.SshConnectionException"
+    ]
+  },
+  {
+    "held_unauthenticated": 4,
+    "limit": 4,
+    "trials": 10,
+    "connection_attempts": 160,
+    "failures": 0,
+    "successful_trials": 10,
+    "successful_hash_checks": 160,
+    "all_authenticated_median_ms": 1085.4247,
+    "all_authenticated_p95_ms": 1122.2001,
+    "failure_stages": [],
+    "error_types": []
+  },
+  {
+    "held_unauthenticated": 4,
+    "limit": 6,
+    "trials": 10,
+    "connection_attempts": 160,
+    "failures": 0,
+    "successful_trials": 10,
+    "successful_hash_checks": 160,
+    "all_authenticated_median_ms": 833.3716,
+    "all_authenticated_p95_ms": 871.9802,
+    "failure_stages": [],
+    "error_types": []
+  },
+  {
+    "held_unauthenticated": 4,
+    "limit": 8,
+    "trials": 10,
+    "connection_attempts": 160,
+    "failures": 8,
+    "successful_trials": 6,
+    "successful_hash_checks": 152,
+    "all_authenticated_median_ms": 620.2274,
+    "all_authenticated_p95_ms": 690.7535,
+    "failure_stages": [
+      "connect"
+    ],
+    "error_types": [
+      "Renci.SshNet.Common.SshConnectionException"
+    ]
+  },
+  {
+    "held_unauthenticated": 4,
+    "limit": 12,
+    "trials": 10,
+    "connection_attempts": 160,
+    "failures": 28,
+    "successful_trials": 1,
+    "successful_hash_checks": 132,
+    "all_authenticated_median_ms": 606.2794,
+    "all_authenticated_p95_ms": 606.2794,
+    "failure_stages": [
+      "connect"
+    ],
+    "error_types": [
+      "Renci.SshNet.Common.SshConnectionException"
+    ]
+  },
+  {
+    "held_unauthenticated": 4,
+    "limit": 16,
+    "trials": 10,
+    "connection_attempts": 160,
+    "failures": 37,
+    "successful_trials": 0,
+    "successful_hash_checks": 123,
+    "all_authenticated_median_ms": null,
+    "all_authenticated_p95_ms": null,
+    "failure_stages": [
+      "connect"
+    ],
+    "error_types": [
+      "Renci.SshNet.Common.SshConnectionException"
+    ]
+  }
+]

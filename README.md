@@ -114,6 +114,7 @@ dotnet publish -c Release -r osx-x64 --self-contained /p:PublishSingleFile=true
     "Password": "password",
     "RemotePath": "/upload",
     "Concurrency": 1,
+    "SftpMaxConcurrentHandshakes": 4,
     "PreserveFolderStructure": false,
     "TimeoutSeconds": 120
   },
@@ -226,6 +227,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `HostKeyFingerprint` | string | 任意 | `null` | SFTP サーバー鍵指紋（未設定だと検証スキップ警告）。`SHA256:` プレフィックス付きで OpenSSH 形式の SHA-256 指紋（`ssh-keygen -lf` の出力）、プレフィックス無しで MD5 16 進指紋として照合 |
 | `RemotePath` | string | 必須 | `""` | リモート基準パス。`local` では書き込み先ディレクトリの絶対パス / UNC パス（例: `\\server\share\in`、`D:\out`） |
 | `Concurrency` | int | 任意 | `1` | primary 宛先の並列転送数（1-16）。`get` と primary への `put` に適用。`AdditionalDestinations` は各要素の `Concurrency` を個別に使用 |
+| `SftpMaxConcurrentHandshakes` | int | 任意 | `4` | 同じホスト・ポートへのSFTP接続確立を同時に行う上限（1～16）。追加宛先もこの上限を共有。認証済みの接続数と並列転送数は各宛先の`Concurrency`で指定する。変更は次回のバッチ起動から適用される |
 | `PreserveFolderStructure` | bool | 任意 | `false` | サブフォルダ構造を維持して転送 |
 | `TimeoutSeconds` | int | 任意 | `120` | 接続・転送タイムアウト秒（1-3600） |
 | `TransferTimeoutSeconds` | int | 任意 | `0` | 1 ファイル（関連 END ファイルを含む）の処理に許す最大秒数（0-86400、`0`=無効）。`TimeoutSeconds` は接続と読み取りにしか掛からないため、相手が受信を止めた場合（特に FTP のアップロード）にバッチが終わらなくなるのを防ぐ保険。打ち切りはキャンセル要求に依存するため、ソケット書き込みで完全にブロックしている場合は即座には中断できません（ベストエフォート） |
@@ -233,7 +235,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `VerifyUploadedFileExists` | bool | 任意 | `true` | SFTP アップロードのリネーム完了後に宛先パスの存在確認（2 往復）を追加で行うか。リネームの成功応答自体がサーバによる完了確認のため、`false` でも転送の完了保証は変わらない。高レイテンシ回線で小ファイル多数なら `false` で往復数を削減できる。SFTP のみ使用 |
 | `BufferSizeKB` | int | 任意 | `32` | SFTP の 1 書き込み要求あたりのバッファサイズ（KB、1-64）。実際のチャンクサイズはサーバが告知するパケット上限との min（OpenSSH 系は 32KB 上限のため既定から上げても効果なし）。SFTP のみ使用 |
 | `Name` | string | 複数宛先で必須 | `null` | 宛先の安定識別子。**複数宛先（ファンアウト）の put では primary・追加宛先すべてで必須かつ一意**（配信トラッキングのマーカーキー）。接続情報と独立した名前にする |
-| `AdditionalDestinations` | object[] | 任意 | `[]` | put 方向の追加送信先。各要素は Transfer と同じ接続系プロパティを持つ（`Direction` / `AdditionalDestinations` を除く）。各宛先の `Name` / `Concurrency` / `TimeoutSeconds` / 認証設定はその宛先に個別適用される。1 ファイルをメイン + 追加宛先の全てへ同時に送信する。**複数宛先では配信トラッキングが常時有効**で、部分失敗時は成功済み宛先を記録し、次回は未配信の宛先だけへ再送する（成功済み宛先への一括再送はしない）。同一の mode/host/port/remote path に複数宛先が向く設定は起動時に警告される |
+| `AdditionalDestinations` | object[] | 任意 | `[]` | put 方向の追加送信先。各要素に接続情報と宛先ごとの転送条件を指定する。`SftpMaxConcurrentHandshakes`は`Transfer`直下で共有する。各宛先の `Name` / `Concurrency` / `TimeoutSeconds` / 認証設定はその宛先に個別適用される。1 ファイルをメイン + 追加宛先の全てへ同時に送信する。**複数宛先では配信トラッキングが常時有効**で、部分失敗時は成功済み宛先を記録し、次回は未配信の宛先だけへ再送する（成功済み宛先への一括再送はしない）。同一の mode/host/port/remote path に複数宛先が向く設定は起動時に警告される |
 | `PerDestinationDeliveryTracking` | bool | 任意 | `false` | **単一宛先**で配信トラッキングを明示的に有効化する場合に使用。複数宛先では常時有効のためこのフラグに関わらずトラッキングされる（put 方向のみ） |
 | `StateDirectory` | string | 任意 | `""` | 配信トラッキングのマーカー保存先。空なら `LocalApplicationData/FtpTransferAgent/delivery-state/<hash>` を使用 |
 | `RetryDirectory` | string/null | 任意 | `null` | 配信トラッキングで部分失敗したファイルの移動先。未指定/null は `LocalApplicationData/FtpTransferAgent/delivery-retry/<watch hash>` を使う。相対パスを明示した場合は `Watch.Path` 配下として解決し、空文字で移動を無効化する |
@@ -245,6 +247,23 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 既定では各宛先はライブのソースを直接読みます。`EnableUploadSnapshot: true` を設定すると、各宛先へ確実に同一内容を届けるために列挙時のデータ/関連 END ファイルを一時スナップショット化してからアップロードします（転送中にソースが変更されても宛先間で内容が割れません）。関連 END ファイルがある場合は END 側の指紋も配信トラッキングの判定に含めます。スナップショットの有無にかかわらず、転送完了処理前、または全宛先配信済みとして送信をスキップした後の cleanup 前に、元ファイルや関連 END ファイルが変更された場合、その実行ではローカル削除や retry 退避を行わず、終了コード `1` で次回実行に持ち越します（スナップショット無効時は、その回に限り宛先間で内容が割れ得ます）。マーカー書き込みなど完了処理の失敗も転送失敗として扱われます。
 
 正常終了・例外終了では一時ファイル（アップロードスナップショット、ダウンロードの検証用一時ファイル）はその実行内で削除されます。プロセスが強制終了・電源断で異常終了した場合に残った一時ファイルは、次回起動時に掃除します。いずれもエージェント専用ディレクトリに隔離して作るため、起動時の掃除は専用ディレクトリの残骸だけを対象にし、**利用者ファイルには一切触れません**（名前が一時ファイルの命名規則に似ていても削除しません）。アップロードスナップショットは `Watch.Path` ごとに分離したテンポラリ配下（`<TEMP>/FtpTransferAgent/upload-snapshots/<watch パスのハッシュ>`）に作られ、起動時に同一構成の残骸だけを削除します。ダウンロード（get）の検証用一時ファイルは `Watch.Path` 配下の専用ディレクトリ（`.ftptransferagent-tmp`）に作られ（最終ファイルと同一ボリュームのためアトミックなリネームは維持）、起動時にこのディレクトリの残骸だけを削除します。このディレクトリ自体も、全ダウンロード完了後に空であれば削除するため（起動時に空だった場合も同様）、`Watch.Path` にエージェント由来の空フォルダが残りません。削除は非再帰で行うため、中に何か残っている場合はディレクトリごと保持され、**ファイルが巻き込まれて消えることはありません**。いずれも二重起動防止ロックにより同一構成の並走が無いため、進行中の転送を壊しません。
+
+#### SFTPの接続確立上限
+
+`SftpMaxConcurrentHandshakes`は`Transfer`直下に指定します。次の例では、接続確立を同時8件までにし、認証済みの接続で最大16並列の転送を行います。
+
+```json
+"Transfer": {
+  "Concurrency": 16,
+  "SftpMaxConcurrentHandshakes": 8
+}
+```
+
+コマンド引数でも変更できます。Windowsでは`FtpTransferAgent.exe --Transfer:SftpMaxConcurrentHandshakes=8`を指定してください。変更は次回起動から反映されます。1～16の範囲外を指定すると起動時にエラーになります。
+
+今回の[接続確立上限の検証](docs/evaluation/2026-10-02-sftp-auth/README.md)では、専用状態で8件の認証がすべて成功しました。共用状態では8件で接続拒否が出たため、既定値は4件を維持しています。
+
+同じバッチ内では、ホスト名とポートが同じ宛先同士で上限を共有します。ユーザー名や保存先フォルダーが異なっていても、認証の開始が集中しないように制御します。接続を確立した後は、その接続を再利用して転送します。
 
 ### App
 
@@ -385,11 +404,17 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | 項目 | 型 | 必須 | 既定値 | 説明 |
 |---|---|---|---|---|
 | `DeleteAfterVerify` | bool | 任意 | `true` | **`put` 専用**。成功後（複数宛先では全宛先成功後）、ローカルファイルを削除。`false` で元ファイルを保持。**`get` では無視されます**（ダウンロードでローカルファイルが削除されることはありません）。既定が `true` のため、`get` 構成では起動時に警告を出します |
-| `DeleteRemoteAfterDownload` | bool | 任意 | `false` | **`get` 専用**。成功後、リモートファイルを削除。`put` では無視されます（起動時に警告） |
+| `DeleteRemoteAfterDownload` | bool | 任意 | `false` | **`get` 専用**。成功後にリモートファイルの削除を試す。失敗した場合は警告ログに残し、転送は成功扱い。削除の自動再試行・再開は行わない。`put` では無視されます（起動時に警告） |
 | `DeleteRemoteEndFiles` | bool | 任意 | `false` | END ファイル成功時のリモート END ファイル削除。`get` で `TransferEndFiles=false` の場合は、**取得はせずにサーバ上の END ファイルだけを削除**します |
 | `DeleteLocalSkippedEndFiles` | bool | 任意 | `false` | **`put` 専用**。`TransferEndFiles=false` のとき、転送成功したデータに対応する未転送 END ファイルをローカルから削除する。`get` では無視されます（起動時に警告） |
 
 > **方向による違い**: `Direction` を `put` から `get` に変えると、`put` 用の削除設定・配信トラッキング・追加宛先はすべて無効になります。無視される設定は起動時に警告として通知されます。
+
+取得後のリモート削除は、ファイルを残してもよい運用を想定しています。削除失敗は警告ログにパスと例外を記録し、取得済みファイルを再取得しません。削除だけの失敗では終了コード0となり、エラーメールの対象にもなりません。転送や内容照合の失敗は従来どおり再試行・失敗判定の対象です。
+
+データと必要なENDを取得・照合してからENDを削除します。ENDを削除できなかった場合は関連データも残します。`RequireEndFile=true`でENDだけ削除済みのデータが残った場合、次回の通常列挙では対象外です。ENDが残っている場合やEND必須でない構成では、次回の通常実行で再取得されることがあります。
+
+削除復旧用の追加ハッシュ照合とJSON保存は行いません。取得中のデータとENDは、送り元で同名のまま上書きしない運用にしてください。旧版の削除再開記録が残っている場合は警告を出しますが、記録からの自動削除と設定変更の禁止は行いません。[検証結果と読取量の比較](docs/evaluation/2026-10-02-download-cleanup/README.md)を参照してください。
 
 ### Smtp
 

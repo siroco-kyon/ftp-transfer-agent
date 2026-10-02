@@ -1,0 +1,9 @@
+{
+  "payload_bytes": 32768,
+  "server": "Paramiko 5.0.0 on Windows",
+  "host_key": "SHA256:x+bMXwXkvnfhU6yPQXzmHYE0R0cHT9wQut8B6UyPfik",
+  "current_dll_sha256": "44e30eb6cb65dbf1c5f5bc9f3f5ca86fb6efbad1f7e332a5ca05324e4d5a4dd1",
+  "baseline_exe_sha256": "ed9631b1be919fbd823ffb5b1fcd49d7127e15ffdc081b39ada7c9cf48b3e8c6",
+  "baseline": "2026-10-01 published executable, automatic deletion recovery enabled",
+  "current_source_sha256_lf": "18e40004292f1c3df3d2426c517080d50817505e065f2c8434f981f261ec7abf"
+}

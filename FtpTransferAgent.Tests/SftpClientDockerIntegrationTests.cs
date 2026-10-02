@@ -4,6 +4,7 @@ using System.Net.Sockets;
 using System.Runtime.CompilerServices;
 using FtpTransferAgent.Configuration;
 using FtpTransferAgent.Services;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Moq;
 using Renci.SshNet;
@@ -256,6 +257,50 @@ public class SftpClientDockerIntegrationTests
     [DockerFact]
     public async Task SixteenConnectionsStartedTogether_CompleteRepeatedlyWithoutConnectionRetries()
     {
+        await VerifyConnectionBurstAsync(new SftpConnectionLimiter(4));
+    }
+
+    [DockerFact]
+    public async Task EightConcurrentHandshakes_WithSixteenTransfers_CompleteRepeatedlyWithoutRetries()
+    {
+        await VerifyConnectionBurstAsync(new SftpConnectionLimiter(8));
+    }
+
+    [DockerFact]
+    public async Task DependencyInjectedClients_ShareConfiguredGateAcrossDestinations()
+    {
+        var limiter = new SftpConnectionLimiter(8);
+        var services = new ServiceCollection();
+        services.AddSingleton(limiter);
+        services.AddSingleton(_logger.Object);
+        using var provider = services.BuildServiceProvider();
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var leases = new List<IDisposable>();
+        try
+        {
+            for (var i = 0; i < 8; i++)
+            {
+                leases.Add(await limiter.AcquireAsync(_fixture.Host, _fixture.Port, timeout.Token));
+            }
+            // Workerと同じ生成方法で、異なる宛先設定にもDIの共通上限が適用される。
+            using var primary = ActivatorUtilities.CreateInstance<SftpClientWrapper>(provider, CreateOptions(), new RetainedTempFileRegistry());
+            using var additional = ActivatorUtilities.CreateInstance<SftpClientWrapper>(provider, CreateOptions(), new RetainedTempFileRegistry());
+            var first = primary.ExistsAsync("/upload", timeout.Token);
+            var second = additional.ExistsAsync("/upload", timeout.Token);
+            Assert.False(first.IsCompleted);
+            Assert.False(second.IsCompleted);
+            leases[0].Dispose();
+            Assert.True(await first);
+            Assert.True(await second);
+        }
+        finally
+        {
+            foreach (var lease in leases) lease.Dispose();
+        }
+    }
+
+    private async Task VerifyConnectionBurstAsync(SftpConnectionLimiter limiter)
+    {
         Assert.True(_fixture.IsAvailable, _fixture.UnavailableReason);
         var directory = CreateTempDir();
         try
@@ -270,7 +315,7 @@ public class SftpClientDockerIntegrationTests
                 var remoteBase = $"/upload/burst-{Guid.NewGuid():N}";
                 var tasks = Enumerable.Range(0, 16).Select(async index =>
                 {
-                    using var wrapper = new SftpClientWrapper(CreateOptions(), _logger.Object);
+                    using var wrapper = new SftpClientWrapper(CreateOptions(), _logger.Object, connectionLimiter: limiter);
                     await start.Task;
                     var remote = $"{remoteBase}/{index}.bin";
                     await wrapper.UploadAsync(source, remote, timeout.Token);

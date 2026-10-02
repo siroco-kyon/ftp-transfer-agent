@@ -7,6 +7,7 @@ import hashlib
 import json
 import re
 import statistics
+import subprocess
 import xml.etree.ElementTree as ET
 
 ROOT=Path(__file__).resolve().parent
@@ -60,6 +61,10 @@ cleanup=json.loads((ROOT/'speed-native/cleanup.json').read_text())
 assert not cleanup['exists_after_cleanup'] and cleanup['server_socket_closed'] and cleanup['transports_active']==0
 for script in ROOT.glob('*.py'):ast.parse(script.read_text(encoding='utf-8'))
 index=json.loads((ROOT/'evidence-index.json').read_text(encoding='utf-8'))
-for entry in index['source_files']+index['additional_evidence']:
+for entry in index['source_files']:
+    # 過去の測定は、その測定時のソースに対応する。後日の変更と混同しない。
+    source=subprocess.run(['git','show',f"{index['measured_source_commit']}:{entry['path']}"],cwd=REPO,check=True,capture_output=True).stdout
+    assert hashlib.sha256(source.replace(b'\r\n',b'\n')).hexdigest()==entry['sha256_lf'],entry['path']
+for entry in index['additional_evidence']:
     assert hashlib.sha256((REPO/entry['path']).read_bytes().replace(b'\r\n',b'\n')).hexdigest()==entry['sha256_lf'],entry['path']
 print(json.dumps({'structure_valid':True,'links_valid':len(document.hrefs),'manual_items':221,'automated_passed':443,'sftp_runs':12,'verified_sftp_files':12000,'source_and_evidence_hashes_match':True}))

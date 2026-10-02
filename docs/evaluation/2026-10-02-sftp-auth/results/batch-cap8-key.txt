@@ -1,0 +1,432 @@
+Configuration warnings:
+WARNING: TransferEndFiles is enabled but RequireEndFile is disabled. END files will only be transferred when their corresponding data files are also selected for transfer.
+WARNING: Very short retry delay may cause server to reject connections
+INFO: Acquired process lock at C:\Users\ku_em\AppData\Local\FtpTransferAgent\locks\0e2e039aed55e10a\ftp-transfer-agent.lock
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Upload fanout: 32 data file(s), 0 related END file(s), 1 destination(s), 0 from retry directory
+2026-10-02 12:29:14 info: Microsoft.Hosting.Lifetime[0]
+      Application started. Press Ctrl+C to shut down.
+2026-10-02 12:29:14 info: Microsoft.Hosting.Lifetime[0]
+      Hosting environment: Production
+2026-10-02 12:29:14 info: Microsoft.Hosting.Lifetime[0]
+      Content root path: D:\Github\ftp-transfer-agent\FtpTransferAgent
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: PrivateKey only (host=127.0.0.1, port=61838, user=testuser, key=D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\probe-key)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: PrivateKey only (host=127.0.0.1, port=61838, user=testuser, key=D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\probe-key)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: PrivateKey only (host=127.0.0.1, port=61838, user=testuser, key=D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\probe-key)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: PrivateKey only (host=127.0.0.1, port=61838, user=testuser, key=D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\probe-key)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: PrivateKey only (host=127.0.0.1, port=61838, user=testuser, key=D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\probe-key)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: PrivateKey only (host=127.0.0.1, port=61838, user=testuser, key=D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\probe-key)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: PrivateKey only (host=127.0.0.1, port=61838, user=testuser, key=D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\probe-key)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: PrivateKey only (host=127.0.0.1, port=61838, user=testuser, key=D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\probe-key)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: PrivateKey only (host=127.0.0.1, port=61838, user=testuser, key=D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\probe-key)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: PrivateKey only (host=127.0.0.1, port=61838, user=testuser, key=D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\probe-key)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: PrivateKey only (host=127.0.0.1, port=61838, user=testuser, key=D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\probe-key)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: PrivateKey only (host=127.0.0.1, port=61838, user=testuser, key=D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\probe-key)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: PrivateKey only (host=127.0.0.1, port=61838, user=testuser, key=D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\probe-key)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: PrivateKey only (host=127.0.0.1, port=61838, user=testuser, key=D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\probe-key)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: PrivateKey only (host=127.0.0.1, port=61838, user=testuser, key=D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\probe-key)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP auth configured: PrivateKey only (host=127.0.0.1, port=61838, user=testuser, key=D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\probe-key)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [e7808948-f023-4fb9-b867-4150217a82bc] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\0.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/0.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [0e9cdf2a-04c0-470f-89c8-1256ff86ecaf] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\18.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/18.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [aeaf5dad-5679-4cf9-a4f4-8a5c249d05db] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\13.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/13.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [76938a5f-2d90-4e05-b548-ff0682660c97] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\2.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/2.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [63f03457-cb7d-4acc-9a65-bf63fb3f356d] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\19.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/19.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [707abb72-4f33-4027-be21-451922e3a0ff] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\11.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/11.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [64b4b073-0b66-4fd8-adba-8e874f7f559f] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\16.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/16.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [a6c48467-dfbe-470b-b516-44b2690a8aff] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\10.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/10.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [d2e3cbe7-6a0f-4454-bf5f-1e0aef8b3fe4] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\17.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/17.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [34903e53-99e9-4b78-8e49-f1cf7ae13659] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\20.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/20.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [da5374a4-6c95-4ba1-878a-c0d3f0297afe] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\15.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/15.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [96521e01-1b93-4d5f-a218-af68caa6e4e4] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\1.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/1.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [52459036-80fa-4ce8-9bc3-2ca8b94edd83] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\21.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/21.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [35c7e896-b9c7-47eb-93e8-b68a3862212a] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\12.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/12.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [e6d382f3-4469-4a71-8477-e58d44d0e89d] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\22.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/22.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [89880c39-0db6-4e09-a077-1b1b8cfc4d60] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\14.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/14.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd+8avQFV78s
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd+8avQFV78s
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd+8avQFV78s
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd+8avQFV78s
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd+8avQFV78s
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd+8avQFV78s
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd+8avQFV78s
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd+8avQFV78s
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=61838, User=testuser, ServerVersion=SSH-2.0-OpenSSH_10.3, KeyExchange=mlkem768x25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=61838, User=testuser, ServerVersion=SSH-2.0-OpenSSH_10.3, KeyExchange=mlkem768x25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=61838, User=testuser, ServerVersion=SSH-2.0-OpenSSH_10.3, KeyExchange=mlkem768x25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=61838, User=testuser, ServerVersion=SSH-2.0-OpenSSH_10.3, KeyExchange=mlkem768x25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=61838, User=testuser, ServerVersion=SSH-2.0-OpenSSH_10.3, KeyExchange=mlkem768x25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd+8avQFV78s
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=61838, User=testuser, ServerVersion=SSH-2.0-OpenSSH_10.3, KeyExchange=mlkem768x25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd+8avQFV78s
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd+8avQFV78s
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd+8avQFV78s
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd+8avQFV78s
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [d2e3cbe7-6a0f-4454-bf5f-1e0aef8b3fe4] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\17.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [a6c48467-dfbe-470b-b516-44b2690a8aff] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\10.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [e7808948-f023-4fb9-b867-4150217a82bc] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\0.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [89880c39-0db6-4e09-a077-1b1b8cfc4d60] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\14.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [0e9cdf2a-04c0-470f-89c8-1256ff86ecaf] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\18.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [96521e01-1b93-4d5f-a218-af68caa6e4e4] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\1.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=61838, User=testuser, ServerVersion=SSH-2.0-OpenSSH_10.3, KeyExchange=mlkem768x25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=61838, User=testuser, ServerVersion=SSH-2.0-OpenSSH_10.3, KeyExchange=mlkem768x25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd+8avQFV78s
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [e6d382f3-4469-4a71-8477-e58d44d0e89d] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\22.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [52459036-80fa-4ce8-9bc3-2ca8b94edd83] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\21.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [d2e3cbe7-6a0f-4454-bf5f-1e0aef8b3fe4] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\17.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [89880c39-0db6-4e09-a077-1b1b8cfc4d60] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\14.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [e7808948-f023-4fb9-b867-4150217a82bc] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\0.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [96521e01-1b93-4d5f-a218-af68caa6e4e4] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\1.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [a6c48467-dfbe-470b-b516-44b2690a8aff] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\10.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [0e9cdf2a-04c0-470f-89c8-1256ff86ecaf] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\18.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [e6d382f3-4469-4a71-8477-e58d44d0e89d] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\22.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [52459036-80fa-4ce8-9bc3-2ca8b94edd83] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\21.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\1.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\18.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\21.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\10.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\14.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\17.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\0.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\22.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\14.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\10.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\17.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\0.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [c4c909b7-cdb7-4a4b-88ee-406c3b5f2517] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\24.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/24.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [c1438751-ceea-440e-b85f-3acfb4debc51] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\23.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/23.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [074a4af8-49f5-4f4e-bbe4-933e0b5e001c] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\26.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/26.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\18.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [2f4d0a17-ccbe-4d3b-ac0d-02e9ecb06bd1] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\25.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/25.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\21.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\1.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [1813f054-81be-42fb-b5eb-771aa01a87fc] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\27.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/27.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\22.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [7842df1c-2d6b-4520-ba1c-8debb85af988] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\29.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/29.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [ebaa8712-dd34-440e-a86e-7cc1c359d7b9] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\28.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/28.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [85328b73-36d5-4c9a-95dc-10169f178ca1] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\3.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/3.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd+8avQFV78s
+2026-10-02 12:29:14 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      Host key fingerprint verified: SHA256:IgSqvXCa057wFBR4wH1HjjrIbjP0FrcAd+8avQFV78s
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [c1438751-ceea-440e-b85f-3acfb4debc51] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\23.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [85328b73-36d5-4c9a-95dc-10169f178ca1] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\3.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [c4c909b7-cdb7-4a4b-88ee-406c3b5f2517] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\24.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [ebaa8712-dd34-440e-a86e-7cc1c359d7b9] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\28.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [074a4af8-49f5-4f4e-bbe4-933e0b5e001c] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\26.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [2f4d0a17-ccbe-4d3b-ac0d-02e9ecb06bd1] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\25.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [7842df1c-2d6b-4520-ba1c-8debb85af988] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\29.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [1813f054-81be-42fb-b5eb-771aa01a87fc] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\27.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [85328b73-36d5-4c9a-95dc-10169f178ca1] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\3.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [c1438751-ceea-440e-b85f-3acfb4debc51] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\23.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\23.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\3.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\3.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\23.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [ee60ed94-66fb-4bc2-8750-cff235fd9aae] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\30.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/30.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [2ed16c5d-d397-4258-a785-50c34f5a9fa5] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\31.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/31.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [2f4d0a17-ccbe-4d3b-ac0d-02e9ecb06bd1] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\25.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [c4c909b7-cdb7-4a4b-88ee-406c3b5f2517] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\24.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\25.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\24.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [ebaa8712-dd34-440e-a86e-7cc1c359d7b9] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\28.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [074a4af8-49f5-4f4e-bbe4-933e0b5e001c] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\26.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [7842df1c-2d6b-4520-ba1c-8debb85af988] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\29.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [1813f054-81be-42fb-b5eb-771aa01a87fc] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\27.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\26.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\29.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\27.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\28.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\25.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [0ea7ea38-275f-4993-8605-d3133ec2fa2f] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\4.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/4.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\24.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\26.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [6c228694-179e-455a-9b0e-12c867169472] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\5.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/5.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [bbb16e9e-b71a-43a7-8919-43f0397b1c78] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\6.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/6.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\29.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\28.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [c4dc581f-5a24-4b56-ad05-ce791b27b057] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\7.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/7.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [593b7005-985d-40cd-b95e-bea7fffa8f9f] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\8.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/8.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\27.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [7377685c-794b-4de1-a47b-c7ea639b8ab7] Starting upload D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\9.bin (1.00 KB) to sftp://127.0.0.1:61838/upload/batch-8-key (/upload/batch-8-key/9.bin)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [ee60ed94-66fb-4bc2-8750-cff235fd9aae] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\30.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [2ed16c5d-d397-4258-a785-50c34f5a9fa5] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\31.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [bbb16e9e-b71a-43a7-8919-43f0397b1c78] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\6.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [0ea7ea38-275f-4993-8605-d3133ec2fa2f] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\4.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [593b7005-985d-40cd-b95e-bea7fffa8f9f] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\8.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [7377685c-794b-4de1-a47b-c7ea639b8ab7] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\9.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [6c228694-179e-455a-9b0e-12c867169472] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\5.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [c4dc581f-5a24-4b56-ad05-ce791b27b057] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\7.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [ee60ed94-66fb-4bc2-8750-cff235fd9aae] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\30.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\30.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\30.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [bbb16e9e-b71a-43a7-8919-43f0397b1c78] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\6.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\6.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [2ed16c5d-d397-4258-a785-50c34f5a9fa5] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\31.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [0ea7ea38-275f-4993-8605-d3133ec2fa2f] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\4.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\31.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\4.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\6.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\31.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\4.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [593b7005-985d-40cd-b95e-bea7fffa8f9f] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\8.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [6c228694-179e-455a-9b0e-12c867169472] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\5.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\5.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\8.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\5.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\8.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [7377685c-794b-4de1-a47b-c7ea639b8ab7] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\9.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\9.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      [c4dc581f-5a24-4b56-ad05-ce791b27b057] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\7.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\7.bin
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\9.bin after all destinations succeeded
+2026-10-02 12:29:14 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\7.bin after all destinations succeeded
+2026-10-02 12:29:15 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=61838, User=testuser, ServerVersion=SSH-2.0-OpenSSH_10.3, KeyExchange=mlkem768x25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 12:29:15 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=61838, User=testuser, ServerVersion=SSH-2.0-OpenSSH_10.3, KeyExchange=mlkem768x25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      [707abb72-4f33-4027-be21-451922e3a0ff] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\11.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      [707abb72-4f33-4027-be21-451922e3a0ff] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\11.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\11.bin
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\11.bin after all destinations succeeded
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      [34903e53-99e9-4b78-8e49-f1cf7ae13659] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\20.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      [34903e53-99e9-4b78-8e49-f1cf7ae13659] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\20.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\20.bin
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\20.bin after all destinations succeeded
+2026-10-02 12:29:15 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=61838, User=testuser, ServerVersion=SSH-2.0-OpenSSH_10.3, KeyExchange=mlkem768x25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 12:29:15 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=61838, User=testuser, ServerVersion=SSH-2.0-OpenSSH_10.3, KeyExchange=mlkem768x25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      [64b4b073-0b66-4fd8-adba-8e874f7f559f] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\16.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      [da5374a4-6c95-4ba1-878a-c0d3f0297afe] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\15.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:15 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=61838, User=testuser, ServerVersion=SSH-2.0-OpenSSH_10.3, KeyExchange=mlkem768x25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      [64b4b073-0b66-4fd8-adba-8e874f7f559f] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\16.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\16.bin
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\16.bin after all destinations succeeded
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      [da5374a4-6c95-4ba1-878a-c0d3f0297afe] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\15.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\15.bin
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\15.bin after all destinations succeeded
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      [35c7e896-b9c7-47eb-93e8-b68a3862212a] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\12.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:15 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=61838, User=testuser, ServerVersion=SSH-2.0-OpenSSH_10.3, KeyExchange=mlkem768x25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      [35c7e896-b9c7-47eb-93e8-b68a3862212a] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\12.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\12.bin
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\12.bin after all destinations succeeded
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      [aeaf5dad-5679-4cf9-a4f4-8a5c249d05db] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\13.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:15 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=61838, User=testuser, ServerVersion=SSH-2.0-OpenSSH_10.3, KeyExchange=mlkem768x25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 12:29:15 info: FtpTransferAgent.Services.SftpClientWrapper[0]
+      SFTP session established: Host=127.0.0.1, Port=61838, User=testuser, ServerVersion=SSH-2.0-OpenSSH_10.3, KeyExchange=mlkem768x25519-sha256, Encryption=aes128-ctr, Hmac=hmac-sha2-256
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      [aeaf5dad-5679-4cf9-a4f4-8a5c249d05db] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\13.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\13.bin
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\13.bin after all destinations succeeded
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      [76938a5f-2d90-4e05-b548-ff0682660c97] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\2.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      [63f03457-cb7d-4acc-9a65-bf63fb3f356d] Upload completed for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\19.bin -> sftp://127.0.0.1:61838/upload/batch-8-key (1.00 KB)
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      [76938a5f-2d90-4e05-b548-ff0682660c97] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\2.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\2.bin
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\2.bin after all destinations succeeded
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      [63f03457-cb7d-4acc-9a65-bf63fb3f356d] Hash verification successful for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\19.bin at sftp://127.0.0.1:61838/upload/batch-8-key
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      All 1 destinations succeeded for D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\19.bin
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      Deleted local file D:\Github\ftp-transfer-agent\.audit-results\2026-10-02-sftp-auth-verified\batch-input\19.bin after all destinations succeeded
+2026-10-02 12:29:15 info: FtpTransferAgent.Worker[0]
+      Transfer completed. Total: 32, Success: 32, Failed: 0, Critical Errors: 0, Success Rate: 100.0%, Volume: 32.00 KB
+2026-10-02 12:29:15 info: Microsoft.Hosting.Lifetime[0]
+      Application is shutting down...

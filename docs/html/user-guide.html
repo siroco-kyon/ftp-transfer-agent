@@ -310,6 +310,7 @@ dotnet run --project FtpTransferAgent</code></pre>
 <tr><td><code>appsettings.invalid.json</code></td><td>されない</td><td>意図的に不正な JSON を含む設定バリデーションのテスト用サンプル。ビルド出力・publish にもコピーされない</td></tr>
 </table>
 
+
 <h3>環境による読み込み挙動</h3>
 <figure class="fig">
 <svg viewBox="0 0 900 190" xmlns="http://www.w3.org/2000/svg" font-family="'BIZ UDPGothic','Yu Gothic UI','Meiryo',sans-serif">
@@ -414,10 +415,11 @@ dotnet run --project FtpTransferAgent</code></pre>
 <table>
 <tr><th>項目</th><th>型</th><th>必須</th><th>既定値</th><th>説明</th></tr>
 <tr><td><code>DeleteAfterVerify</code></td><td>bool</td><td>任意</td><td><code>true</code></td><td><strong><code>put</code> 専用</strong>。成功後（複数宛先では全宛先成功後）、ローカルファイルを削除。<code>false</code> で元ファイルを保持。<strong><code>get</code> では無視されます</strong>（起動時に警告）</td></tr>
-<tr><td><code>DeleteRemoteAfterDownload</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td><code>get</code> 成功後、リモートファイルを削除</td></tr>
+<tr><td><code>DeleteRemoteAfterDownload</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td><code>get</code> 成功後に削除を試す。失敗時はファイルを残して警告ログに記録し、取得成功として扱う</td></tr>
 <tr><td><code>DeleteRemoteEndFiles</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td>END ファイル成功時のリモート END ファイル削除</td></tr>
 <tr><td><code>DeleteLocalSkippedEndFiles</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td><code>put</code> で <code>TransferEndFiles=false</code> のとき、転送成功したデータに対応する未転送 END ファイルをローカルから削除する</td></tr>
 </table>
+<p>getでの削除失敗は警告ログで確認してください。削除の自動再試行・再開と復旧用の追加ハッシュ照合は行いません。END削除に失敗した場合は関連データも残します。取得中のデータとENDは、送り元で同名のまま上書きしない運用とします。<a href="evaluation-report.html#download-cleanup">評価検証の結果</a>に詳細を記載しています。</p>
 
 <h3>Smtp</h3>
 <p>接続・宛先の必須チェックは <code>Enabled: true</code> の場合のみ行われます。メール通知を使わない場合は <code>Smtp</code> セクションを省略しても起動できます。</p>
