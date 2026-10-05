@@ -214,8 +214,8 @@
     },
     {
       "path": "docs/evaluation/2026-10-01/verify_evidence.py",
-      "sha256_lf": "7fcd651d01941d17b6852e134fe2afb552e4a823116003a0c277224eafdbfd49",
-      "sha256": "7fcd651d01941d17b6852e134fe2afb552e4a823116003a0c277224eafdbfd49"
+      "sha256_lf": "57e833afdfe4fd568ab5ca4bccdcdf6014956df149c9c9ecb3f2e992b8680b34",
+      "sha256": "57e833afdfe4fd568ab5ca4bccdcdf6014956df149c9c9ecb3f2e992b8680b34"
     },
     {
       "path": "docs/evaluation/2026-10-01/windows-release.trx",
