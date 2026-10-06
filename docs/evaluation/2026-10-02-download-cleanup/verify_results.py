@@ -51,6 +51,6 @@ for filename, passed in (('windows-release.trx', 460), ('cleanup-targeted.trx', 
     assert int(counts['passed']) == passed and counts['failed'] == '0' and counts['notExecuted'] == '0'
 report = (REPO / 'docs/html/evaluation-report.html').read_text(encoding='utf-8')
 assert 'id="download-cleanup"' in report and '460' in report
-assert '削除のための追加ハッシュ照合とJSON保存を外しました' in report
+assert '削除処理で行っていた追加のハッシュ照合とJSON保存を廃止しました' in report
 print(json.dumps(dict(regression_passed=460, targeted_passed=46, sftp_conditions=18,
                       extra_cleanup_data_reads=0, cleanup_confirmed=True)))

@@ -36,7 +36,8 @@ for href in document.hrefs:
     if href.startswith('#'):assert href[1:] in document.ids,href
     elif not re.match(r'^https?://',href):assert (REPORT.parent/unquote(href.split('#')[0])).exists(),href
 appendix=text.split('<div id="manual-groups">',1)[1].split('</section>',1)[0]
-assert hashlib.sha256(appendix.encode()).hexdigest()==(ROOT/'manual-appendix-before-v13.sha256').read_text().strip()
+# 旧版のハッシュは測定時の記録として保持し、現在の明細は推敲後のハッシュと照合する。
+assert hashlib.sha256(appendix.encode()).hexdigest()==REPORT.with_name('evaluation-report-manual-appendix.sha256').read_text().strip()
 manual=json.loads((ROOT/'manual-results.json').read_text(encoding='utf-8'))
 assert hashlib.sha256((REPO/manual['source']).read_bytes().replace(b'\r\n',b'\n')).hexdigest()==manual['source_sha256_lf']
 assert all(item['result']=='検証OK' for item in manual['items'])
