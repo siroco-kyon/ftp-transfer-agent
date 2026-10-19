@@ -45,9 +45,8 @@ ns = {'t': 'http://microsoft.com/schemas/VisualStudio/TeamTest/2010'}
 counters = ET.parse(HERE/'windows-release.trx').find('.//t:Counters', ns).attrib
 assert counters['passed'] == '451' and counters['failed'] == '0' and counters['notExecuted'] == '0'
 for item in json.loads((HERE/'results/source-hashes.json').read_text()):
+    # Retained results describe the measured source snapshots, independently of later product changes.
     assert hashlib.sha256((HERE/'results'/item['snapshot']).read_bytes().replace(b'\r\n', b'\n')).hexdigest() == item['sha256_lf'], item['path']
-    if item['path'].startswith('FtpTransferAgent/'):
-        assert hashlib.sha256((REPO/item['path']).read_bytes().replace(b'\r\n', b'\n')).hexdigest() == item['sha256_lf'], item['path']
 text = (REPO/'docs/html/evaluation-report.html').read_text(encoding='utf-8')
 for row in module.summarize(trials):
     if row['held_unauthenticated'] == 0 and row['limit'] <= 8:

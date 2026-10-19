@@ -20,6 +20,8 @@ public class Worker : BackgroundService
     private const int QueueCapacity = 1000;
     private readonly ILogger<Worker> _logger;
     private readonly WatchOptions _watch;
+    private readonly bool _usesEndFileSuffixes;
+    private readonly string[] _endFileSuffixes;
     private readonly TransferOptions _transfer;
     private readonly RetryOptions _retry;
     private readonly HashOptions _hash;
@@ -49,6 +51,7 @@ public class Worker : BackgroundService
     // ローカルパスの同一性判定に使う比較子。大小の区別は OS ではなくボリュームの性質なので
     // (大小を区別する APFS、区別しない Linux 上のマウント等)、Watch.Path 上で実測して決める。
     private StringComparer? _localPathComparer;
+    private IEqualityComparer<string>? _localEndFileComparer;
 
     // 転送処理用のチャンネル（容量制限でメモリリーク防止）
 
@@ -56,6 +59,11 @@ public class Worker : BackgroundService
     public Worker(IOptions<WatchOptions> watch, IOptions<TransferOptions> transfer, IOptions<RetryOptions> retry, IOptions<HashOptions> hash, IOptions<CleanupOptions> cleanup, IServiceProvider services, ILogger<Worker> logger, IHostApplicationLifetime lifetime, ApplicationExitCode? exitCode = null)
     {
         _watch = watch.Value;
+        _usesEndFileSuffixes = _watch.UsesEndFileSuffixes;
+        _endFileSuffixes = (_usesEndFileSuffixes ? _watch.EndFileSuffixes : _watch.EndFileExtensions)?
+            .Where(value => !string.IsNullOrWhiteSpace(value))
+            .Select(value => _usesEndFileSuffixes || value.StartsWith('.') ? value : $".{value}")
+            .ToArray() ?? Array.Empty<string>();
         _transfer = transfer.Value;
         _retry = retry.Value;
         _hash = hash.Value;
@@ -690,7 +698,7 @@ public class Worker : BackgroundService
         }
 
         // データファイルを「大小無視の正規化パス」でまとめる。関連付けはこのキーで行うため、
-        // 1 つのキーに複数のデータファイルや複数の END が集まると帰属を判別できない
+        // 1 つのキーに複数のデータファイルが集まると帰属を判別できない
         var dataByKey = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         foreach (var dataFile in dataFiles)
         {
@@ -703,8 +711,8 @@ public class Worker : BackgroundService
             group.Add(dataFile);
         }
 
-        // END ファイル側も同じキーでまとめる。/foo.END と /FOO.END は同じキーに落ちるため、
-        // データファイルが 1 つでも「どちらの END か」を決められない
+        // END ファイル側も対応するデータのキーでまとめる。
+        // 異なる種類の末尾は同居できるが、/foo.END と /FOO.END のような大小だけの差は曖昧になる。
         var endByKey = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
         foreach (var endFile in endFiles)
         {
@@ -726,7 +734,15 @@ public class Worker : BackgroundService
         foreach (var (key, group) in dataByKey)
         {
             var ambiguousData = group.Count > 1;
-            var ambiguousEnd = endByKey.TryGetValue(key, out var relatedEnds) && relatedEnds.Count > 1;
+            // .END と _end のような別種類のマーカーは同居できる。
+            // 大小だけが異なる同じマーカーが複数ある場合に限り、帰属が曖昧になる。
+            var conflictingEnds = endByKey.TryGetValue(key, out var relatedEnds)
+                ? relatedEnds.GroupBy(NormalizeRemotePath, StringComparer.OrdinalIgnoreCase)
+                    .Where(ends => ends.Count() > 1)
+                    .SelectMany(ends => ends)
+                    .ToArray()
+                : Array.Empty<string>();
+            var ambiguousEnd = conflictingEnds.Length > 0;
             if (!ambiguousData && !ambiguousEnd)
             {
                 continue;
@@ -742,7 +758,7 @@ public class Worker : BackgroundService
             {
                 _logger.LogError(
                     "{Count} remote END files differ only by case ({Ends}) and all match the data file(s) {Remotes}, so the marker cannot be identified unambiguously. They will not be downloaded; rename them on the server so the names do not differ only by case.",
-                    relatedEnds!.Count, string.Join(", ", relatedEnds!), string.Join(", ", group));
+                    conflictingEnds.Length, string.Join(", ", conflictingEnds), string.Join(", ", group));
             }
 
             foreach (var remotePath in group)
@@ -1190,12 +1206,12 @@ public class Worker : BackgroundService
     }
 
     // データファイルに対応する END ファイルを、列挙時に構築した END ファイル集合から解決する。
-    // 集合は IsEndFile と同じ大小無視で構築され、各要素はディスク上の実ファイル名(大小を保持)を持つ。
+    // 集合は END の末尾部分を大小無視で照合し、ディスク上の実ファイル名(大小を保持)を持つ。
     // そのため設定値 (例 ".END") と実ファイル (例 ".end") の大小が異なっても一致し、実名を返せる。
     // ファイルシステムを再探索しないので、列挙結果と常に一致する (転送/削除の不整合を防ぐ)。
     private IReadOnlyList<string> GetExistingEndFilesForDataFile(string dataFilePath, HashSet<string> knownEndFiles)
     {
-        if (string.IsNullOrEmpty(dataFilePath) || _watch.EndFileExtensions is null || _watch.EndFileExtensions.Length == 0)
+        if (string.IsNullOrEmpty(dataFilePath) || _endFileSuffixes.Length == 0)
         {
             return Array.Empty<string>();
         }
@@ -1209,21 +1225,15 @@ public class Worker : BackgroundService
         // 解決済みの実ファイルパスで重複排除する。
         // 設定値の大小違い (".END" と ".end") から同一の実ファイルに辿り着いても二重追加しない。
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var endExt in _watch.EndFileExtensions)
+        foreach (var suffix in _endFileSuffixes)
         {
-            if (string.IsNullOrWhiteSpace(endExt))
-            {
-                continue;
-            }
-
-            var normalizedEndExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
-            // END ファイルはデータファイルと同一ディレクトリの "<データファイル名>.<拡張子>" なので、
-            // データファイルのパス文字列にそのまま拡張子を連結する。
+            // END ファイルは同一ディレクトリの "<完全なデータファイル名><末尾文字列>"。
+            // 拡張子指定のドット補完はコンストラクターで行い、ここではそのまま連結する。
             // Path.GetDirectoryName + Path.Combine で組み立てると、Watch.Path に "/" が含まれる場合
             // ("./watch" 等) に GetDirectoryName がセパレータを "\" へ正規化する一方、
             // Directory.EnumerateFiles は元の "/" を保持するため文字列比較が一致せず、
             // END ファイルが存在するのに見つからない (= 黙って転送されない) 事故が起きる。
-            var candidate = dataFilePath + normalizedEndExt;
+            var candidate = dataFilePath + suffix;
 
             // 集合から実名 (格納時の大小) を取り出す。大小無視で一致し、実ファイル名を保持する。
             if (knownEndFiles.TryGetValue(candidate, out var actual) && seen.Add(actual))
@@ -1242,13 +1252,12 @@ public class Worker : BackgroundService
     {
         var patterns = _watch.AllowedExtensions ?? System.Array.Empty<string>();
         var dataFiles = new List<string>();
-        var endFiles = new List<string>();
+        var endFileSet = new HashSet<string>(files.Where(IsEndFile), GetLocalEndFileComparer());
 
         foreach (var file in files)
         {
             if (IsEndFile(file))
             {
-                endFiles.Add(file);
                 continue;
             }
 
@@ -1257,7 +1266,7 @@ public class Worker : BackgroundService
                 continue;
             }
 
-            if (_watch.RequireEndFile && !HasEndFile(file))
+            if (_watch.RequireEndFile && !HasRequiredLocalEndFile(file, endFileSet))
             {
                 _logger.LogDebug("Skipping file {File} - no corresponding END file found", file);
                 continue;
@@ -1266,7 +1275,6 @@ public class Worker : BackgroundService
             dataFiles.Add(file);
         }
 
-        var endFileSet = new HashSet<string>(endFiles, StringComparer.OrdinalIgnoreCase);
         var candidates = new List<UploadCandidate>(dataFiles.Count);
         foreach (var file in dataFiles)
         {
@@ -1855,15 +1863,14 @@ public class Worker : BackgroundService
 
                     // データファイルとENDファイルのペアを収集
                     var dataFiles = new List<string>();
-                    var endFiles = new List<string>();
+                    var endFileSet = new HashSet<string>(files.Where(IsEndFile), GetLocalEndFileComparer());
 
                     foreach (var file in files)
                     {
                         // ENDファイルかどうかを先にチェック
                         if (IsEndFile(file))
                         {
-                            // ENDファイルは常に別リストに保存（転送するかどうかは後で判断）
-                            endFiles.Add(file);
+                            // END ファイルは列挙済みの集合から関連付け、転送するかは後で判断する。
                             continue;
                         }
 
@@ -1876,7 +1883,7 @@ public class Worker : BackgroundService
                         // ENDファイル検証が有効な場合は、対応するENDファイルの存在を確認
                         if (_watch.RequireEndFile)
                         {
-                            if (!HasEndFile(file))
+                            if (!HasRequiredLocalEndFile(file, endFileSet))
                             {
                                 _logger.LogDebug("Skipping file {File} - no corresponding END file found", file);
                                 continue;
@@ -1887,7 +1894,6 @@ public class Worker : BackgroundService
                     }
 
                     var destinations = GetUploadDestinations();
-                    var endFileSet = new HashSet<string>(endFiles, StringComparer.OrdinalIgnoreCase);
                     // キー比較は Ordinal にする (大文字小文字を区別するファイルシステムでは
                     // 大小違いの同名ファイルが併存し得るため、大小無視だと重複キーで列挙全体が失敗する)
                     var relatedEndFilesByDataFile = dataFiles.ToDictionary(
@@ -2804,28 +2810,14 @@ public class Worker : BackgroundService
     /// </summary>
     private bool IsEndFile(string filePath)
     {
-        if (string.IsNullOrEmpty(filePath) || _watch.EndFileExtensions == null)
+        if (string.IsNullOrEmpty(filePath))
         {
             return false;
         }
 
         try
         {
-            var extension = Path.GetExtension(filePath);
-            if (string.IsNullOrEmpty(extension))
-            {
-                return false;
-            }
-
-            return _watch.EndFileExtensions.Any(endExt =>
-            {
-                if (string.IsNullOrWhiteSpace(endExt))
-                {
-                    return false;
-                }
-                var normalizedEndExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
-                return string.Equals(extension, normalizedEndExt, StringComparison.OrdinalIgnoreCase);
-            });
+            return FindEndFileSuffix(filePath) is not null;
         }
         catch (Exception ex)
         {
@@ -2833,6 +2825,57 @@ public class Worker : BackgroundService
             return false;
         }
     }
+
+    // EndFileSuffixes は末尾文字列全体、EndFileExtensions は最後の拡張子全体を照合する。
+    // '_' での分割や途中の文字列置換は行わない。
+    private string? FindEndFileSuffix(string filePath)
+    {
+        var fileName = Path.GetFileName(filePath);
+        if (string.IsNullOrEmpty(fileName))
+        {
+            return null;
+        }
+
+        var extension = _usesEndFileSuffixes ? null : Path.GetExtension(fileName);
+        return _endFileSuffixes.FirstOrDefault(suffix => _usesEndFileSuffixes
+            ? fileName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase)
+            : string.Equals(extension, suffix, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private IEqualityComparer<string> GetLocalEndFileComparer()
+    {
+        if (!_usesEndFileSuffixes)
+        {
+            return StringComparer.OrdinalIgnoreCase;
+        }
+
+        if (_localEndFileComparer is null)
+        {
+            var pathComparer = GetLocalPathComparer();
+            _localEndFileComparer = EqualityComparer<string>.Create(
+                (left, right) => pathComparer.Equals(NormalizeLocalEndFile(left), NormalizeLocalEndFile(right)),
+                path => pathComparer.GetHashCode(NormalizeLocalEndFile(path)!));
+        }
+        return _localEndFileComparer;
+    }
+
+    // 末尾部分だけ設定値の大小へそろえ、データ名部分は対象ファイルシステムの比較規則で扱う。
+    // 大小を区別する環境で sample.csv と Sample.csv に同じ END を関連付けない。
+    private string? NormalizeLocalEndFile(string? path)
+    {
+        if (path is null)
+        {
+            return null;
+        }
+        var suffix = FindEndFileSuffix(path);
+        return suffix is null ? path : path[..^suffix.Length] + suffix;
+    }
+
+    // 末尾文字列指定では列挙時の実名集合を使い、大小を区別するファイルシステムでも末尾を大小無視で照合する。
+    private bool HasRequiredLocalEndFile(string filePath, HashSet<string> knownEndFiles) =>
+        _usesEndFileSuffixes
+            ? GetExistingEndFilesForDataFile(filePath, knownEndFiles).Count > 0
+            : HasEndFile(filePath);
 
     /// <summary>
     /// 指定されたファイルに対応するENDファイルが存在するかどうかを確認
@@ -2846,7 +2889,7 @@ public class Worker : BackgroundService
         }
 
         // ENDファイル拡張子が設定されていない場合
-        if (_watch.EndFileExtensions == null || _watch.EndFileExtensions.Length == 0)
+        if (_endFileSuffixes.Length == 0)
         {
             return false;
         }
@@ -2862,16 +2905,18 @@ public class Worker : BackgroundService
                 return false;
             }
 
-            foreach (var endExt in _watch.EndFileExtensions)
+            if (_usesEndFileSuffixes)
             {
-                // null または空の拡張子をスキップ
-                if (string.IsNullOrWhiteSpace(endExt))
-                {
-                    continue;
-                }
+                var endFiles = new HashSet<string>(
+                    Directory.EnumerateFiles(directory).Where(path => IsEndFile(path)
+                        && (File.GetAttributes(path) & FileAttributes.ReparsePoint) == 0),
+                    GetLocalEndFileComparer());
+                return HasRequiredLocalEndFile(filePath, endFiles);
+            }
 
-                var endFileExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
-                var endFilePath = Path.Combine(directory, fileName + endFileExt);
+            foreach (var suffix in _endFileSuffixes)
+            {
+                var endFilePath = Path.Combine(directory, fileName + suffix);
 
                 if (File.Exists(endFilePath)
                     && (File.GetAttributes(endFilePath) & FileAttributes.ReparsePoint) == 0)
@@ -2901,28 +2946,14 @@ public class Worker : BackgroundService
     /// </summary>
     private bool IsEndFileRemote(string filePath)
     {
-        if (string.IsNullOrEmpty(filePath) || _watch.EndFileExtensions == null)
+        if (string.IsNullOrEmpty(filePath))
         {
             return false;
         }
 
         try
         {
-            var extension = Path.GetExtension(filePath);
-            if (string.IsNullOrEmpty(extension))
-            {
-                return false;
-            }
-
-            return _watch.EndFileExtensions.Any(endExt =>
-            {
-                if (string.IsNullOrWhiteSpace(endExt))
-                {
-                    return false;
-                }
-                var normalizedEndExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
-                return string.Equals(extension, normalizedEndExt, StringComparison.OrdinalIgnoreCase);
-            });
+            return FindEndFileSuffix(filePath) is not null;
         }
         catch (Exception ex)
         {
@@ -2937,8 +2968,8 @@ public class Worker : BackgroundService
     private string GetDataFileForEndFileRemote(string endFilePath)
     {
         // ENDファイルから対応するデータファイルの完全パスを取得します。
-        // ディレクトリとファイル名を分離し、拡張子を除去した上で再結合します。
-        if (string.IsNullOrEmpty(endFilePath) || _watch.EndFileExtensions == null)
+        // ディレクトリとファイル名を分離し、一致した末尾文字列だけを一度除去します。
+        if (string.IsNullOrEmpty(endFilePath))
         {
             return string.Empty;
         }
@@ -2948,44 +2979,32 @@ public class Worker : BackgroundService
             // ディレクトリとファイル名を取得
             var directory = Path.GetDirectoryName(endFilePath) ?? string.Empty;
             var fileName = Path.GetFileName(endFilePath);
-            var extension = Path.GetExtension(endFilePath);
-
-            foreach (var endExt in _watch.EndFileExtensions)
+            var suffix = FindEndFileSuffix(endFilePath);
+            if (suffix is not null && fileName.Length > suffix.Length)
             {
-                // 空白や空の拡張子はスキップ
-                if (string.IsNullOrWhiteSpace(endExt))
+                var baseName = fileName.Substring(0, fileName.Length - suffix.Length);
+                // ディレクトリと結合して完全パスを生成。セパレーターは '/' に統一
+                string fullPath;
+                if (string.IsNullOrEmpty(directory))
                 {
-                    continue;
+                    // ルートディレクトリにファイルがある場合、必ず先頭に'/'を付与
+                    fullPath = $"/{baseName}";
                 }
-
-                var normalizedEndExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
-                if (string.Equals(extension, normalizedEndExt, StringComparison.OrdinalIgnoreCase))
+                else
                 {
-                    // ファイル名からEND拡張子を除去
-                    var baseName = fileName.Substring(0, fileName.Length - normalizedEndExt.Length);
-                    // ディレクトリと結合して完全パスを生成。セパレーターは '/' に統一
-                    string fullPath;
-                    if (string.IsNullOrEmpty(directory))
+                    var trimmedDir = directory.TrimEnd(Path.DirectorySeparatorChar, '/', '\\');
+                    // ディレクトリがルート("/")の場合はそのまま、そうでなければスラッシュを付与
+                    if (trimmedDir.Length == 0 || trimmedDir == "/")
                     {
-                        // ルートディレクトリにファイルがある場合、必ず先頭に'/'を付与
                         fullPath = $"/{baseName}";
                     }
                     else
                     {
-                        var trimmedDir = directory.TrimEnd(Path.DirectorySeparatorChar, '/', '\\');
-                        // ディレクトリがルート("/")の場合はそのまま、そうでなければスラッシュを付与
-                        if (trimmedDir.Length == 0 || trimmedDir == "/")
-                        {
-                            fullPath = $"/{baseName}";
-                        }
-                        else
-                        {
-                            fullPath = $"/{trimmedDir.TrimStart('/', '\\')}/{baseName}";
-                        }
+                        fullPath = $"/{trimmedDir.TrimStart('/', '\\')}/{baseName}";
                     }
-                    // パス区切り文字を統一し返す
-                    return fullPath.Replace('\\', '/');
                 }
+                // パス区切り文字を統一し返す
+                return fullPath.Replace('\\', '/');
             }
         }
         catch (Exception ex)
@@ -3008,7 +3027,7 @@ public class Worker : BackgroundService
         }
 
         // ENDファイル拡張子が設定されていない場合
-        if (_watch.EndFileExtensions == null || _watch.EndFileExtensions.Length == 0)
+        if (_endFileSuffixes.Length == 0)
         {
             return false;
         }
@@ -3024,16 +3043,9 @@ public class Worker : BackgroundService
                 return false;
             }
 
-            foreach (var endExt in _watch.EndFileExtensions)
+            foreach (var suffix in _endFileSuffixes)
             {
-                // null または空の拡張子をスキップ
-                if (string.IsNullOrWhiteSpace(endExt))
-                {
-                    continue;
-                }
-
-                var endFileExt = endExt.StartsWith(".") ? endExt : $".{endExt}";
-                var endFileName = fileName + endFileExt;
+                var endFileName = fileName + suffix;
 
                 // リモートパスはUnix形式（/）を使用（パス正規化）
                 var normalizedDirectory = directory?.Replace('\\', '/');

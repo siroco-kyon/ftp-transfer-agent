@@ -124,7 +124,8 @@ dotnet run --project FtpTransferAgent -- --Transfer:Concurrency=4 --Hash:Algorit
 | IncludeSubfolders | bool | - | false | サブフォルダも対象にする |
 | AllowedExtensions | string[] | - | `[]` | 対象ファイルのフィルタ。拡張子（`"txt"` / `".txt"`）またはワイルドカード（`"*.txt"` / `"data_*.csv"` / `"?.log"`）を指定可能。空配列は全ファイル対象（起動時に警告）。大文字小文字は区別しない |
 | RequireEndFile | bool | - | false | 対応する END ファイルがあるデータのみ転送対象にする |
-| EndFileExtensions | string[] | - | `[".END", ".end"]` | END ファイルの拡張子一覧（ドット有無いずれも可）。**設定ファイルに記述した場合は既定値を置き換える**（追記ではない）。例えば `[".TRG"]` と書くと `.END` / `.end` は END 拡張子として扱われない |
+| EndFileSuffixes | string[] | - | `[".END"]` | END の末尾文字列指定。完全なデータファイル名にそのまま追加する（`"_end"` → `data.csv_end`）。配列は既定値を置き換える |
+| EndFileExtensions | string[] | - | 未指定 | 互換性のため使える拡張子指定。ドットがない値には補う（`"_end"` → `data.csv._end`）。`EndFileSuffixes` との同時明示は不可 |
 | TransferEndFiles | bool | - | false | データ転送の成功後に END ファイル自体も転送する |
 
 **ENDファイル機能の詳細**は [5.4](#54-end-ファイル制御) を参照してください。
@@ -315,21 +316,28 @@ dotnet run --project FtpTransferAgent -- --Transfer:Concurrency=4 --Hash:Algorit
 
 ### 5.4 END ファイル制御
 
-END ファイルは「データファイル名 + END 拡張子」（例: `data.txt.END`）で、データの転送準備完了を示すマーカーです。
+END ファイルは「完全なデータファイル名 + 末尾文字列」で、データの転送準備完了を示すマーカーです。両設定とも省略した場合は `EndFileSuffixes: [".END"]` を使います。同梱の `appsettings.json` は次の3種類に対応します。
 
-- **RequireEndFile: true**: 対応する END ファイルが存在するデータのみ転送対象にする
-- **対象方向**: アップロード（put）/ダウンロード（get）の両方で有効
-- **順序保証**: ファイル名でソートし、データファイルを先に処理する
-- **対応データのない END ファイルは転送しない**
-- **TransferEndFiles: true**: データ転送の成功後に END ファイル自体も転送する
-  - 転送先・転送元の END ファイル名は**ディスク（またはリモート一覧）上の実際の大文字小文字を保持**する。設定 `EndFileExtensions` に大文字 `.END` が含まれていても、実体が小文字 `.end` なら `.end` のまま転送される
-  - 転送成功後、ローカルの END ファイルは削除される
-  - `Cleanup.DeleteRemoteEndFiles: true` で転送先 END ファイルも削除
-- **TransferEndFiles: false**
-  - `put`: END ファイルは転送されずローカルに残る。`Cleanup.DeleteLocalSkippedEndFiles: true` を併用すると、対応データの転送成功後に END ファイルをローカルから削除する
-  - `get`: END ファイルはダウンロードされない。`Cleanup.DeleteRemoteEndFiles: true` を併用すると、**取得はせずにサーバ上の END ファイルだけを削除**する。`Cleanup.DeleteRemoteAfterDownload: true`（データを取得後にサーバから消す構成）で `DeleteRemoteEndFiles` を併用しないと、データだけが削除されて END がサーバに残り続ける。どちらも既定の `false` の場合はいずれも削除されない
-- **削除の方向**: `Cleanup.DeleteLocalSkippedEndFiles` は `put` のみ、`Cleanup.DeleteRemoteEndFiles` は転送先（`put`）/ 転送元（`get`）のリモート END に作用する
-- **セキュリティ**: 異常に長い拡張子やパス区切りを含む END 拡張子は起動時に検出
+```json
+{
+  "Watch": {
+    "RequireEndFile": true,
+    "EndFileSuffixes": [".END", ".TRG", "_end"],
+    "TransferEndFiles": true
+  }
+}
+```
+
+- `sales_tokyo.csv_end` は `sales_tokyo.csv` に対応する。途中の `_` は関係なく、拡張子の置き換えは行わない
+- 末尾文字列は大文字小文字を区別せず、実際の名前を保持する。ローカルのデータ名部分はファイルシステムの比較規則に従う
+- 配列は追記ではなく置き換え。必要な末尾文字列をすべて指定する
+- 両設定の明示や、`["_end", ".csv_end"]` のように異なる末尾が重なる指定は起動時エラー。内部既定値は明示に含めない
+
+`EndFileSuffixes` は `null` 不可。要素は1〜50文字とし、空白・制御文字・`..`・パス区切り・`*?:<>"|` は禁止。空配列 `[]` は END 関連機能がすべて無効の場合だけ許可する。
+
+互換性のため `EndFileExtensions` による拡張子指定も使える。`"_end"` はドットを補って `"._end"` と扱う。方式を切り替える場合は、別の設定ファイル・環境変数も含め、使わない側の指定を削除する。
+
+制御は put/get の両方で有効。`RequireEndFile: true` なら END があるデータのみ転送し、`TransferEndFiles: true` なら「データ → END」の順で転送する。対応データのない END は転送しない。END の削除条件は [Cleanup](#426-cleanupクリーンアップ設定) を参照。
 
 ### 5.5 整合性検証（ハッシュ）
 

@@ -14,15 +14,14 @@ using Microsoft.Extensions.Options;
 var builder = Host.CreateApplicationBuilder(args);
 
 // 設定クラスを DI コンテナに登録し、起動時に検証を行う
-// 配列は PostConfigure で明示的に置き換える。既定の配列バインドは C# 側の初期値に
-// 設定値を「追記」するため、EndFileExtensions: [".TRG"] と書いても既定の
-// ".END"/".end" が残ってしまう (指定した拡張子だけが有効にならない)。
+// 配列は PostConfigure で置き換え、設定に書いていない既定の要素が残らないようにする。
 builder.Services.AddOptions<WatchOptions>()
     .BindConfiguration("Watch")
     .PostConfigure(o =>
     {
         ConfigurationArrayBinder.ReplaceIfDeclared(builder.Configuration, "Watch:AllowedExtensions", v => o.AllowedExtensions = v);
         ConfigurationArrayBinder.ReplaceIfDeclared(builder.Configuration, "Watch:EndFileExtensions", v => o.EndFileExtensions = v);
+        ConfigurationArrayBinder.ReplaceNullableIfDeclared(builder.Configuration, "Watch:EndFileSuffixes", v => o.EndFileSuffixes = v);
     })
     .ValidateDataAnnotations().ValidateOnStart();
 builder.Services.AddOptions<TransferOptions>().BindConfiguration("Transfer").ValidateDataAnnotations().ValidateOnStart();

@@ -22,6 +22,21 @@ public static class ConfigurationArrayBinder
     /// </summary>
     public static void ReplaceIfDeclared(IConfiguration configuration, string key, Action<string[]> apply)
     {
+        ReplaceCore(configuration, key, values => apply(values ?? Array.Empty<string>()), preserveNull: false);
+    }
+
+    /// <summary>
+    /// 宣言された配列を置き換え、配列ではないスカラー値を null として通知する。
+    /// JSON provider 9 では JSON null は空文字、空配列は null として格納されるため、
+    /// null を不正設定として検証する場合は、このメソッドで両者を区別する。
+    /// </summary>
+    public static void ReplaceNullableIfDeclared(IConfiguration configuration, string key, Action<string[]?> apply)
+    {
+        ReplaceCore(configuration, key, apply, preserveNull: true);
+    }
+
+    private static void ReplaceCore(IConfiguration configuration, string key, Action<string[]?> apply, bool preserveNull)
+    {
         if (configuration is not IConfigurationRoot root)
         {
             return;
@@ -39,10 +54,11 @@ public static class ConfigurationArrayBinder
                 return;
             }
 
-            if (provider.TryGet(key, out _))
+            if (provider.TryGet(key, out var scalarValue))
             {
-                // 要素を持たずにキーだけを宣言している = 空配列
-                apply(Array.Empty<string>());
+                // JSON provider 9 の空配列は null、JSON null やその他のスカラーは文字列になる。
+                // preserveNull が false なら双方を空配列とし、true ならスカラーを null として検証へ渡す。
+                apply(preserveNull && scalarValue is not null ? null : Array.Empty<string>());
                 return;
             }
         }

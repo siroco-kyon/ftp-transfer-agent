@@ -490,8 +490,14 @@ public class ConfigurationValidator
                                     cleanup.DeleteLocalSkippedEndFiles ||
                                     cleanup.DeleteRemoteEndFiles;
 
-        // ENDファイル設定の有効性チェック
-        if (watch.RequireEndFile)
+        // 選択された方式だけを検証する。両設定の省略時は末尾文字列方式。
+        if (watch.UsesEndFileSuffixes)
+        {
+            ValidateEndFileSuffixes(watch, usesEndFileExtensions, result);
+        }
+
+        // 拡張子指定の値は、END 機能が有効な場合に検証する。
+        if (!watch.UsesEndFileSuffixes && watch.RequireEndFile)
         {
             if (watch.EndFileExtensions == null || !watch.EndFileExtensions.Any())
             {
@@ -501,7 +507,7 @@ public class ConfigurationValidator
         }
 
         var endFileExtensions = watch.EndFileExtensions;
-        if (usesEndFileExtensions && endFileExtensions is { Length: > 0 })
+        if (!watch.UsesEndFileSuffixes && usesEndFileExtensions && endFileExtensions is { Length: > 0 })
         {
             var invalidEndExtensions = endFileExtensions
                 .Where(ext => string.IsNullOrWhiteSpace(ext) ||
@@ -539,7 +545,7 @@ public class ConfigurationValidator
             result.Warnings.Add("TransferEndFiles is enabled but RequireEndFile is disabled. END files will only be transferred when their corresponding data files are also selected for transfer.");
         }
 
-        if (watch.TransferEndFiles && (watch.EndFileExtensions == null || watch.EndFileExtensions.Length == 0))
+        if (!watch.UsesEndFileSuffixes && watch.TransferEndFiles && (watch.EndFileExtensions == null || watch.EndFileExtensions.Length == 0))
         {
             result.Errors.Add("TransferEndFiles is enabled but EndFileExtensions is empty. Please specify END file extensions");
         }
@@ -568,6 +574,78 @@ public class ConfigurationValidator
             result.Warnings.Add($"BufferSizeKB={transfer.BufferSizeKB} takes effect only when the SFTP server accepts packets larger than 32KB (OpenSSH-based servers cap at 32KB)");
         }
     }
+
+    private static void ValidateEndFileSuffixes(WatchOptions watch, bool usesEndFiles, ConfigurationValidationResult result)
+    {
+        if (watch.HasExplicitEndFileExtensions && watch.HasExplicitEndFileSuffixes)
+        {
+            result.Errors.Add("EndFileExtensions and EndFileSuffixes cannot both be explicitly configured. When using EndFileSuffixes, remove EndFileExtensions and include all END suffixes in EndFileSuffixes.");
+        }
+
+        var suffixes = watch.EndFileSuffixes;
+        if (suffixes is null)
+        {
+            result.Errors.Add("EndFileSuffixes must not be null. Specify an array of END suffixes.");
+            return;
+        }
+
+        if (suffixes.Length == 0)
+        {
+            if (usesEndFiles)
+            {
+                result.Errors.Add("EndFileSuffixes must contain at least one suffix when an END file feature is enabled.");
+            }
+            return;
+        }
+
+        var invalidSuffixes = suffixes
+            .Where(suffix => !IsValidEndFileSuffix(suffix))
+            .Select(suffix => suffix is null ? "<null>" : System.Text.Json.JsonSerializer.Serialize(suffix))
+            .ToList();
+        if (invalidSuffixes.Count > 0)
+        {
+            result.Errors.Add($"Invalid EndFileSuffixes: {string.Join(", ", invalidSuffixes)}. Use literal filename suffixes of 1-50 characters without whitespace, control characters, '..', path separators, wildcards, or :<>\"|.");
+        }
+
+        // 大文字小文字違いは大小を区別するファイルシステムで別ファイルを指すため許容する。
+        var validSuffixes = suffixes.Where(IsValidEndFileSuffix).ToArray();
+        var duplicateSuffixes = validSuffixes
+            .GroupBy(suffix => suffix, StringComparer.Ordinal)
+            .Where(group => group.Count() > 1)
+            .Select(group => group.Key)
+            .ToList();
+        if (duplicateSuffixes.Count > 0)
+        {
+            result.Warnings.Add($"Duplicate EndFileSuffixes found: {string.Join(", ", duplicateSuffixes)}");
+        }
+
+        for (var first = 0; first < validSuffixes.Length; first++)
+        {
+            for (var second = first + 1; second < validSuffixes.Length; second++)
+            {
+                var firstSuffix = validSuffixes[first];
+                var secondSuffix = validSuffixes[second];
+                if (string.Equals(firstSuffix, secondSuffix, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                if (firstSuffix.EndsWith(secondSuffix, StringComparison.OrdinalIgnoreCase)
+                    || secondSuffix.EndsWith(firstSuffix, StringComparison.OrdinalIgnoreCase))
+                {
+                    result.Errors.Add($"EndFileSuffixes contains overlapping suffixes '{firstSuffix}' and '{secondSuffix}'. One suffix must not end with another because the corresponding data filename would be ambiguous.");
+                }
+            }
+        }
+    }
+
+    private static bool IsValidEndFileSuffix(string? suffix) =>
+        !string.IsNullOrEmpty(suffix)
+        && suffix.Length <= 50
+        && !suffix.Contains("..", StringComparison.Ordinal)
+        && !suffix.Any(character => char.IsWhiteSpace(character)
+                                    || char.IsControl(character)
+                                    || "/\\:*?\"<>|".Contains(character));
 
     private void ValidatePerformanceConfiguration(TransferOptions transfer, RetryOptions retry, ConfigurationValidationResult result)
     {
@@ -795,7 +873,7 @@ public class ConfigurationValidator
         }
 
         // ENDファイル機能の使用状況（null安全性を確保）
-        if (watch.TransferEndFiles && (watch.EndFileExtensions == null || watch.EndFileExtensions.Length == 0))
+        if (!watch.UsesEndFileSuffixes && watch.TransferEndFiles && (watch.EndFileExtensions == null || watch.EndFileExtensions.Length == 0))
         {
             result.Errors.Add("TransferEndFiles is enabled but no END file extensions are configured.");
         }
