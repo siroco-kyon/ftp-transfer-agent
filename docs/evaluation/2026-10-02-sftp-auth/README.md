@@ -36,7 +36,7 @@
 
 `results/trials.json`と`results/key-auth/trials.json`に全接続の結果を収録しました。`summary.json`はその集計です。`batch-smoke.json`と各通常起動ログには設定バインド・Worker・接続再利用の確認結果を保存しています。`windows-release.trx`は全451件成功、失敗0件、スキップ0件のWindows回帰テスト結果です。
 
-`results/source-hashes.json`と`results/measured-sources/`は測定に使用したソースの写しです。採取後、再実行スクリプトの再試行ログの集計式を製品ログに合わせて修正しました。収録ログを正しい集計式で再確認し、再試行0回という結果は変わっていません。
+`results/source-hashes.json`と`results/measured-sources/`は測定に使用したソースの写しです。ハッシュ照合の対象は保存した測定時点のソースです。採取後、再実行スクリプトの再試行ログの集計式を製品ログに合わせて修正しました。収録ログを正しい集計式で再確認し、再試行0回という結果は変わっていません。
 
 Docker、.NET 10、Python 3があるWindows環境で、リポジトリのルートから実行できます。
 

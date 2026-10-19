@@ -209,7 +209,8 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 | `IncludeSubfolders` | bool | 任意 | `false` | サブフォルダも対象にする |
 | `AllowedExtensions` | string[] | 任意 | `[]` | 対象ファイルのフィルタ。拡張子 (`"txt"` / `".txt"`) またはワイルドカード (`"*.txt"` / `"data_*.csv"`) を指定可能。空配列は全ファイル対象（起動時警告あり） |
 | `RequireEndFile` | bool | 任意 | `false` | 対応する END ファイルがあるデータのみ転送 |
-| `EndFileExtensions` | string[] | 任意 | `[".END", ".end"]` | END 拡張子一覧。**設定ファイルに書いた場合は既定値を置き換える**（追記ではない）。`[".TRG"]` と書けば `.END` / `.end` は END として扱われません |
+| `EndFileSuffixes` | string[] | 任意 | `[".END"]` | END の末尾文字列指定。完全なデータファイル名にそのまま追加する（`"_end"` → `data.csv_end`）。配列は既定値を置き換える |
+| `EndFileExtensions` | string[] | 任意 | 未指定 | 互換性のため使える拡張子指定。ドットがない値には補う（`"_end"` → `data.csv._end`）。`EndFileSuffixes` との同時明示は不可 |
 | `TransferEndFiles` | bool | 任意 | `false` | 対応するデータ転送の成功後に END ファイル自体も転送する |
 
 ### Transfer
@@ -334,7 +335,7 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
   "Watch": {
     "RequireEndFile": true,
     "TransferEndFiles": false,
-    "EndFileExtensions": [".END", ".TRG"]
+    "EndFileSuffixes": [".END", ".TRG"]
   },
   "Cleanup": {
     "DeleteLocalSkippedEndFiles": true
@@ -496,25 +497,28 @@ appsettings.{環境名}.json  ← DOTNET_ENVIRONMENT の値と一致するとき
 
 ## ENDファイル制御
 
-`RequireEndFile: true` の場合、`data.txt.END` のように「データファイル名 + END拡張子」が必要です。
+END ファイルは「完全なデータファイル名 + 末尾文字列」です。両設定とも省略した場合は `EndFileSuffixes: [".END"]` を使います。同梱の `appsettings.json` は次の3種類に対応します。
 
 ```json
 {
   "Watch": {
     "RequireEndFile": true,
-    "EndFileExtensions": [".END", ".TRG"],
+    "EndFileSuffixes": [".END", ".TRG", "_end"],
     "TransferEndFiles": true
   }
 }
 ```
 
-挙動:
+- `sales_tokyo.csv_end` は `sales_tokyo.csv` に対応します。途中の `_` は関係なく、拡張子の置き換えは行いません。
+- 末尾文字列は大文字小文字を区別せず、実際の名前を保持します。ローカルのデータ名部分はファイルシステムの比較規則に従います。
+- 配列は追記ではなく置き換えです。必要な末尾文字列をすべて指定してください。
+- 両設定の明示や、`["_end", ".csv_end"]` のように異なる末尾が重なる指定は起動時エラーです。内部既定値は明示に含みません。
 
-- データファイルは END 存在時のみ転送
-- `TransferEndFiles: true` のとき END ファイルも転送（転送成功後にローカルの END ファイルを削除）
-- 順序は「データ -> END」を保証
-- 対応データがない END は転送しない
-- `TransferEndFiles: false` かつ `Cleanup.DeleteLocalSkippedEndFiles: true` のとき、転送成功したデータに対応する END ファイルをローカルから削除する
+`EndFileSuffixes` は `null` 不可。要素は1〜50文字で、空白・制御文字・`..`・パス区切り・`*?:<>"|` は使えません。空配列 `[]` は END 関連機能がすべて無効の場合だけ指定できます。
+
+拡張子指定の `EndFileExtensions` も使えます。`"_end"` はドットを補って `"._end"` と扱います。方式を切り替える場合は、別の設定ファイル・環境変数も含め、使わない側の指定を削除してください。
+
+`RequireEndFile: true` なら END があるデータのみ転送します。`TransferEndFiles: true` なら「データ → END」の順で転送し、対応データのない END は転送しません。転送・削除の組み合わせは [Cleanup](#cleanup) を参照してください。
 
 ## ローカル / UNC 共有への転送（Mode=local）
 
