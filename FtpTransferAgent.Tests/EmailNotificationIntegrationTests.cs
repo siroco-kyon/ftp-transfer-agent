@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace FtpTransferAgent.Tests;
 
+[Collection("SMTP integration")]
 public class EmailNotificationIntegrationTests
 {
     private static SmtpOptions Options(TestSmtpServer server) => new()

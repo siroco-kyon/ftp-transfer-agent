@@ -132,17 +132,16 @@ public class ParallelProcessingIntegrationTests : IDisposable
         var retryOptions = new RetryOptions { MaxAttempts = 1, DelaySeconds = 1 };
         var logger = _serviceProvider.GetRequiredService<ILogger<TransferQueue>>();
         var queue = new TransferQueue(channel, retryOptions, logger, 2);
+        var slowStarted = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseSlow = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
 
         async Task DelayedHandler(TransferItem item, CancellationToken ct)
         {
-            var delay = item.Path switch
+            if (item.Path == "slow.txt")
             {
-                "quick.txt" => 100,
-                "medium.txt" => 200,
-                "slow.txt" => 500,
-                _ => 50
-            };
-            await Task.Delay(delay, ct);
+                slowStarted.TrySetResult();
+                await releaseSlow.Task.WaitAsync(ct);
+            }
         }
 
         // Act
@@ -153,15 +152,19 @@ public class ParallelProcessingIntegrationTests : IDisposable
 
         var processingTask = queue.StartAsync(DelayedHandler, CancellationToken.None);
 
-        // 少し待ってから長時間実行中のアイテムをチェック
-        await Task.Delay(150);
-        var longRunningItems = queue.GetLongRunningItems(TimeSpan.FromMilliseconds(100)).ToList();
-
-        // Assert
-        Assert.NotEmpty(longRunningItems);
-        Assert.Contains(longRunningItems, item => item.ItemKey.Contains("medium.txt") || item.ItemKey.Contains("slow.txt"));
-
-        await processingTask;
+        try
+        {
+            // 開始を確認し、検出が終わるまで対象を完了させない。負荷による再開遅延に依存しない。
+            await slowStarted.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            await Task.Delay(150);
+            var longRunningItems = queue.GetLongRunningItems(TimeSpan.FromMilliseconds(100)).ToList();
+            Assert.Contains(longRunningItems, item => item.ItemKey.Contains("slow.txt"));
+        }
+        finally
+        {
+            releaseSlow.TrySetResult();
+            await processingTask;
+        }
 
         var finalStats = queue.GetStatistics();
         Assert.Equal(3, finalStats.TotalCompleted);
