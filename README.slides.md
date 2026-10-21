@@ -142,6 +142,20 @@ dotnet run --project FtpTransferAgent
 
 ---
 
+## メール件名の設定
+
+```text
+[売上連携][実行元: APP01] 大阪FTPへ転送失敗
+```
+
+- `Smtp.JobName`: 業務名。指定すると新形式の件名に切り替わる
+- 実行元は OS ホスト名。`SourceServerName` で表示名を指定可能
+- 検証環境だけ `SubjectPrefix: "検証"` を追加
+- 転送先の表示は `DisplayName`。配信管理用の `Name` は変更しない
+- 設定例・既定値・移行方法は [エラーメールの設定と運用](docs/email-notifications.md) を参照
+
+---
+
 ## END ファイル制御
 
 - `RequireEndFile: true` の場合、対応する END があるデータだけ転送

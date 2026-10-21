@@ -7,6 +7,7 @@ using System.Text.Json;
 
 namespace FtpTransferAgent.Tests;
 
+[Collection("SMTP integration")]
 public sealed class ProgramEmailIntegrationTests
 {
     [Fact]

@@ -556,6 +556,7 @@ schtasks /create /tn "FtpTransferAgent" /sc minute /mo 5 ^
 <ol>
   <li>ジョブの終了コード（ジョブ管理基盤のアラート）</li>
   <li>エラー通知メール（SMTP 有効時）</li>
+  <li>メール件名は業務・実行元・転送先を表示可能。例: <code>[売上連携][実行元: APP01] 大阪FTPへ転送失敗</code>。設定例は <a href="user-guide.html#email-subject-settings">ユーザーガイド</a>を参照。</li>
   <li>ログファイル（<code>logs/yyyy/MM/</code> 配下）</li>
 </ol>
 

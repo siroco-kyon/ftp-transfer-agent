@@ -16,6 +16,9 @@ public class DestinationOptions
     /// </summary>
     public string? Name { get; set; }
 
+    /// <summary>メール専用の表示名。配信済み記録や重複判定のキーには使わない。</summary>
+    public string? DisplayName { get; set; }
+
     /// <summary>
     /// 転送方式。<c>ftp</c> / <c>sftp</c> は通信プロトコル、<c>local</c> はローカル / UNC
     /// (SMB 共有) のファイルシステムへの転送 (put 専用)。
