@@ -172,7 +172,7 @@ public class Worker : BackgroundService
     {
         var queueLogger = _services.GetRequiredService<ILogger<TransferQueue>>();
         var channel = CreateTransferChannel();
-        var queue = new TransferQueue(channel, _retry, queueLogger, concurrency, finalFailureEventId);
+        var queue = new TransferQueue(channel, _retry, queueLogger, concurrency, finalFailureEventId, destination);
         return new QueueContext(destination, name, channel, queue, new ClientPool());
     }
 
@@ -1299,6 +1299,13 @@ public class Worker : BackgroundService
         DeliveryTrackingContext? tracking,
         LocalCleanupGuard? cleanupGuard)
     {
+        var failedNames = results.Where(result => !result.Success).Select(result => result.DestinationName).ToHashSet(StringComparer.Ordinal);
+        var failedDestinations = GetUploadDestinations().Where(destination => failedNames.Contains(GetDestinationName(destination))).ToArray();
+        var peers = string.Join("、", failedDestinations.Select(EmailTransferContext.DisplayName));
+        using var emailScope = _logger.BeginScope(new EmailTransferContext(
+            peers.Length == 0 ? "複数宛先" : peers,
+            string.Join("、", failedDestinations.Select(EmailTransferContext.DescribeEndpoint)),
+            peers.Length == 0 ? "配信完了処理でエラー" : $"{peers}へ未配信"));
         if (tracking is null || _deliveryStore is null)
         {
             HandleFanoutCompletionAllOrNothing(
@@ -1735,6 +1742,12 @@ public class Worker : BackgroundService
         var queueContexts = CreateQueueContexts();
         var primaryQueue = GetPrimaryQueueContext(queueContexts);
 
+        // バッチ全体では接続先の情報だけを添え、監視や後処理のエラーを転送失敗と断定しない。
+        using var emailScope = _logger.BeginScope(
+            _transfer.Direction is "get" || _transfer.AdditionalDestinations is not { Count: > 0 }
+                ? EmailTransferContext.For(_transfer, _transfer.Direction is "get" ? TransferAction.Download : TransferAction.Upload) with { Summary = "転送処理でエラー" }
+                : new EmailTransferContext("複数宛先", "各宛先のログを参照", "転送処理でエラー"));
+
         // 宛先別配信トラッキング: 複数宛先 (ファンアウト) の put では常時有効化し、
         // 「未配信の宛先だけ再送」する (全宛先への一括再送は行わない)。単一宛先では
         // PerDestinationDeliveryTracking フラグで明示的に有効化したときのみ使う。
@@ -2118,6 +2131,7 @@ public class Worker : BackgroundService
             // ダウンロード処理が有効な場合はリモート一覧を取得
             if (_transfer.Direction is "get")
             {
+                using var listingEmailScope = _logger.BeginScope(EmailTransferContext.For(_transfer, TransferAction.Download));
                 // 前回の異常終了 (強制終了/電源断) で残った検証用一時ファイル (.verify./.tmp.) を掃除する。
                 // 二重起動防止ロックにより同一 watch の別インスタンスは並走しないため、ここで消すのは
                 // 必ず死んだ前回実行の残骸であり、進行中の転送を壊さない。

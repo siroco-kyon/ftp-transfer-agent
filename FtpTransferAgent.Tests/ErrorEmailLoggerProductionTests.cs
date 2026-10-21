@@ -38,11 +38,12 @@ public class ErrorEmailLoggerProductionTests
     }
 
     [Fact]
-    public void Logger_BeginScope_ShouldReturnNull()
+    public void Logger_BeginScope_ShouldSupportDisposableScopes()
     {
         var logger = CreateLogger(CreateOptions());
         var scope = InvokeBeginScope(logger, "scope");
-        Assert.Null(scope);
+        Assert.NotNull(scope);
+        scope.Dispose();
     }
 
     [Fact]

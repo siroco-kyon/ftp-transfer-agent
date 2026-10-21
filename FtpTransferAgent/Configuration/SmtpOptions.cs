@@ -21,6 +21,18 @@ public class SmtpOptions : IValidatableObject
     public string From { get; set; } = string.Empty;
     public string[] To { get; set; } = Array.Empty<string>();
 
+    /// <summary>メールに表示する業務名。件名設定がすべて空なら従来形式を維持する。</summary>
+    public string? JobName { get; set; }
+    /// <summary>件名の先頭に付ける目印。例: 検証。括弧は自動で付ける。</summary>
+    public string? SubjectPrefix { get; set; }
+    /// <summary>実行元の表示名。空の場合は OS のホスト名を使う。</summary>
+    public string? SourceServerName { get; set; }
+    /// <summary>JobName / SourceServerName / Summary を置換する件名テンプレート。</summary>
+    public string? SubjectTemplate { get; set; }
+
+    public bool UsesCustomSubject => new[] { JobName, SubjectPrefix, SourceServerName, SubjectTemplate }
+        .Any(value => !string.IsNullOrWhiteSpace(value));
+
     /// <summary>
     /// 1 回のバッチ実行で送信するエラーメールの上限。
     /// 大量エラー時のメール洪水を防ぐ。0 以下で無制限。

@@ -42,6 +42,7 @@ th,td{border:1px solid var(--line);padding:7px 11px;text-align:left;vertical-ali
 th{background:linear-gradient(180deg,#eaf6ef,#dcefe4);color:var(--green);white-space:nowrap}
 tr:nth-child(even) td{background:#f7fafc}
 td code{white-space:nowrap}
+#email-subject-settings td code{white-space:normal;overflow-wrap:anywhere}
 ul,ol{padding-left:1.6em}
 li{margin:4px 0}
 .note,.warn,.danger,.tip{border-radius:10px;padding:14px 18px;margin:16px 0;border-left:6px solid}
@@ -436,6 +437,154 @@ dotnet run --project FtpTransferAgent</code></pre>
 <tr><td><code>SuppressPerDestinationFailureDetailEmails</code></td><td>bool</td><td>任意</td><td><code>false</code></td><td>複数宛先で、個々の宛先への転送失敗の<strong>詳細メールだけ</strong>を抑制する。ファイル単位の部分配信サマリ通知・他種のエラーメールは送信され続け、ファイルログと終了コードにも影響しない</td></tr>
 </table>
 <p>エラーメールは非同期送信ですが、プロセス終了時には送信中のメールの完了を最大 15 秒待機するため、バッチ終了直前のエラー通知も失われません。</p>
+
+<div id="email-subject-settings">
+<h3>エラーメールの件名と実行元・転送先の表示</h3>
+<p>複数のサーバーに配置する場合は、業務名と実行元サーバー名を件名に表示できます。転送先・取得元が分かるエラーでは、その名前と失敗内容も表示します。本番では環境の文字を付けず、検証環境だけ接頭辞を付けられます。</p>
+<h4>最小設定と件名の例</h4>
+<p>すでに SMTP 接続・宛先を設定している場合は、<code>Smtp</code> に業務名を追加するだけで新形式に切り替わります。</p>
+<pre><code class="language-json">&quot;JobName&quot;: &quot;売上データ連携&quot;
+</code></pre>
+<p>実行元の OS ホスト名が <code>APP01</code>、失敗した転送先の <code>DisplayName</code> が「大阪FTP」の場合、件名は次のようになります。</p>
+<pre><code class="language-text">[売上データ連携][実行元: APP01] 大阪FTPへ転送失敗
+</code></pre>
+<p><code>From</code> は送信元メールアドレス、<code>RelayHost</code> はメールを中継する SMTP サーバーです。どちらもツールが動いているサーバー名ではありません。実行元には <code>SourceServerName</code> または OS ホスト名を使います。</p>
+<h4>設定例</h4>
+<p>既存の <code>appsettings.json</code> の該当箇所へ追加・変更する例です。転送先の認証情報や監視フォルダーなど、ここにない既存設定は引き続き必要です。</p>
+<pre><code class="language-json">{
+  &quot;Smtp&quot;: {
+    &quot;Enabled&quot;: true,
+    &quot;RelayHost&quot;: &quot;smtp.example.com&quot;,
+    &quot;RelayPort&quot;: 25,
+    &quot;UseTls&quot;: false,
+    &quot;From&quot;: &quot;agent@example.com&quot;,
+    &quot;To&quot;: [&quot;operations@example.com&quot;],
+    &quot;JobName&quot;: &quot;売上データ連携&quot;,
+    &quot;SubjectPrefix&quot;: &quot;&quot;,
+    &quot;SourceServerName&quot;: &quot;&quot;,
+    &quot;SubjectTemplate&quot;: &quot;[{JobName}][実行元: {SourceServerName}] {Summary}&quot;
+  },
+  &quot;Transfer&quot;: {
+    &quot;Name&quot;: &quot;primary&quot;,
+    &quot;DisplayName&quot;: &quot;大阪FTP&quot;,
+    &quot;Host&quot;: &quot;ftp-osaka.example.com&quot;,
+    &quot;AdditionalDestinations&quot;: [
+      {
+        &quot;Name&quot;: &quot;tokyo&quot;,
+        &quot;DisplayName&quot;: &quot;東京SFTP&quot;,
+        &quot;Mode&quot;: &quot;sftp&quot;,
+        &quot;Host&quot;: &quot;sftp-tokyo.example.com&quot;,
+        &quot;Port&quot;: 22
+      }
+    ]
+  }
+}
+</code></pre>
+<h4>設定項目と省略時の動作</h4>
+<table>
+<thead>
+<tr>
+<th>設定</th>
+<th>型</th>
+<th>省略・空欄の場合</th>
+<th>用途</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Smtp.JobName</code></td>
+<td>string</td>
+<td>新形式では <code>FtpTransferAgent</code></td>
+<td>業務を識別する名前</td>
+</tr>
+<tr>
+<td><code>Smtp.SubjectPrefix</code></td>
+<td>string</td>
+<td>何も付けない</td>
+<td><code>検証</code> などの目印。角括弧は自動で付くため、値には含めない</td>
+</tr>
+<tr>
+<td><code>Smtp.SourceServerName</code></td>
+<td>string</td>
+<td>OS のホスト名</td>
+<td>ツールの実行元。分かりやすい表示名で上書きできる</td>
+</tr>
+<tr>
+<td><code>Smtp.SubjectTemplate</code></td>
+<td>string</td>
+<td><code>[{JobName}][実行元: {SourceServerName}] {Summary}</code></td>
+<td>件名の並び方。新形式への切替後に適用する既定値</td>
+</tr>
+<tr>
+<td><code>Transfer.DisplayName</code></td>
+<td>string</td>
+<td><code>Name</code>、それも空なら FTP/SFTP は <code>Host</code>、local は <code>RemotePath</code></td>
+<td>メイン転送先のメール用表示名</td>
+</tr>
+<tr>
+<td><code>Transfer.AdditionalDestinations[].DisplayName</code></td>
+<td>string</td>
+<td>各宛先の <code>Name</code>、次に <code>Host</code> または <code>RemotePath</code></td>
+<td>追加転送先のメール用表示名</td>
+</tr>
+</tbody>
+</table>
+<p>4つの <code>Smtp</code> 件名設定がすべて未指定・空文字・空白のみなら、従来の <code>[ログカテゴリ] Error</code> と既存の本文を維持します。いずれかに空白以外の文字を設定すると新形式になります。<code>DisplayName</code> だけの追加では新形式に切り替わりません。<code>Smtp.Enabled: false</code> の場合はメールを送りません。</p>
+<p><code>Name</code> は配信済み状態を管理する識別子、<code>DisplayName</code> はメールに表示する名前です。表示だけを変える場合は <code>DisplayName</code> を変更してください。<code>Name</code> の変更は配信管理に影響します。<code>DisplayName</code> を変更しても配信済み記録・転送先・再送対象は変わりません。同じ表示名を複数宛先に使うと件名では区別できないため、異なる名前を推奨します。本文には接続先ホスト・ポート・パスも載ります。</p>
+<h4>検証環境と実行元の表示名</h4>
+<p>本番は <code>SubjectPrefix</code> を空欄にします。検証環境では <code>Smtp.SubjectPrefix</code> を <code>検証</code> にすると、次の件名になります。</p>
+<pre><code class="language-text">[検証][売上データ連携][実行元: TEST01] 大阪FTPへ転送失敗
+</code></pre>
+<p><code>Smtp.SourceServerName</code> を <code>大阪・連携サーバー01</code> に設定した例です。</p>
+<pre><code class="language-text">[売上データ連携][実行元: 大阪・連携サーバー01] 大阪FTPへ転送失敗
+</code></pre>
+<p>OS ホスト名を使えば、サーバーごとに実行元名を書き換える必要はありません。表示名を指定する場合は、配置先に合わせて設定してください。環境変数からは <code>Smtp__JobName</code>、<code>Smtp__SubjectPrefix</code>、<code>Smtp__SourceServerName</code>、<code>Smtp__SubjectTemplate</code> でも上書きできます。<code>DOTNET_ENVIRONMENT</code> から接頭辞を自動設定することはありません。開発用設定では <code>appsettings.Development.json</code> に接頭辞だけを上書きできます。</p>
+<h4>テンプレートと固定件名</h4>
+<p>置換できる変数は、大文字小文字も含めて <code>{JobName}</code>、<code>{SourceServerName}</code>、<code>{Summary}</code> の3つです。<code>{Summary}</code> はアプリが処理の情報から作ります。次の例のように並び順を変更できます。</p>
+<pre><code class="language-json">&quot;SubjectTemplate&quot;: &quot;{Summary} / {JobName} / {SourceServerName}&quot;
+</code></pre>
+<p>固定件名も指定できます。接頭辞を設定している場合は、固定件名にも付加します。</p>
+<pre><code class="language-json">&quot;SubjectTemplate&quot;: &quot;売上データ連携のエラー通知&quot;
+</code></pre>
+<p>表示値に含まれる変数のような文字列は再展開しません。未知の変数、不正な波括弧、改行・制御文字を含むテンプレート、1,000文字を超えるテンプレートは警告を標準エラー出力に残して標準テンプレートに戻します。テンプレートの不備だけで転送処理を止めません。</p>
+<p>表示値の改行・制御文字は空白へ置き換えます。件名は最大200文字で、超過分は末尾を <code>…</code> にして省略します。業務名・実行元・接続先・概要の詳細は本文で確認できます。テンプレートを変えても、本文の識別情報は残ります。</p>
+<h4>送信・取得・部分配信の違い</h4>
+<table>
+<thead>
+<tr>
+<th>状況</th>
+<th>件名の例</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>大阪FTPへの送信失敗</td>
+<td><code>[売上データ連携][実行元: APP01] 大阪FTPへ転送失敗</code></td>
+</tr>
+<tr>
+<td>東京SFTPからの取得失敗（<code>Direction: get</code>）</td>
+<td><code>[売上データ連携][実行元: APP01] 東京SFTPからの取得失敗</code></td>
+</tr>
+<tr>
+<td>一部の宛先へ未配信</td>
+<td><code>[売上データ連携][実行元: APP01] 大阪FTPへ未配信</code></td>
+</tr>
+<tr>
+<td>共有フォルダーへの送信失敗</td>
+<td><code>[売上データ連携][実行元: APP01] 大阪共有へ転送失敗</code></td>
+</tr>
+<tr>
+<td>宛先を特定できないエラー</td>
+<td><code>[売上データ連携][実行元: APP01] 転送処理でエラー</code></td>
+</tr>
+</tbody>
+</table>
+<p>共有フォルダーでは <code>Mode: local</code>、<code>RemotePath: "\\\\fileserver\\sales"</code> とし、<code>DisplayName: "大阪共有"</code> を指定できます。<code>get</code> の接続先は取得元を意味し、使われない <code>AdditionalDestinations</code> は件名にも使いません。複数宛先の部分配信メールには、そのファイルの未配信先を列挙します。</p>
+<p>本文の先頭には業務名・実行元・転送先または取得元・接続先・概要を表示し、続けて元のログと例外詳細を載せます。原因や対象を特定できない場合は推測せず、ログの詳細を確認できる形にします。</p>
+<h4>通知条件と移行時の確認</h4>
+<p>今回の設定は通知の表示を変えるものです。Error 以上のログに対する送信、<code>MaxEmailsPerRun</code>、<code>SuppressPerDestinationFailureDetailEmails</code>、終了時の最大15秒の送信待機は従来どおりです。再試行途中の Error も引き続き通知対象です。実行全体を1通にまとめる機能や、未配信ファイルの件数集約は行いません。起動エラーを新たに通知する機能も追加していません。</p>
+<p>移行時は、まず <code>JobName</code> と宛先の <code>DisplayName</code> を設定し、必要なら検証環境の接頭辞を追加してください。新しい件名に切り替わるため、受信側で件名を条件にしている振り分け・監視ルールも確認してください。従来の件名に戻す場合は、4つの <code>Smtp</code> 件名設定を削除するか、すべて空欄にします。</p>
+</div>
 
 <h3>Logging</h3>
 <table>

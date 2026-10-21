@@ -11,10 +11,11 @@ namespace FtpTransferAgent.Logging;
 /// 送信タスクを追跡し、Dispose 時に未完了の送信を待機することで、
 /// バッチ終了直前のエラーメールが失われないようにする。
 /// </summary>
-internal sealed class ErrorEmailLoggerProvider : ILoggerProvider
+internal sealed class ErrorEmailLoggerProvider : ILoggerProvider, ISupportExternalScope
 {
     private readonly SmtpOptions _options;
     private readonly ErrorEmailDispatcher _dispatcher;
+    private IExternalScopeProvider _scopeProvider = new LoggerExternalScopeProvider();
 
     public ErrorEmailLoggerProvider(SmtpOptions options)
     {
@@ -24,8 +25,10 @@ internal sealed class ErrorEmailLoggerProvider : ILoggerProvider
 
     public ILogger CreateLogger(string categoryName)
     {
-        return new ErrorEmailLogger(categoryName, _options, _dispatcher);
+        return new ErrorEmailLogger(categoryName, _options, _dispatcher, _scopeProvider);
     }
+
+    public void SetScopeProvider(IExternalScopeProvider scopeProvider) => _scopeProvider = scopeProvider;
 
     public void Dispose()
     {
@@ -42,15 +45,17 @@ internal sealed class ErrorEmailLoggerProvider : ILoggerProvider
 internal sealed class ErrorEmailDispatcher
 {
     private readonly SmtpOptions _options;
+    private readonly EmailMessageFormatter _formatter;
     private readonly ConcurrentDictionary<Task, byte> _pendingSends = new();
     private int _enqueuedCount;
 
     public ErrorEmailDispatcher(SmtpOptions options)
     {
         _options = options;
+        _formatter = new EmailMessageFormatter(options);
     }
 
-    public void Enqueue(string category, string message, Exception? exception)
+    public void Enqueue(string category, string message, Exception? exception, EmailTransferContext? context)
     {
         // 送信上限 (0 以下は無制限)。大量エラー時のメール洪水を防ぐ
         if (_options.MaxEmailsPerRun > 0)
@@ -67,6 +72,8 @@ internal sealed class ErrorEmailDispatcher
             }
         }
 
+        // スコープが破棄・切替される前に内容を確定し、並列宛先の情報混在を防ぐ。
+        var content = _formatter.Format(category, message, exception, context);
         var sendTask = Task.Run(async () =>
         {
             try
@@ -82,8 +89,10 @@ internal sealed class ErrorEmailDispatcher
                 using var mail = new MailMessage
                 {
                     From = new MailAddress(_options.From),
-                    Subject = $"[{category}] Error",
-                    Body = message + (exception != null ? "\n" + exception : string.Empty)
+                    Subject = content.Subject,
+                    Body = content.Body,
+                    SubjectEncoding = System.Text.Encoding.UTF8,
+                    BodyEncoding = System.Text.Encoding.UTF8
                 };
                 foreach (var to in _options.To)
                 {
@@ -129,6 +138,7 @@ internal sealed class ErrorEmailLogger : ILogger
     private readonly string _category;
     private readonly SmtpOptions _options;
     private readonly ErrorEmailDispatcher _dispatcher;
+    private readonly IExternalScopeProvider _scopeProvider;
 
     // リフレクション経由の利用 (テスト) との互換のため 2 引数コンストラクタを維持
     public ErrorEmailLogger(string category, SmtpOptions options)
@@ -137,13 +147,19 @@ internal sealed class ErrorEmailLogger : ILogger
     }
 
     public ErrorEmailLogger(string category, SmtpOptions options, ErrorEmailDispatcher dispatcher)
+        : this(category, options, dispatcher, new LoggerExternalScopeProvider())
+    {
+    }
+
+    public ErrorEmailLogger(string category, SmtpOptions options, ErrorEmailDispatcher dispatcher, IExternalScopeProvider scopeProvider)
     {
         _category = category;
         _options = options;
         _dispatcher = dispatcher;
+        _scopeProvider = scopeProvider;
     }
 
-    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
+    public IDisposable? BeginScope<TState>(TState state) where TState : notnull => _scopeProvider.Push(state);
 
     public bool IsEnabled(LogLevel logLevel) => logLevel >= LogLevel.Error;
 
@@ -163,6 +179,12 @@ internal sealed class ErrorEmailLogger : ILogger
         }
 
         var message = formatter(state, exception);
-        _dispatcher.Enqueue(_category, message, exception);
+        EmailTransferContext? context = null;
+        _scopeProvider.ForEachScope((scope, _) =>
+        {
+            if (scope is EmailTransferContext transferContext)
+                context = transferContext;
+        }, 0);
+        _dispatcher.Enqueue(_category, message, exception, context);
     }
 }

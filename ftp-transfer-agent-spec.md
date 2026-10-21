@@ -224,6 +224,26 @@ dotnet run --project FtpTransferAgent -- --Transfer:Concurrency=4 --Hash:Algorit
 
 エラーメールは非同期送信ですが、プロセス終了時に送信中メールの完了を最大 15 秒待機するため、終了直前の通知も失われません。
 
+##### 件名と表示情報
+
+`JobName`、`SubjectPrefix`、`SourceServerName`、`SubjectTemplate` のいずれかに空白以外を指定すると新形式になります。すべて未指定・空欄なら従来の件名と本文です。メール送信条件は変わりません。
+
+| 項目 | 型 | 省略時の動作 |
+|---|---|---|
+| `Smtp.JobName` | string | 新形式では `FtpTransferAgent` |
+| `Smtp.SubjectPrefix` | string | 接頭辞なし。本番の文字は自動で付けない |
+| `Smtp.SourceServerName` | string | OS ホスト名を使う |
+| `Smtp.SubjectTemplate` | string | `[{JobName}][実行元: {SourceServerName}] {Summary}` |
+| 各宛先の `DisplayName` | string | `Name` → FTP/SFTP は `Host`、local は `RemotePath` |
+
+対応変数は `{JobName}`、`{SourceServerName}`、`{Summary}` です。固定件名も指定可能です。接頭辞はテンプレートの展開後に `[値]` として付けます。値の再展開は行いません。不正な変数・波括弧・制御文字・改行、1,000文字を超えるテンプレートは標準エラー出力へ警告し、既定テンプレートに戻します。表示値の改行・制御文字は空白にし、件名は Unicode の文字単位で最大200文字に省略します。
+
+`DisplayName` はメール専用です。配信状態のキー、重複判定、転送先、再試行、終了コードには使いません。転送単位のログスコープから宛先情報を取得し、非同期送信を開始する前に件名と本文を確定します。`get` は「取得失敗」、`put` は「転送失敗」と表示します。部分配信はファイル単位の未配信先を表示し、実行全体のファイル件数は集約しません。
+
+例: `[売上データ連携][実行元: APP01] 大阪FTPへ転送失敗`。本文には業務・実行元・宛先表示名・接続先・概要と既存のログ・例外詳細を含めます。宛先を特定できない場合は一般的な概要を使います。
+
+設定例、検証環境、共有フォルダー、テンプレート変更、既存構成からの移行は [エラーメールの設定と運用](docs/email-notifications.md) を参照してください。
+
 #### 4.2.8 Logging（ログ設定）
 
 | 項目 | 型 | 必須 | 既定値 | 説明 |

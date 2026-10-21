@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Threading.Channels;
 using FtpTransferAgent.Configuration;
+using FtpTransferAgent.Logging;
 using Microsoft.Extensions.Logging;
 using Polly;
 using Polly.Retry;
@@ -24,6 +25,7 @@ public class TransferQueue
     // アイテムが最終的に失敗した際のエラーログに付与する EventId。
     // 複数宛先ファンアウトのキューでは宛先失敗を識別できるようにし、メール抑制の対象にできる。
     private readonly EventId _finalFailureEventId;
+    private readonly DestinationOptions? _destination;
     private readonly ConcurrentDictionary<string, bool> _processedItems = new();
     private readonly ConcurrentDictionary<string, DateTime> _activeItems = new();
     private readonly ConcurrentBag<Exception> _criticalExceptions = new();
@@ -32,12 +34,13 @@ public class TransferQueue
     private int _totalFailed = 0;
     private long _totalBytesTransferred = 0;
 
-    public TransferQueue(Channel<TransferItem> channel, RetryOptions options, ILogger<TransferQueue> logger, int concurrency = 1, EventId finalFailureEventId = default)
+    public TransferQueue(Channel<TransferItem> channel, RetryOptions options, ILogger<TransferQueue> logger, int concurrency = 1, EventId finalFailureEventId = default, DestinationOptions? destination = null)
     {
         _reader = channel.Reader;
         _logger = logger;
         _concurrency = Math.Max(1, Math.Min(concurrency, 16)); // 最大16に制限
         _finalFailureEventId = finalFailureEventId;
+        _destination = destination;
         // リトライ可能な例外のみリトライするポリシー
         _policy = Policy
             .Handle<Exception>(ex => RetryableExceptionClassifier.IsRetryable(ex))
@@ -89,6 +92,7 @@ public class TransferQueue
                     // 一度に一つのアイテムのみ処理して真の並列処理を実現
                     if (_reader.TryRead(out var item))
                     {
+                        using var emailScope = _logger.BeginScope(EmailTransferContext.For(item.Destination ?? _destination, item.Action));
                         // 重複処理を防ぐ（アトミックな処理保証）
                         var itemKey = item.DedupKey;
                         Interlocked.Increment(ref _totalEnqueued);
