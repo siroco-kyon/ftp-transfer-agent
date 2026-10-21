@@ -34,6 +34,7 @@ public class EmailNotificationIntegrationTests
             var logger = factory.CreateLogger("LegacyCategory");
             using var scope = logger.BeginScope(EmailTransferContext.For(new DestinationOptions { DisplayName = "大阪FTP" }, TransferAction.Upload));
             logger.LogError("従来の詳細");
+            await Task.Run(provider.Dispose);
         }
         var mail = Assert.Single(server.Messages);
         Assert.Equal("[LegacyCategory] Error", mail.Subject);
@@ -61,6 +62,7 @@ public class EmailNotificationIntegrationTests
             }, CancellationToken.None);
             Assert.Equal(12, queue.GetStatistics().TotalFailed);
             factory.CreateLogger("OutsideQueue").LogError("outside");
+            await Task.Run(provider.Dispose);
         }
 
         Assert.Equal(25, server.Messages.Count);
@@ -88,6 +90,7 @@ public class EmailNotificationIntegrationTests
             var queue = new TransferQueue(channel, new RetryOptions { MaxAttempts = 0 }, factory.CreateLogger<TransferQueue>(),
                 destination: new DestinationOptions { DisplayName = "東京SFTP", Mode = "sftp", Host = "tokyo", Port = 22 });
             await queue.StartAsync((_, _) => throw new TimeoutException("connection timed out"), CancellationToken.None);
+            await Task.Run(provider.Dispose);
         }
         var mail = Assert.Single(server.Messages);
         Assert.Equal("[検証][売上データ連携][実行元: APP01] 東京SFTPからの取得失敗", mail.Subject);
@@ -110,6 +113,7 @@ public class EmailNotificationIntegrationTests
             logger.LogError(LogEvents.MultiDestinationPartialFailure, "partial summary");
             logger.LogCritical("critical");
             logger.LogError("over limit");
+            await Task.Run(provider.Dispose);
         }
         Assert.Equal(2, server.Messages.Count);
         Assert.Contains(server.Messages, mail => mail.Body.Contains("partial summary", StringComparison.Ordinal));
@@ -131,6 +135,7 @@ public class EmailNotificationIntegrationTests
             await queue.StartAsync((_, _) => ++attempts == 1 ? Task.FromException(new TimeoutException()) : Task.CompletedTask, CancellationToken.None);
             Assert.Equal(2, attempts);
             Assert.Equal(1, queue.GetStatistics().TotalCompleted);
+            await Task.Run(provider.Dispose);
         }
         Assert.Empty(server.Messages);
     }

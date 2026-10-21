@@ -19,7 +19,8 @@ internal sealed class TestSmtpServer : IAsyncDisposable
     public TestSmtpServer()
     {
         _listener.Start(64);
-        _accept = AcceptAsync();
+        // xUnit の同時実行数が少ない環境でも、送信完了待機と受信処理を相互待機させない。
+        _accept = Task.Run(AcceptAsync);
     }
 
     private async Task AcceptAsync()
