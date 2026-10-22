@@ -602,16 +602,13 @@ public class Worker : BackgroundService
         {
             // プローブはエージェント専用ディレクトリ内に作る。Watch.Path 直下に作ると、
             // 異常終了で残った場合に put の列挙対象へ紛れ込む恐れがある
-            var probeDirectory = EnsureDownloadTempDirectory();
+            var probe = ReserveDownloadTempFile(".case-probe", CancellationToken.None);
             // 大小を変えるのはファイル名だけにする。絶対パス全体を大文字化すると、
             // 大小を区別する上位ディレクトリの下に大小を区別しないボリュームがマウント
             // されている場合 (/Volumes/share/... 等) に、対象ボリュームへ到達する前に
             // 名前解決が失敗し「区別する」と誤判定してしまう
-            var probeName = $"case-probe-{Guid.NewGuid():N}";
-            var probe = Path.Combine(probeDirectory, probeName);
-            var upper = Path.Combine(probeDirectory, probeName.ToUpperInvariant());
+            var upper = Path.Combine(Path.GetDirectoryName(probe)!, Path.GetFileName(probe).ToUpperInvariant());
             // 小文字と大文字が別名になる (= 大小を区別する) なら Ordinal
-            File.WriteAllBytes(probe, Array.Empty<byte>());
             try
             {
                 comparer = File.Exists(upper) ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal;
@@ -826,6 +823,28 @@ public class Worker : BackgroundService
         Directory.CreateDirectory(dir);
         EnsureNoReparsePointBelowWatch(dir);
         return dir;
+    }
+
+    // 空ファイルを先に確保し、利用中の親フォルダを Put の非再帰削除から守る。
+    private string ReserveDownloadTempFile(string extension, CancellationToken token)
+    {
+        while (true)
+        {
+            token.ThrowIfCancellationRequested();
+            try
+            {
+                var dir = EnsureDownloadTempDirectory();
+                var path = Path.Combine(dir, $"{Guid.NewGuid():N}{extension}");
+                using var reservation = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                return path;
+            }
+            catch (IOException ex) when ((ex is DirectoryNotFoundException or FileNotFoundException)
+                && Directory.Exists(_watch.Path))
+            {
+                // 確保前の存在確認中やファイル作成前に空フォルダが消えたら作り直す。
+                // Watch.Path 自体の消失や権限・リンクのエラーは再試行しない。
+            }
+        }
     }
 
     private void EnsureNoReparsePointBelowWatch(string targetPath)
@@ -2704,8 +2723,7 @@ public class Worker : BackgroundService
             // 検証用一時ファイルはエージェント専用の一時ディレクトリ (Watch.Path 配下) に作る。
             // localPath と同一ボリュームなので最終リネームはアトミックなまま。強制終了で残った
             // 残骸は起動時にこのディレクトリ単位で安全に掃除でき、利用者ファイルには触れない。
-            var downloadTempDir = EnsureDownloadTempDirectory();
-            var verifiedDownloadPath = Path.Combine(downloadTempDir, $"{Guid.NewGuid():N}.verify");
+            var verifiedDownloadPath = ReserveDownloadTempFile(".verify", token);
             try
             {
                 // ダウンロード実行
@@ -2740,8 +2758,7 @@ public class Worker : BackgroundService
             // ハッシュ検証なしでも、一時ファイルをエージェント専用ディレクトリに作ってから
             // localPath へアトミックに移す。これによりクライアントが作る一時ファイルも専用
             // ディレクトリ配下に収まり、強制終了時の残骸を安全に掃除できる。
-            var downloadTempDir = EnsureDownloadTempDirectory();
-            var downloadTempPath = Path.Combine(downloadTempDir, $"{Guid.NewGuid():N}.dl");
+            var downloadTempPath = ReserveDownloadTempFile(".dl", token);
             try
             {
                 await client.DownloadAsync(item.Path, downloadTempPath, token).ConfigureAwait(false);
