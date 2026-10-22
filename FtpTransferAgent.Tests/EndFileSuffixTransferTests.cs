@@ -43,7 +43,158 @@ public class EndFileSuffixTransferTests : IDisposable
         Assert.Equal(new[] { "batch.csv", "batch.csv.END" }, uploads);
         Assert.Equal("payload", await File.ReadAllTextAsync(Path.Combine(_destinationDirectory, "batch.csv")));
         Assert.Equal("ready", await File.ReadAllTextAsync(Path.Combine(_destinationDirectory, "batch.csv.END")));
-        Assert.Empty(Directory.GetFiles(_watchDirectory));
+        Assert.Empty(Directory.GetFileSystemEntries(_watchDirectory));
+    }
+
+    [Fact]
+    public async Task Put_NoFiles_RemovesEmptyTempDirectory()
+    {
+        var watch = new WatchOptions { Path = _watchDirectory };
+
+        var exitCode = await RunAsync(watch, LocalTransfer(), new CleanupOptions());
+
+        Assert.Equal(0, exitCode.Code);
+        Assert.Empty(Directory.GetFileSystemEntries(_watchDirectory));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Put_PreexistingEmptyTempDirectory_RemovesDirectoryAfterRun(bool useExtensions)
+    {
+        var tempDirectory = Path.Combine(_watchDirectory, ".ftptransferagent-tmp");
+        Directory.CreateDirectory(tempDirectory);
+        var watch = new WatchOptions { Path = _watchDirectory };
+        if (useExtensions)
+        {
+            watch.EndFileExtensions = new[] { "END" };
+        }
+
+        var exitCode = await RunAsync(watch, LocalTransfer(), new CleanupOptions());
+
+        Assert.Equal(0, exitCode.Code);
+        Assert.False(Directory.Exists(tempDirectory));
+        Assert.Empty(Directory.GetFileSystemEntries(_watchDirectory));
+    }
+
+    [Fact]
+    public async Task Put_EmptyTempCleanup_PreservesOtherDirectoriesAndExcludedUserFiles()
+    {
+        var tempDirectory = Path.Combine(_watchDirectory, ".ftptransferagent-tmp");
+        var ordinaryEmptyDirectory = Path.Combine(_watchDirectory, "archive");
+        var otherTempDirectory = Path.Combine(_watchDirectory, "tmp");
+        var lookalikeDirectory = Path.Combine(_watchDirectory, ".ftptransferagent-tmp-backup");
+        foreach (var directory in new[] { tempDirectory, ordinaryEmptyDirectory, otherTempDirectory, lookalikeDirectory })
+        {
+            Directory.CreateDirectory(directory);
+        }
+        var protectedPath = Path.Combine(lookalikeDirectory, "protected.txt");
+        var excludedPath = Path.Combine(_watchDirectory, "user.txt");
+        await File.WriteAllTextAsync(protectedPath, "protected backup");
+        await File.WriteAllTextAsync(excludedPath, "excluded user data");
+        var watch = new WatchOptions
+        {
+            Path = _watchDirectory,
+            IncludeSubfolders = true,
+            AllowedExtensions = new[] { ".csv" }
+        };
+        var uploads = new List<string>();
+
+        var exitCode = await RunAsync(watch, LocalTransfer(), new CleanupOptions(), uploads: uploads);
+
+        Assert.Equal(0, exitCode.Code);
+        Assert.Empty(uploads);
+        Assert.False(Directory.Exists(tempDirectory));
+        Assert.Equal(
+            new[] { ordinaryEmptyDirectory, otherTempDirectory, lookalikeDirectory, excludedPath }.OrderBy(path => path, StringComparer.Ordinal),
+            Directory.GetFileSystemEntries(_watchDirectory).OrderBy(path => path, StringComparer.Ordinal));
+        Assert.Empty(Directory.GetFileSystemEntries(ordinaryEmptyDirectory));
+        Assert.Empty(Directory.GetFileSystemEntries(otherTempDirectory));
+        Assert.Equal(new[] { protectedPath }, Directory.GetFileSystemEntries(lookalikeDirectory));
+        Assert.Equal("protected backup", await File.ReadAllTextAsync(protectedPath));
+        Assert.Equal("excluded user data", await File.ReadAllTextAsync(excludedPath));
+    }
+
+    [Fact]
+    public async Task Put_TempDirectoryIsExternalLink_PreservesLinkAndTargetFile()
+    {
+        var tempDirectory = Path.Combine(_watchDirectory, ".ftptransferagent-tmp");
+        var outsideDirectory = Path.Combine(_root, "outside");
+        Directory.CreateDirectory(outsideDirectory);
+        var protectedPath = Path.Combine(outsideDirectory, "protected.csv");
+        await File.WriteAllTextAsync(protectedPath, "external data");
+        try
+        {
+            try
+            {
+                TestDirectoryLink.Create(tempDirectory, outsideDirectory);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or PlatformNotSupportedException)
+            {
+                if (OperatingSystem.IsWindows()) throw;
+                Assert.Skip($"Cannot create a directory symbolic link in this environment: {ex.Message}");
+                return;
+            }
+            var watch = new WatchOptions
+            {
+                Path = _watchDirectory,
+                IncludeSubfolders = true,
+                AllowedExtensions = new[] { ".csv" }
+            };
+            var uploads = new List<string>();
+
+            var exitCode = await RunAsync(watch, LocalTransfer(), new CleanupOptions(), uploads: uploads);
+
+            Assert.Equal(0, exitCode.Code);
+            Assert.Empty(uploads);
+            Assert.Equal(new[] { tempDirectory }, Directory.GetFileSystemEntries(_watchDirectory));
+            Assert.True((File.GetAttributes(tempDirectory) & FileAttributes.ReparsePoint) != 0);
+            Assert.Equal(new[] { protectedPath }, Directory.GetFileSystemEntries(outsideDirectory));
+            Assert.Equal("external data", await File.ReadAllTextAsync(protectedPath));
+        }
+        finally
+        {
+            // リンクを先に非再帰で外し、fixture の再帰削除がリンクを扱わないようにする。
+            if (Directory.EnumerateFileSystemEntries(_watchDirectory).Contains(tempDirectory, StringComparer.Ordinal))
+            {
+                Directory.Delete(tempDirectory, recursive: false);
+            }
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Put_TempDirectoryContainsFileOrSubdirectory_PreservesAllContents(bool createSubdirectory)
+    {
+        var tempDirectory = Path.Combine(_watchDirectory, ".ftptransferagent-tmp");
+        Directory.CreateDirectory(tempDirectory);
+        var retainedPath = Path.Combine(tempDirectory, createSubdirectory ? "retained-directory" : "retained.txt");
+        if (createSubdirectory)
+        {
+            Directory.CreateDirectory(retainedPath);
+        }
+        else
+        {
+            await File.WriteAllTextAsync(retainedPath, "must stay");
+        }
+        var watch = new WatchOptions { Path = _watchDirectory, IncludeSubfolders = true };
+        var uploads = new List<string>();
+
+        var exitCode = await RunAsync(watch, LocalTransfer(), new CleanupOptions(), uploads: uploads);
+
+        Assert.Equal(0, exitCode.Code);
+        Assert.Empty(uploads);
+        Assert.True(Directory.Exists(tempDirectory));
+        Assert.Equal(new[] { retainedPath }, Directory.GetFileSystemEntries(tempDirectory));
+        if (createSubdirectory)
+        {
+            Assert.True(Directory.Exists(retainedPath));
+        }
+        else
+        {
+            Assert.Equal("must stay", await File.ReadAllTextAsync(retainedPath));
+        }
     }
 
     [Theory]
@@ -65,7 +216,7 @@ public class EndFileSuffixTransferTests : IDisposable
         Assert.Equal("ready", await File.ReadAllTextAsync(Path.Combine(_destinationDirectory, dataName + "_end")));
         Assert.False(File.Exists(Path.Combine(_destinationDirectory, dataName + "._end")));
         Assert.Equal(new[] { dataName, dataName + "_end" }, uploads);
-        Assert.Empty(Directory.GetFiles(_watchDirectory));
+        Assert.Empty(Directory.GetFileSystemEntries(_watchDirectory));
     }
 
     [Fact]
@@ -81,7 +232,7 @@ public class EndFileSuffixTransferTests : IDisposable
         Assert.Equal(0, exitCode.Code);
         Assert.Equal(new[] { "sales_001.csv", "sales_001.csv_END" }, uploads);
         Assert.Contains("sales_001.csv_END", Directory.GetFiles(_destinationDirectory).Select(Path.GetFileName));
-        Assert.Empty(Directory.GetFiles(_watchDirectory));
+        Assert.Empty(Directory.GetFileSystemEntries(_watchDirectory));
     }
 
     [Fact]
@@ -126,6 +277,7 @@ public class EndFileSuffixTransferTests : IDisposable
             It.Is<string>(path => path.EndsWith("_end", StringComparison.Ordinal)), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         Assert.Equal("payload", await File.ReadAllTextAsync(Path.Combine(_watchDirectory, "batch.csv")));
         Assert.Equal("ready", await File.ReadAllTextAsync(Path.Combine(_watchDirectory, "batch.csv_end")));
+        Assert.False(Directory.Exists(Path.Combine(_watchDirectory, ".ftptransferagent-tmp")));
     }
 
     [Fact]
@@ -176,7 +328,7 @@ public class EndFileSuffixTransferTests : IDisposable
         Assert.Contains("batch.csv.END", uploads);
         Assert.Contains("batch.csv_end", uploads);
         Assert.Equal(3, Directory.GetFiles(_destinationDirectory).Length);
-        Assert.Empty(Directory.GetFiles(_watchDirectory));
+        Assert.Empty(Directory.GetFileSystemEntries(_watchDirectory));
     }
 
     [Fact]
@@ -191,7 +343,7 @@ public class EndFileSuffixTransferTests : IDisposable
 
         Assert.Equal(0, exitCode.Code);
         Assert.Equal(new[] { "batch.csv" }, uploads);
-        Assert.Empty(Directory.GetFiles(_watchDirectory));
+        Assert.Empty(Directory.GetFileSystemEntries(_watchDirectory));
         Assert.False(File.Exists(Path.Combine(_destinationDirectory, "batch.csv_end")));
     }
 
@@ -216,7 +368,7 @@ public class EndFileSuffixTransferTests : IDisposable
             Assert.Equal("payload", await File.ReadAllTextAsync(Path.Combine(directory, "sales_end_001.csv")));
             Assert.Equal("ready", await File.ReadAllTextAsync(Path.Combine(directory, "sales_end_001.csv_end")));
         }
-        Assert.Empty(Directory.GetFiles(_watchDirectory));
+        Assert.Empty(Directory.GetFileSystemEntries(_watchDirectory));
     }
 
     [Fact]

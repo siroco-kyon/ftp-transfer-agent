@@ -38,7 +38,7 @@ public class Worker : BackgroundService
     // アップロードスナップショットの一時ルート (watch 構成ごとに分離)。トラッキング初期化時に設定。
     private string? _uploadSnapshotRootFullPath;
 
-    // ダウンロードの検証用一時ファイルを置くエージェント専用ディレクトリ名 (Watch.Path 配下)。
+    // ダウンロードの検証とファイルシステム判定で使う専用ディレクトリ名 (Watch.Path 配下)。
     // 利用者ファイルと混在させず、このディレクトリ単位で残骸を安全に掃除するために使う。
     private const string DownloadTempDirectoryName = ".ftptransferagent-tmp";
 
@@ -908,7 +908,7 @@ public class Worker : BackgroundService
             leftovers, tempDir);
     }
 
-    // 空になったダウンロード検証用一時ディレクトリを Watch.Path から取り除く。
+    // 送受信・ファイルシステム判定で共用する一時ディレクトリを、空の場合だけ取り除く。
     // 非再帰の Directory.Delete を使うため、中に何か残っていれば IOException になるだけで
     // ファイルが消えることはない (中身がある = まだ必要な残骸なので次回起動時の掃除に任せる)。
     private void TryRemoveDownloadTempDirectoryIfEmpty()
@@ -923,7 +923,7 @@ public class Worker : BackgroundService
 
             EnsureNoReparsePointBelowWatch(tempDir);
             Directory.Delete(tempDir, recursive: false);
-            _logger.LogDebug("Removed the empty download temp directory {Dir}", tempDir);
+            _logger.LogDebug("Removed the empty agent temp directory {Dir}", tempDir);
         }
         catch (Exception ex) when (ex is IOException
             or UnauthorizedAccessException
@@ -931,7 +931,7 @@ public class Worker : BackgroundService
             or InvalidOperationException)
         {
             // 中身が残っている / 別プロセスが掴んでいる等。次回起動時の掃除で回収する
-            _logger.LogDebug("Could not remove the download temp directory {Dir}: {Error}", tempDir, ex.Message);
+            _logger.LogDebug("Could not remove the agent temp directory {Dir}: {Error}", tempDir, ex.Message);
         }
     }
 
@@ -2363,12 +2363,9 @@ public class Worker : BackgroundService
                 TryDeleteDirectory(snapshotDirectory);
             }
 
-            // ダウンロードが全て終わった後なら検証用一時ディレクトリは空のはずなので、
-            // Watch.Path に空フォルダを残さないよう取り除く (中身があれば削除されない)
-            if (_transfer.Direction is "get")
-            {
-                TryRemoveDownloadTempDirectoryIfEmpty();
-            }
+            // 全ワーカー終了後、送受信・ファイルシステム判定で使った空フォルダを取り除く。
+            // 中身がある場合は非再帰の削除が失敗し、そのまま保持される。
+            TryRemoveDownloadTempDirectoryIfEmpty();
         }
 
         // 最終統計情報をログ出力
